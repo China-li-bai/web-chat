@@ -1,0 +1,279 @@
+/* 全局样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol';
+  font-size: 14px;
+  line-height: 1.5715;
+  color: rgba(0, 0, 0, 0.85);
+  background-color: #f0f2f5;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 动画效果 */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-in-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .ant-layout-sider {
+    position: fixed !important;
+    z-index: 1000;
+    height: 100vh;
+  }
+  
+  .app-content {
+    margin-left: 0 !important;
+  }
+  
+  .app-header {
+    margin-left: 0 !important;
+  }
+}
+
+/* 自定义组件样式 */
+.recording-button {
+  transition: all 0.3s ease;
+}
+
+.recording-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+}
+
+.recording-button.recording {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 77, 79, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0);
+  }
+}
+
+/* 音频波形动画 */
+.audio-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.audio-wave .bar {
+  width: 3px;
+  background: #1890ff;
+  border-radius: 2px;
+  animation: wave 1.2s ease-in-out infinite;
+}
+
+.audio-wave .bar:nth-child(1) { animation-delay: 0s; }
+.audio-wave .bar:nth-child(2) { animation-delay: 0.1s; }
+.audio-wave .bar:nth-child(3) { animation-delay: 0.2s; }
+.audio-wave .bar:nth-child(4) { animation-delay: 0.3s; }
+.audio-wave .bar:nth-child(5) { animation-delay: 0.4s; }
+
+@keyframes wave {
+  0%, 40%, 100% {
+    height: 10px;
+  }
+  20% {
+    height: 20px;
+  }
+}
+
+/* 进度条自定义样式 */
+.score-progress .ant-progress-text {
+  font-weight: bold;
+}
+
+.score-progress.excellent .ant-progress-bg {
+  background: linear-gradient(90deg, #52c41a, #73d13d);
+}
+
+.score-progress.good .ant-progress-bg {
+  background: linear-gradient(90deg, #faad14, #ffc53d);
+}
+
+.score-progress.poor .ant-progress-bg {
+  background: linear-gradient(90deg, #f5222d, #ff4d4f);
+}
+
+/* 卡片悬停效果 */
+.hover-card {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.hover-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 统计数字动画 */
+.statistic-number {
+  animation: countUp 0.8s ease-out;
+}
+
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 主题切换动画 */
+.theme-transition {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 加载状态 */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* 错误状态 */
+.error-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.error-state .error-icon {
+  font-size: 48px;
+  color: #f5222d;
+  margin-bottom: 16px;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.empty-state .empty-icon {
+  font-size: 48px;
+  color: #d9d9d9;
+  margin-bottom: 16px;
+}
+
+/* 工具提示样式 */
+.custom-tooltip {
+  max-width: 300px;
+}
+
+/* 表格样式优化 */
+.practice-table .ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 600;
+}
+
+.practice-table .ant-table-tbody > tr:hover > td {
+  background: #f5f5f5;
+}
+
+/* 日历样式 */
+.practice-calendar .ant-picker-calendar-date-value {
+  font-size: 12px;
+}
+
+.practice-calendar .ant-badge {
+  font-size: 10px;
+}
+
+/* 移动端适配 */
+@media (max-width: 576px) {
+  .ant-card {
+    margin: 8px;
+  }
+  
+  .ant-statistic-title {
+    font-size: 12px;
+  }
+  
+  .ant-statistic-content {
+    font-size: 18px;
+  }
+  
+  .recording-button {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 18px !important;
+  }
+}

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI口语练习 - 智能语音学习平台</title>
+    <meta name="description" content="基于AI的智能口语练习平台，提供发音纠正、语音评分和个性化学习方案" />
+    <meta name="keywords" content="AI口语练习,语音识别,发音纠正,英语学习,语音评分" />
+    
+    <!-- 预加载关键资源 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- 样式预加载 -->
+    <style>
+      /* 初始加载样式 */
+      #root {
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      }
+      
+      .loading-container {
+        text-align: center;
+        color: white;
+      }
+      
+      .loading-logo {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 20px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        animation: pulse 2s infinite;
+      }
+      
+      .loading-text {
+        font-size: 18px;
+        font-weight: 500;
+        margin-bottom: 10px;
+      }
+      
+      .loading-subtitle {
+        font-size: 14px;
+        opacity: 0.8;
+      }
+      
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.1);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top: 3px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <!-- 初始加载界面 -->
+      <div class="loading-container">
+        <div class="loading-logo">
+          🎤
+        </div>
+        <div class="loading-text">AI口语练习</div>
+        <div class="loading-subtitle">智能语音学习平台</div>
+        <div class="loading-spinner"></div>
+      </div>
+    </div>
+    
+    <!-- 应用脚本 -->
+    <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- 错误处理 -->
+    <script>
+      window.addEventListener('error', function(e) {
+        console.error('应用加载错误:', e.error);
+        document.getElementById('root').innerHTML = `
+          <div style="text-align: center; padding: 50px; color: #f5222d;">
+            <h2>应用加载失败</h2>
+            <p>请刷新页面重试，或检查网络连接</p>
+            <button onclick="location.reload()" style="
+              padding: 10px 20px;
+              background: #1890ff;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              margin-top: 20px;
+            ">刷新页面</button>
+          </div>
+        `;
+      });
+      
+      // 检查浏览器兼容性
+      if (!window.MediaRecorder) {
+        document.getElementById('root').innerHTML = `
+          <div style="text-align: center; padding: 50px; color: #fa8c16;">
+            <h2>浏览器不支持</h2>
+            <p>您的浏览器不支持录音功能，请使用现代浏览器（Chrome、Firefox、Safari等）</p>
+          </div>
+        `;
+      }
+    </script>
+  </body>
+</html>
