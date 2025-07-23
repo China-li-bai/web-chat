@@ -61,9 +61,13 @@ function generateStylePrompt(style, text) {
 }
 
 // 使用 Gemini 官方 SDK 进行 TTS
-export async function generateSpeechWithGemini(text, apiKey, style = 'professional') {
+export async function generateSpeechWithGemini(text, userApiKey = null, style = 'professional') {
+  // 优先从环境变量获取 API 密钥，然后使用用户设置的密钥
+  const envApiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = envApiKey || userApiKey;
+  
   if (!apiKey) {
-    throw new Error('API密鑰未配置');
+    throw new Error('API密鑰未配置，請在環境變量中設置 GEMINI_API_KEY 或在設置中配置 Gemini API 密鑰');
   }
   
   try {
@@ -74,7 +78,7 @@ export async function generateSpeechWithGemini(text, apiKey, style = 'profession
     const voiceName = selectVoiceByStyle(style, text);
     const styledPrompt = generateStylePrompt(style, text);
     
-    // 调用 Gemini TTS API
+    // 调用 Gemini TTS API - 使用正确的配置格式
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{
@@ -82,7 +86,7 @@ export async function generateSpeechWithGemini(text, apiKey, style = 'profession
           text: styledPrompt
         }]
       }],
-      generationConfig: {
+      config: {
         responseModalities: ["AUDIO"],
         speechConfig: {
           voiceConfig: {

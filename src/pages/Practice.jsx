@@ -481,15 +481,11 @@ const Practice = () => {
     try {
       message.loading({ content: '🤖 Gemini AI 語音生成中...', key: messageKey, duration: 0 });
       
-      // 检查API密钥
-      if (!aiSettings?.apiKey) {
-        throw new Error('API密鑰未配置，請在設置中配置 Gemini API 密鑰');
-      }
-      
       // 使用官方 Gemini SDK 生成语音
+      // 优先从环境变量获取 API 密钥，用户设置的密钥作为备选
       const result = await generateSpeechWithGemini(
         practiceText, 
-        aiSettings.apiKey, 
+        aiSettings?.apiKey, // 用户设置的 API 密钥作为备选
         voiceStyle
       );
       

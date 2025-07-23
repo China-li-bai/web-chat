@@ -79,8 +79,8 @@
         <p>这个页面用于测试 Gemini 官方 SDK 的语音生成功能</p>
         
         <div class="form-group">
-            <label for="apiKey">Gemini API 密钥:</label>
-            <input type="password" id="apiKey" placeholder="请输入您的 Gemini API 密钥">
+            <label for="apiKey">Gemini API 密钥 (可选，优先使用环境变量):</label>
+            <input type="password" id="apiKey" placeholder="如果环境变量未配置，请输入您的 Gemini API 密钥">
         </div>
         
         <div class="form-group">
@@ -116,11 +116,6 @@
             const statusDiv = document.getElementById('status');
             const testBtn = document.getElementById('testBtn');
             
-            if (!apiKey) {
-                showStatus('请输入 API 密钥', 'error');
-                return;
-            }
-            
             if (!text) {
                 showStatus('请输入要转换的文本', 'error');
                 return;
@@ -129,10 +124,10 @@
             try {
                 testBtn.disabled = true;
                 testBtn.textContent = '🔄 生成中...';
-                showStatus('正在使用 Gemini 官方 SDK 生成语音...', 'info');
+                showStatus('正在使用 Gemini 官方 SDK 生成语音... (优先使用环境变量中的 API 密钥)', 'info');
                 
-                // 使用 Gemini SDK 生成语音
-                const result = await generateSpeechWithGemini(text, apiKey, style);
+                // 使用 Gemini SDK 生成语音 - 优先从环境变量获取 API 密钥
+                const result = await generateSpeechWithGemini(text, apiKey || null, style);
                 
                 showStatus(`✅ 语音生成成功！使用语音: ${result.voiceName}, 风格: ${result.style}`, 'success');
                 
@@ -167,7 +162,7 @@
         }
         
         // 页面加载时的提示
-        showStatus('📝 请输入您的 Gemini API 密钥和测试文本，然后点击测试按钮', 'info');
+        showStatus('📝 请输入测试文本，然后点击测试按钮。系统将优先使用环境变量中的 API 密钥', 'info');
     </script>
 </body>
 </html>
