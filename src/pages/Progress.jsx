@@ -25,7 +25,7 @@ import {
 } from '@ant-design/icons';
 import { Line, Column, Pie } from '@ant-design/plots';
 import dayjs from 'dayjs';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;

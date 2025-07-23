@@ -8,6 +8,9 @@ const fs = require('fs');
 const FormData = require('form-data');
 const fetch = require('node-fetch');
 
+// 加載環境變量
+require('dotenv').config();
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -53,27 +56,37 @@ const upload = multer({
   }
 });
 
-// API配置 - 这里需要替换为实际的API密钥
+// API配置 - 優先從環境變量讀取，然後允許頁面配置覆蓋
 const API_CONFIG = {
   // 百度语音API配置
   baidu: {
-    appId: 'YOUR_BAIDU_APP_ID',
-    apiKey: 'YOUR_BAIDU_API_KEY',
-    secretKey: 'YOUR_BAIDU_SECRET_KEY'
+    appId: process.env.BAIDU_APP_ID || 'YOUR_BAIDU_APP_ID',
+    apiKey: process.env.BAIDU_API_KEY || 'YOUR_BAIDU_API_KEY',
+    secretKey: process.env.BAIDU_SECRET_KEY || 'YOUR_BAIDU_SECRET_KEY'
   },
   // 科大讯飞API配置
   xunfei: {
-    appId: 'YOUR_XUNFEI_APP_ID',
-    apiKey: 'YOUR_XUNFEI_API_KEY',
-    apiSecret: 'YOUR_XUNFEI_API_SECRET'
+    appId: process.env.XUNFEI_APP_ID || 'YOUR_XUNFEI_APP_ID',
+    apiKey: process.env.XUNFEI_API_KEY || 'YOUR_XUNFEI_API_KEY',
+    apiSecret: process.env.XUNFEI_API_SECRET || 'YOUR_XUNFEI_API_SECRET'
   },
   // 腾讯云API配置
   tencent: {
-    secretId: 'YOUR_TENCENT_SECRET_ID',
-    secretKey: 'YOUR_TENCENT_SECRET_KEY',
-    region: 'ap-beijing'
+    secretId: process.env.TENCENT_SECRET_ID || 'YOUR_TENCENT_SECRET_ID',
+    secretKey: process.env.TENCENT_SECRET_KEY || 'YOUR_TENCENT_SECRET_KEY',
+    region: process.env.TENCENT_REGION || 'ap-beijing'
+  },
+  // Google Gemini API配置
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || null
   }
 };
+
+// 獲取有效的API配置（環境變量優先，然後是頁面傳入的配置）
+function getEffectiveConfig(service, userConfig = {}) {
+  const defaultConfig = API_CONFIG[service] || {};
+  return { ...defaultConfig, ...userConfig };
+}
 
 // 模拟数据存储
 let practiceRecords = [];
@@ -141,11 +154,15 @@ function levenshteinDistance(str1, str2) {
 }
 
 // 百度语音识别API调用
-async function baiduSpeechToText(audioBuffer) {
+async function baiduSpeechToText(audioBuffer, config = {}) {
   try {
+    // 使用有效配置（環境變量 + 用戶配置）
+    const { apiKey, secretKey, appId } = config;
+    
+    console.log('调用百度语音识别API', { hasApiKey: !!apiKey, hasSecretKey: !!secretKey, hasAppId: !!appId });
+    
     // 这里是百度语音识别API的调用逻辑
     // 实际使用时需要替换为真实的API调用
-    console.log('调用百度语音识别API');
     
     // 模拟API响应
     return {
@@ -162,10 +179,15 @@ async function baiduSpeechToText(audioBuffer) {
 }
 
 // 科大讯飞语音合成API调用
-async function xunfeiTextToSpeech(text) {
+async function xunfeiTextToSpeech(text, config = {}) {
   try {
+    // 使用有效配置（環境變量 + 用戶配置）
+    const { apiKey, apiSecret, appId } = config;
+    
+    console.log('调用科大讯飞语音合成API:', text, { hasApiKey: !!apiKey, hasApiSecret: !!apiSecret, hasAppId: !!appId });
+    
     // 这里是科大讯飞语音合成API的调用逻辑
-    console.log('调用科大讯飞语音合成API:', text);
+    // 实际使用时需要替换为真实的API调用
     
     // 模拟API响应
     return {
@@ -190,8 +212,12 @@ app.post('/api/speech-to-text', upload.single('audio'), async (req, res) => {
       return res.status(400).json({ error: '没有上传音频文件' });
     }
     
+    // 獲取用戶配置（如果有的話）
+    const { provider = 'baidu', config = {} } = req.body;
+    const effectiveConfig = getEffectiveConfig(provider, config);
+    
     const audioBuffer = fs.readFileSync(req.file.path);
-    const result = await baiduSpeechToText(audioBuffer);
+    const result = await baiduSpeechToText(audioBuffer, effectiveConfig);
     
     // 清理临时文件
     fs.unlinkSync(req.file.path);
@@ -210,13 +236,16 @@ app.post('/api/speech-to-text', upload.single('audio'), async (req, res) => {
 // 语音合成接口
 app.post('/api/text-to-speech', async (req, res) => {
   try {
-    const { text, voice = 'female' } = req.body;
+    const { text, voice = 'female', provider = 'xunfei', config = {} } = req.body;
     
     if (!text) {
       return res.status(400).json({ error: '文本不能为空' });
     }
     
-    const result = await xunfeiTextToSpeech(text);
+    // 獲取有效配置（環境變量優先，然後是用戶配置）
+    const effectiveConfig = getEffectiveConfig(provider, config);
+    
+    const result = await xunfeiTextToSpeech(text, effectiveConfig);
     
     if (result.error) {
       return res.status(500).json({ error: result.error });
@@ -226,6 +255,105 @@ app.post('/api/text-to-speech', async (req, res) => {
   } catch (error) {
     console.error('语音合成错误:', error);
     res.status(500).json({ error: '语音合成失败' });
+  }
+});
+
+// Gemini AI 语音合成接口
+app.post('/api/gemini-tts', async (req, res) => {
+  try {
+    const { text, apiKey, voice = 'Kore', speaker, config = {} } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({ error: '文本不能为空' });
+    }
+    
+    // 使用統一的配置策略（環境變量優先，然後是用戶配置）
+    const userConfig = { apiKey, ...config };
+    const effectiveConfig = getEffectiveConfig('gemini', userConfig);
+    
+    if (!effectiveConfig.apiKey) {
+      return res.status(400).json({ error: 'API密鑰不能為空，請在請求中提供或在環境變量中配置 GEMINI_API_KEY' });
+    }
+    
+    // 構建 Gemini TTS API 請求
+    const geminiRequest = {
+      contents: [{
+        parts: [{ text: text }]
+      }],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: voice
+            }
+          }
+        }
+      }
+    };
+    
+    // 如果指定了說話者，使用多說話者配置
+    if (speaker) {
+      geminiRequest.generationConfig.speechConfig = {
+        multiSpeakerVoiceConfig: {
+          speakerVoiceConfigs: [{
+            speaker: speaker,
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voice
+              }
+            }
+          }]
+        }
+      };
+    }
+    
+    // 使用 Gemini 2.5 Flash Preview TTS 模型
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${effectiveConfig.apiKey}`;
+    
+    const response = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(geminiRequest)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini TTS API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    const geminiResult = await response.json();
+    
+    if (!geminiResult.candidates || geminiResult.candidates.length === 0) {
+      throw new Error('Gemini TTS API 沒有返回有效結果');
+    }
+    
+    // 檢查是否有音頻數據
+    const candidate = geminiResult.candidates[0];
+    if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+      throw new Error('Gemini TTS API 沒有返回音頻數據');
+    }
+    
+    const audioPart = candidate.content.parts.find(part => part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith('audio/'));
+    
+    if (!audioPart) {
+      throw new Error('Gemini TTS API 返回的數據中沒有音頻內容');
+    }
+    
+    // 返回音頻數據（Base64 編碼）
+    const result = {
+      audio: audioPart.inlineData.data,
+      mimeType: audioPart.inlineData.mimeType,
+      text: text
+    };
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('Gemini TTS 錯誤:', error);
+    res.status(500).json({ error: `Gemini語音合成失敗: ${error.message}` });
   }
 });
 

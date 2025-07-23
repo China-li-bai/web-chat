@@ -24,8 +24,10 @@ import {
   SecurityScanOutlined,
   ExportOutlined,
   ImportOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  RobotOutlined
 } from '@ant-design/icons';
+import GeminiSettings from '../components/GeminiSettings';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -310,6 +312,19 @@ const Settings = () => {
               marks={{ 0.5: '0.5x', 1.0: '1.0x', 1.5: '1.5x', 2.0: '2.0x' }}
             />
           </Form.Item>
+        </Card>
+
+        {/* Gemini AI导师设置 */}
+        <Card 
+          title={
+            <Space>
+              <RobotOutlined />
+              Gemini AI導師設置
+            </Space>
+          } 
+          style={{ marginBottom: '24px' }}
+        >
+          <GeminiSettings />
         </Card>
 
         {/* 学习设置 */}
