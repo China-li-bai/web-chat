@@ -96,6 +96,40 @@ const Practice = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const audioRef = useRef(null);
+  
+  // 请求麦克风权限函数
+  const requestMicrophonePermission = async () => {
+    try {
+      // 在 Tauri v1 中，navigator.mediaDevices 可能为 undefined
+      if (!navigator.mediaDevices) {
+        console.error('navigator.mediaDevices 不可用');
+        Modal.error({
+          title: '麦克风权限',
+          content: '在 Tauri 应用中，麦克风权限需要在系统级别授予。请确保您已在系统设置中允许此应用访问麦克风，然后重启应用。',
+        });
+        return false;
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 获取权限后立即释放资源
+      stream.getTracks().forEach(track => track.stop());
+      setMicPermission(true);
+      console.log('麦克风权限已获取');
+      return true;
+    } catch (error) {
+      console.error('无法获取麦克风权限:', error);
+      Modal.error({
+        title: '麦克风权限',
+        content: '无法访问麦克风，请在系统设置中允许此应用访问麦克风，然后重启应用。',
+      });
+      return false;
+    }
+  };
+  
+  // 组件加载时请求麦克风权限
+  useEffect(() => {
+    requestMicrophonePermission();
+  }, []);
 
   // 练习主题
   const topics = [
@@ -183,7 +217,45 @@ const Practice = () => {
 
   // 开始录音
   const startRecording = async () => {
+    // 如果之前没有获取到麦克风权限，先尝试获取
+    if (!micPermission) {
+      // 在 Tauri v1 中，navigator.mediaDevices 可能为 undefined
+      if (!navigator.mediaDevices) {
+        console.error('navigator.mediaDevices 不可用');
+        Modal.error({
+          title: '麦克风权限',
+          content: '在 Tauri 应用中，麦克风权限需要在系统级别授予。请确保您已在系统设置中允许此应用访问麦克风，然后重启应用。',
+        });
+        return;
+      }
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // 获取权限后立即释放资源
+        stream.getTracks().forEach(track => track.stop());
+        setMicPermission(true);
+        console.log('麦克风权限已获取');
+      } catch (error) {
+        console.error('无法获取麦克风权限:', error);
+        Modal.error({
+          title: '麦克风权限',
+          content: '无法访问麦克风，请在系统设置中允许此应用访问麦克风，然后重启应用。',
+        });
+        return; // 如果无法获取权限，直接返回
+      }
+    }
+    
     try {
+      // 在 Tauri v1 中，navigator.mediaDevices 可能为 undefined
+      if (!navigator.mediaDevices) {
+        console.error('navigator.mediaDevices 不可用');
+        Modal.error({
+          title: '麦克风权限',
+          content: '在 Tauri 应用中，麦克风权限需要在系统级别授予。请确保您已在系统设置中允许此应用访问麦克风，然后重启应用。',
+        });
+        return;
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
@@ -203,6 +275,7 @@ const Practice = () => {
 
       mediaRecorderRef.current.start();
       setIsRecording(true);
+      console.log('录音开始');
       
       // 只在Tauri环境中调用Tauri命令
       if (isTauriApp()) {
@@ -663,10 +736,22 @@ const Practice = () => {
                     onClick={isRecording ? stopRecording : startRecording}
                     style={{ width: '80px', height: '80px', fontSize: '24px' }}
                     loading={loading}
+                    disabled={!micPermission && !isRecording}
+                    title={!micPermission ? '请先获取麦克风权限' : ''}
                   />
                   <Text>
-                    {isRecording ? '点击停止录音' : '点击开始录音'}
+                    {isRecording ? '点击停止录音' : (micPermission ? '点击开始录音' : '麦克风权限未获取')}
                   </Text>
+                  
+                  {!micPermission && (
+                    <Button 
+                      type="dashed" 
+                      onClick={() => requestMicrophonePermission()}
+                      icon={<AudioOutlined />}
+                    >
+                      请求麦克风权限
+                    </Button>
+                  )}
                 </Space>
               </div>
 
