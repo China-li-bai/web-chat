@@ -308,16 +308,52 @@ app.post('/api/gemini-tts', async (req, res) => {
       };
     }
     
-    // 使用 Gemini 2.5 Flash Preview TTS 模型
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${effectiveConfig.apiKey}`;
+    // 使用 Gemini 代理服務或官方 API
+    const geminiProxyUrl = process.env.GEMINI_PROXY_URL || 'https://gemini.66666618.xyz';
+    const useProxy = process.env.USE_GEMINI_PROXY !== 'false'; // 默認使用代理
     
-    const response = await fetch(geminiUrl, {
+    let geminiUrl;
+    if (useProxy) {
+      // 使用代理服務
+      geminiUrl = `${geminiProxyUrl}/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${effectiveConfig.apiKey}`;
+      console.log('使用 Gemini 代理服務:', geminiProxyUrl);
+    } else {
+      // 使用官方 API
+      geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${effectiveConfig.apiKey}`;
+      console.log('使用 Gemini 官方 API');
+    }
+    
+    // 配置代理和請求選項
+    const fetchOptions = {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       },
-      body: JSON.stringify(geminiRequest)
-    });
+      body: JSON.stringify(geminiRequest),
+      timeout: 30000 // 30秒超時
+    };
+    
+    // 如果設置了代理，使用代理
+    const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.PROXY_URL;
+    if (proxyUrl) {
+      console.log('使用代理:', proxyUrl.replace(/:\/\/.*@/, '://***@')); // 隱藏認證信息
+      
+      // 動態導入 https-proxy-agent
+      try {
+        const { HttpsProxyAgent } = await import('https-proxy-agent');
+        fetchOptions.agent = new HttpsProxyAgent(proxyUrl);
+      } catch (importError) {
+        console.warn('https-proxy-agent 未安裝，嘗試使用環境變量代理');
+        // 設置環境變量，讓 Node.js 自動使用代理
+        if (!process.env.HTTPS_PROXY && !process.env.HTTP_PROXY) {
+          process.env.HTTPS_PROXY = proxyUrl;
+        }
+      }
+    }
+    
+    console.log('正在調用 Gemini TTS API...');
+    const response = await fetch(geminiUrl, fetchOptions);
     
     if (!response.ok) {
       const errorText = await response.text();
