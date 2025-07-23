@@ -90,7 +90,16 @@ const API_CONFIG = {
 // 獲取有效的API配置（環境變量優先，然後是頁面傳入的配置）
 function getEffectiveConfig(service, userConfig = {}) {
   const defaultConfig = API_CONFIG[service] || {};
-  return { ...defaultConfig, ...userConfig };
+  const result = { ...defaultConfig };
+  
+  // 只有当用户配置中的值不为 undefined 或 null 时才覆盖默认配置
+  Object.keys(userConfig).forEach(key => {
+    if (userConfig[key] !== undefined && userConfig[key] !== null) {
+      result[key] = userConfig[key];
+    }
+  });
+  
+  return result;
 }
 
 // 模拟数据存储
@@ -266,7 +275,7 @@ app.post('/api/text-to-speech', async (req, res) => {
 // Gemini AI 语音合成接口
 app.post('/api/gemini-tts', async (req, res) => {
   try {
-    const { text, apiKey, voice = 'Kore', speaker, config = {} } = req.body;
+    const { text, apiKey, voice, speaker, style, config = {} } = req.body;
     
     if (!text) {
       return res.status(400).json({ error: '文本不能为空' });
@@ -282,19 +291,69 @@ app.post('/api/gemini-tts', async (req, res) => {
       return res.status(400).json({ error: 'API密鑰不能為空，請在請求中提供或在環境變量中配置 GEMINI_API_KEY' });
     }
     
-    const API_KEY = effectiveConfig.apiKey;
+    // 根據官方文檔，可用的預構建語音選項
+    const availableVoices = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Aoede'];
+    
+    // 智能語音選擇：根據文本內容和風格選擇最適合的語音
+    let selectedVoice = voice;
+    if (!selectedVoice || !availableVoices.includes(selectedVoice)) {
+      // 根據風格和內容智能選擇語音
+      if (style === 'cheerful' || style === 'friendly') {
+        selectedVoice = 'Aoede'; // 最適合友好、愉快的語調
+      } else if (style === 'professional' || style === 'formal') {
+        selectedVoice = 'Kore'; // 專業、正式的語調
+      } else if (style === 'warm' || style === 'conversational') {
+        selectedVoice = 'Puck'; // 溫暖、對話式的語調
+      } else if (style === 'authoritative' || style === 'serious') {
+        selectedVoice = 'Charon'; // 權威、嚴肅的語調
+      } else if (style === 'dynamic' || style === 'energetic') {
+        selectedVoice = 'Fenrir'; // 動態、有活力的語調
+      } else {
+        // 默認選擇：根據文本長度和內容類型
+        if (text.length > 200) {
+          selectedVoice = 'Kore'; // 長文本使用清晰、專業的語音
+        } else if (text.includes('!') || text.includes('?')) {
+          selectedVoice = 'Aoede'; // 包含感嘆號或問號的文本使用表達力強的語音
+        } else {
+          selectedVoice = 'Puck'; // 默認使用溫暖、自然的語音
+        }
+      }
+    }
+    
+    console.log(`選擇的語音: ${selectedVoice} (原始請求: ${voice}, 風格: ${style})`);
+    
+    // 構建優化的文本提示，增強語音表現力
+    let enhancedText = text;
+    if (style) {
+      const stylePrompts = {
+        cheerful: 'Say cheerfully and with enthusiasm: ',
+        friendly: 'Say in a warm and friendly tone: ',
+        professional: 'Say in a clear and professional manner: ',
+        formal: 'Say formally and respectfully: ',
+        warm: 'Say with warmth and care: ',
+        conversational: 'Say in a natural, conversational way: ',
+        authoritative: 'Say with confidence and authority: ',
+        serious: 'Say seriously and thoughtfully: ',
+        dynamic: 'Say with energy and dynamism: ',
+        energetic: 'Say with high energy and excitement: '
+      };
+      
+      if (stylePrompts[style]) {
+        enhancedText = stylePrompts[style] + text;
+      }
+    }
     
     // 構建 Gemini TTS API 請求 - 根據官方文檔格式
     const geminiRequest = {
       contents: [{
-        parts: [{ text: text }]
+        parts: [{ text: enhancedText }]
       }],
       generationConfig: {
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
-              voiceName: voice
+              voiceName: selectedVoice
             }
           }
         }
@@ -309,7 +368,7 @@ app.post('/api/gemini-tts', async (req, res) => {
             speaker: speaker,
             voiceConfig: {
               prebuiltVoiceConfig: {
-                voiceName: voice
+                voiceName: selectedVoice
               }
             }
           }]

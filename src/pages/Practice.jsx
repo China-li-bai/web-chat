@@ -32,48 +32,12 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import AITutorFeedback from '../components/AITutorFeedback';
 import GeminiSettings from '../components/GeminiSettings';
+import { generateSpeechWithGemini, playAudioBlob } from '../utils/geminiTTS';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-// L16 PCM 轉 WAV 格式的工具函數
-const convertL16ToWav = (pcmData, sampleRate = 24000, numChannels = 1) => {
-  const bitsPerSample = 16;
-  const blockAlign = numChannels * bitsPerSample / 8;
-  const byteRate = sampleRate * blockAlign;
-  const dataSize = pcmData.length;
-  const fileSize = 36 + dataSize;
-  
-  // 創建 WAV 文件頭
-  const header = new ArrayBuffer(44);
-  const view = new DataView(header);
-  
-  // RIFF chunk descriptor
-  view.setUint32(0, 0x52494646, false); // "RIFF"
-  view.setUint32(4, fileSize, true); // file size
-  view.setUint32(8, 0x57415645, false); // "WAVE"
-  
-  // fmt sub-chunk
-  view.setUint32(12, 0x666d7420, false); // "fmt "
-  view.setUint32(16, 16, true); // sub-chunk size
-  view.setUint16(20, 1, true); // audio format (PCM)
-  view.setUint16(22, numChannels, true); // number of channels
-  view.setUint32(24, sampleRate, true); // sample rate
-  view.setUint32(28, byteRate, true); // byte rate
-  view.setUint16(32, blockAlign, true); // block align
-  view.setUint16(34, bitsPerSample, true); // bits per sample
-  
-  // data sub-chunk
-  view.setUint32(36, 0x64617461, false); // "data"
-  view.setUint32(40, dataSize, true); // data size
-  
-  // 合併頭部和音頻數據
-  const wavData = new Uint8Array(44 + dataSize);
-  wavData.set(new Uint8Array(header), 0);
-  wavData.set(pcmData, 44);
-  
-  return wavData;
-};
+
 
 const Practice = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -84,6 +48,7 @@ const Practice = () => {
   const [loading, setLoading] = useState(false);
   const [currentTopic, setCurrentTopic] = useState('日常对话');
   const [practiceText, setPracticeText] = useState('Hello, how are you today? I hope you are having a wonderful day.');
+  const [micPermission, setMicPermission] = useState(false);
   
   // AI導師相關狀態
   const [aiTutorEnabled, setAiTutorEnabled] = useState(true);
@@ -92,6 +57,9 @@ const Practice = () => {
   const [aiSettings, setAiSettings] = useState(null);
   const [generatingContent, setGeneratingContent] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState('intermediate');
+  
+  // 語音風格選擇
+  const [voiceStyle, setVoiceStyle] = useState('professional');
   
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -173,30 +141,95 @@ const Practice = () => {
 
   // 生成AI練習內容
   const generateAIPracticeContent = async () => {
-    if (!aiSettings?.apiKey) {
-      Modal.warning({
-        title: '需要配置API密鑰',
-        content: '請先在設置中配置Gemini API密鑰以使用AI生成功能。',
-      });
-      return;
-    }
-
     setGeneratingContent(true);
     try {
-      const topicKey = topics.find(t => t.label === currentTopic)?.key || 'daily';
-      const content = await invoke('generate_practice_content', {
-        topic: topicKey,
-        difficultyLevel,
-        userInterests: aiSettings.interests || []
-      });
-      
-      setPracticeText(content);
-      restart(); // 清除之前的練習結果
-      
-      Modal.success({
-        title: '內容生成成功！',
-        content: 'AI已為您生成個性化的練習內容，開始練習吧！',
-      });
+      if (isTauriApp()) {
+        // Tauri環境：使用後端API生成內容
+        const topicKey = topics.find(t => t.label === currentTopic)?.key || 'daily';
+        const content = await invoke('generate_practice_content', {
+          topic: topicKey,
+          difficultyLevel,
+          userInterests: aiSettings?.interests || []
+        });
+        
+        setPracticeText(content);
+        restart(); // 清除之前的練習結果
+        
+        Modal.success({
+          title: '內容生成成功！',
+          content: 'AI已為您生成個性化的練習內容，開始練習吧！',
+        });
+      } else {
+        // H5環境：如果有API key則可以調用後端API，否則使用預設內容
+        if (!aiSettings?.apiKey) {
+          // 沒有API key時使用預設的高質量練習內容
+          const topicKey = topics.find(t => t.label === currentTopic)?.key || 'daily';
+          const advancedTexts = {
+            daily: [
+              "Good morning! How did you sleep last night? I hope you had sweet dreams and feel refreshed today.",
+              "What are your plans for this beautiful weekend? I'm thinking of visiting the local farmers market.",
+              "The weather has been quite unpredictable lately, hasn't it? Yesterday was sunny, but today looks cloudy."
+            ],
+            business: [
+              "Let's schedule a meeting to discuss the quarterly sales report and our marketing strategy for next quarter.",
+              "I'd like to present our new product proposal to the board of directors next Tuesday morning.",
+              "Our customer satisfaction ratings have improved significantly since we implemented the new service protocols."
+            ],
+            travel: [
+              "I'm planning a trip to Europe next summer and would love to visit the historic cities of Rome and Paris.",
+              "The flight was delayed for three hours due to bad weather, but the airline provided excellent customer service.",
+              "Have you ever been to a traditional Japanese ryokan? The experience is absolutely unforgettable."
+            ],
+            academic: [
+              "The research methodology we discussed in yesterday's seminar was quite comprehensive and well-structured.",
+              "Climate change continues to be one of the most pressing environmental challenges of our generation.",
+              "The professor's lecture on quantum physics was fascinating, though admittedly quite complex to understand."
+            ]
+          };
+          
+          const texts = advancedTexts[topicKey] || advancedTexts.daily;
+          const randomText = texts[Math.floor(Math.random() * texts.length)];
+          setPracticeText(randomText);
+          restart();
+          
+          Modal.info({
+            title: '使用預設內容',
+            content: '已為您選擇高質量的練習內容。如需AI個性化生成，請在設置中配置Gemini API密鑰。',
+          });
+        } else {
+          // 有API key時可以嘗試調用後端生成（如果後端支持的話）
+          Modal.info({
+            title: '功能開發中',
+            content: 'H5環境下的AI內容生成功能正在開發中，目前為您提供精選的練習內容。',
+          });
+          
+          // 暫時使用預設內容
+          const topicKey = topics.find(t => t.label === currentTopic)?.key || 'daily';
+          const advancedTexts = {
+            daily: [
+              "Good morning! How did you sleep last night? I hope you had sweet dreams and feel refreshed today.",
+              "What are your plans for this beautiful weekend? I'm thinking of visiting the local farmers market."
+            ],
+            business: [
+              "Let's schedule a meeting to discuss the quarterly sales report and our marketing strategy for next quarter.",
+              "I'd like to present our new product proposal to the board of directors next Tuesday morning."
+            ],
+            travel: [
+              "I'm planning a trip to Europe next summer and would love to visit the historic cities of Rome and Paris.",
+              "The flight was delayed for three hours due to bad weather, but the airline provided excellent customer service."
+            ],
+            academic: [
+              "The research methodology we discussed in yesterday's seminar was quite comprehensive and well-structured.",
+              "Climate change continues to be one of the most pressing environmental challenges of our generation."
+            ]
+          };
+          
+          const texts = advancedTexts[topicKey] || advancedTexts.daily;
+          const randomText = texts[Math.floor(Math.random() * texts.length)];
+          setPracticeText(randomText);
+          restart();
+        }
+      }
     } catch (error) {
       console.error('Failed to generate content:', error);
       Modal.error({
@@ -436,165 +469,64 @@ const Practice = () => {
     }
   };
 
-  // Gemini AI 語音播放
+  // 播放Gemini示例 - 使用官方SDK
   const playGeminiExample = async () => {
-    if (isTauriApp()) {
-      try {
-        const result = await invoke('gemini_text_to_speech', { 
-          text: practiceText,
-          voice_config: { voice: 'Kore' }
-        });
-        
-        // 解析Gemini返回的音頻數據
-        const audioData = JSON.parse(result);
-        
-        if (audioData.audio && audioData.mimeType) {
-          // 處理 Gemini TTS 返回的音頻數據
-          let audioBlob;
-          
-          if (audioData.mimeType.includes('audio/L16') || audioData.mimeType.includes('pcm')) {
-            // Gemini TTS 返回 L16 PCM 格式，需要轉換為 WAV
-            const pcmData = Uint8Array.from(atob(audioData.audio), c => c.charCodeAt(0));
-            const wavData = convertL16ToWav(pcmData, 24000, 1); // 24kHz, mono
-            audioBlob = new Blob([wavData], { type: 'audio/wav' });
-          } else {
-            // 其他格式直接使用
-            audioBlob = new Blob([Uint8Array.from(atob(audioData.audio), c => c.charCodeAt(0))], {
-              type: audioData.mimeType
-            });
-          }
-          
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioUrl);
-          
-          audio.onloadstart = () => {
-            message.info('🤖 Gemini AI 語音播放中...');
-          };
-          
-          audio.onerror = (event) => {
-            console.error('Gemini語音播放錯誤:', event);
-            message.error('Gemini語音播放失敗');
-          };
-          
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            message.success('🤖 Gemini AI 語音播放完成');
-          };
-          
-          await audio.play();
-        } else {
-          throw new Error('未收到有效的音頻數據');
-        }
-        
-      } catch (error) {
-        console.error('Gemini TTS error:', error);
-        message.error('Gemini語音合成失敗: ' + error);
-      }
-    } else {
-      // H5環境下調用後端API獲取Gemini音頻
+    if (!practiceText) {
+      message.warning('请先选择练习内容');
+      return;
+    }
+
+    const messageKey = 'gemini-tts';
+    
+    try {
+      message.loading({ content: '🤖 Gemini AI 語音生成中...', key: messageKey, duration: 0 });
+      
+      // 检查API密钥
       if (!aiSettings?.apiKey) {
-        message.warning('請先在設置中配置 Gemini API 密鑰以使用 AI 語音功能');
-        return;
+        throw new Error('API密鑰未配置，請在設置中配置 Gemini API 密鑰');
       }
       
-      try {
-        message.loading('🤖 Gemini AI 正在生成語音...', 0);
-        
-        // 調用後端API獲取Gemini音頻
-        const response = await fetch('/api/gemini-tts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: practiceText,
-            apiKey: aiSettings.apiKey,
-            voice: 'Kore', // 使用 Kore 語音
-            config: {}
-          })
-        });
-        
-        message.destroy(); // 清除loading消息
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+      // 使用官方 Gemini SDK 生成语音
+      const result = await generateSpeechWithGemini(
+        practiceText, 
+        aiSettings.apiKey, 
+        voiceStyle
+      );
+      
+      message.destroy(messageKey);
+      
+      // 播放生成的音频
+      await playAudioBlob(
+        result.audioBlob,
+        () => {
+          message.info(`🤖 Gemini AI 語音播放中... (${result.voiceName} - ${result.style})`);
+        },
+        () => {
+          message.success('🤖 Gemini AI 語音播放完成');
+        },
+        (error) => {
+          console.error('語音播放錯誤:', error);
+          message.error('語音播放失敗');
         }
-        
-        const result = await response.json();
-        
-        if (result.audio && result.mimeType) {
-          // 處理 Gemini TTS 返回的音頻數據
-          let audioBlob;
-          
-          if (result.mimeType.includes('audio/L16') || result.mimeType.includes('pcm')) {
-            // Gemini TTS 返回 L16 PCM 格式，需要轉換為 WAV
-            const pcmData = Uint8Array.from(atob(result.audio), c => c.charCodeAt(0));
-            const wavData = convertL16ToWav(pcmData, 24000, 1); // 24kHz, mono
-            audioBlob = new Blob([wavData], { type: 'audio/wav' });
-          } else {
-            // 其他格式直接使用
-            audioBlob = new Blob([Uint8Array.from(atob(result.audio), c => c.charCodeAt(0))], {
-              type: result.mimeType
-            });
-          }
-          
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioUrl);
-          
-          audio.onloadstart = () => {
-            message.info('🤖 Gemini AI 語音播放中...');
-          };
-          
-          audio.onerror = (event) => {
-            console.error('語音播放錯誤:', event);
-            message.error('語音播放失敗');
-          };
-          
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            message.success('🤖 Gemini AI 語音播放完成');
-          };
-          
-          await audio.play();
-        } else {
-          throw new Error('未收到有效的音頻數據');
-        }
-        
-      } catch (error) {
-        message.destroy(); // 確保清除loading消息
-        console.error('Gemini TTS error:', error);
-        
-        // 如果API調用失敗，回退到基礎語音合成
-        message.warning('Gemini API 調用失敗，使用基礎語音合成模式');
-        
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-          
-          const utterance = new SpeechSynthesisUtterance(practiceText);
-          utterance.lang = 'en-US';
-          utterance.rate = 0.8;
-          utterance.pitch = 1.0;
-          utterance.volume = 1.0;
-          
-          const voices = window.speechSynthesis.getVoices();
-          const preferredVoices = voices.filter(voice => 
-            voice.lang.startsWith('en') && 
-            (voice.name.includes('Google') || voice.name.includes('Microsoft'))
-          );
-          
-          if (preferredVoices.length > 0) {
-            utterance.voice = preferredVoices[0];
-          }
-          
-          utterance.onstart = () => {
-            message.info('🔊 基礎語音播放中...');
-          };
-          
-          window.speechSynthesis.speak(utterance);
-        } else {
-          message.error('您的瀏覽器不支持語音播放功能');
-        }
+      );
+      
+    } catch (error) {
+      message.destroy(messageKey);
+      console.error('Gemini TTS SDK 错误:', error);
+      
+      // 根據錯誤類型給出具體的提示
+      if (error.message.includes('API密鑰')) {
+        message.error('Gemini API 密鑰無效或未配置，請在設置中配置正確的 API 密鑰');
+      } else if (error.message.includes('配額')) {
+        message.error('API 配額已用完，請稍後再試或檢查您的 Gemini API 配額');
+      } else if (error.message.includes('模型不可用')) {
+        message.error('TTS 模型暫時不可用，請稍後再試');
+      } else {
+        message.error(`Gemini TTS 生成失敗: ${error.message}`);
       }
+      
+      // 不再回退到 SpeechSynthesisUtterance，而是提示用户解决问题
+      message.info('請檢查網絡連接和 API 密鑰配置，或稍後再試');
     }
   };
 
@@ -624,7 +556,7 @@ const Practice = () => {
             AI口语练习
           </Title>
           <Space>
-            <Tooltip title="AI導師功能">
+            <Tooltip title="AI导师功能">
               <Switch
                 checked={aiTutorEnabled}
                 onChange={setAiTutorEnabled}
@@ -636,7 +568,7 @@ const Practice = () => {
               icon={<SettingOutlined />} 
               onClick={() => setShowSettings(true)}
             >
-              AI設置
+              AI设置
             </Button>
           </Space>
         </div>
@@ -664,7 +596,7 @@ const Practice = () => {
             <Col xs={24} md={12}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <div>
-                  <Text strong>難度：</Text>
+                  <Text strong>难度：</Text>
                   <Select
                     value={difficultyLevel}
                     onChange={setDifficultyLevel}
@@ -682,9 +614,8 @@ const Practice = () => {
                   icon={<BulbOutlined />}
                   onClick={generateAIPracticeContent}
                   loading={generatingContent}
-                  disabled={!aiSettings?.apiKey}
                 >
-                  AI生成內容
+                  AI生成内容
                 </Button>
               </div>
             </Col>
@@ -704,22 +635,40 @@ const Practice = () => {
                     <Paragraph style={{ fontSize: '16px', lineHeight: '1.6' }}>
                       {practiceText}
                     </Paragraph>
-                    <Space style={{ marginTop: '8px' }}>
-                      <Button 
-                        icon={<SoundOutlined />} 
-                        onClick={playExample}
-                      >
-                        播放示例
-                      </Button>
-                      <Button 
-                          type="primary"
-                          ghost
-                          icon={<ThunderboltOutlined />} 
-                          onClick={playGeminiExample}
+                    <div style={{ marginTop: '12px' }}>
+                      <div style={{ marginBottom: '8px' }}>
+                        <Text strong>语音风格：</Text>
+                        <Select
+                          value={voiceStyle}
+                          onChange={setVoiceStyle}
+                          style={{ width: 120, marginLeft: '8px' }}
+                          size="small"
                         >
-                          🤖 AI語音
+                          <Option value="professional">专业</Option>
+                          <Option value="cheerful">愉快</Option>
+                          <Option value="calm">平静</Option>
+                          <Option value="energetic">活力</Option>
+                          <Option value="friendly">友好</Option>
+                          <Option value="serious">严肃</Option>
+                        </Select>
+                      </div>
+                      <Space>
+                        <Button 
+                          icon={<SoundOutlined />} 
+                          onClick={playExample}
+                        >
+                          播放示例
                         </Button>
-                    </Space>
+                        <Button 
+                            type="primary"
+                            ghost
+                            icon={<ThunderboltOutlined />} 
+                            onClick={playGeminiExample}
+                          >
+                            🤖 AI語音
+                          </Button>
+                      </Space>
+                    </div>
                   </div>
                 }
                 type="info"
