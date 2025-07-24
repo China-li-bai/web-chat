@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const fetch = require('node-fetch');
+// 使用 Node.js 18+ 内置的 fetch API，无需额外导入
 const FormData = require('form-data');
 const fs = require('fs');
 

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini TTS SDK 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #1890ff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #40a9ff;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #f6ffed;
+            color: #52c41a;
+            border: 1px solid #b7eb8f;
+        }
+        .error {
+            background-color: #fff2f0;
+            color: #ff4d4f;
+            border: 1px solid #ffccc7;
+        }
+        .info {
+            background-color: #e6f7ff;
+            color: #1890ff;
+            border: 1px solid #91d5ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Gemini TTS SDK 测试</h1>
+        <p>这个页面用于测试 Gemini 官方 SDK 的语音生成功能</p>
+        
+        <div class="form-group">
+            <label for="apiKey">Gemini API 密钥 (可选，优先使用环境变量):</label>
+            <input type="password" id="apiKey" placeholder="如果环境变量未配置，请输入您的 Gemini API 密钥">
+        </div>
+        
+        <div class="form-group">
+            <label for="text">要转换的文本:</label>
+            <textarea id="text" rows="3" placeholder="请输入要转换为语音的文本">Hello, this is a test of Gemini text-to-speech functionality using the official SDK.</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="style">语音风格:</label>
+            <select id="style">
+                <option value="professional">专业</option>
+                <option value="cheerful">愉快</option>
+                <option value="calm">平静</option>
+                <option value="energetic">活力</option>
+                <option value="friendly">友好</option>
+                <option value="serious">严肃</option>
+            </select>
+        </div>
+        
+        <button onclick="testGeminiTTS()" id="testBtn">🎵 测试 Gemini TTS</button>
+        <button onclick="clearStatus()" id="clearBtn">🗑️ 清除状态</button>
+        
+        <div id="status"></div>
+    </div>
+
+    <script type="module">
+        import { generateSpeechWithGemini, playAudioBlob } from './src/utils/geminiTTS.js';
+        
+        window.testGeminiTTS = async function() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const text = document.getElementById('text').value.trim();
+            const style = document.getElementById('style').value;
+            const statusDiv = document.getElementById('status');
+            const testBtn = document.getElementById('testBtn');
+            
+            if (!text) {
+                showStatus('请输入要转换的文本', 'error');
+                return;
+            }
+            
+            try {
+                testBtn.disabled = true;
+                testBtn.textContent = '🔄 生成中...';
+                showStatus('正在使用 Gemini 官方 SDK 生成语音... (优先使用环境变量中的 API 密钥)', 'info');
+                
+                // 使用 Gemini SDK 生成语音 - 优先从环境变量获取 API 密钥
+                const result = await generateSpeechWithGemini(text, apiKey || null, style);
+                
+                showStatus(`✅ 语音生成成功！使用语音: ${result.voiceName}, 风格: ${result.style}`, 'success');
+                
+                // 播放音频
+                showStatus('🎵 正在播放语音...', 'info');
+                await playAudioBlob(
+                    result.audioBlob,
+                    () => console.log('开始播放'),
+                    () => showStatus('🎉 语音播放完成！Gemini SDK 集成成功！', 'success'),
+                    (error) => {
+                        console.error('播放错误:', error);
+                        showStatus('❌ 音频播放失败: ' + error.message, 'error');
+                    }
+                );
+                
+            } catch (error) {
+                console.error('Gemini TTS 错误:', error);
+                showStatus('❌ Gemini TTS 生成失败: ' + error.message, 'error');
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '🎵 测试 Gemini TTS';
+            }
+        };
+        
+        window.clearStatus = function() {
+            document.getElementById('status').innerHTML = '';
+        };
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        // 页面加载时的提示
+        showStatus('📝 请输入测试文本，然后点击测试按钮。系统将优先使用环境变量中的 API 密钥', 'info');
+    </script>
+</body>
+</html>

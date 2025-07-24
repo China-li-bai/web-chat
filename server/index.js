@@ -1,19 +1,24 @@
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const FormData = require('form-data');
-const fetch = require('node-fetch');
+import express from 'express';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import FormData from 'form-data';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
 // 加載環境變量
-require('dotenv').config();
+dotenv.config();
+
+// ES模块中获取__dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
+const io = new SocketIOServer(server, {
   cors: {
     origin: "http://localhost:1420",
     methods: ["GET", "POST"]
@@ -85,7 +90,16 @@ const API_CONFIG = {
 // 獲取有效的API配置（環境變量優先，然後是頁面傳入的配置）
 function getEffectiveConfig(service, userConfig = {}) {
   const defaultConfig = API_CONFIG[service] || {};
-  return { ...defaultConfig, ...userConfig };
+  const result = { ...defaultConfig };
+  
+  // 只有当用户配置中的值不为 undefined 或 null 时才覆盖默认配置
+  Object.keys(userConfig).forEach(key => {
+    if (userConfig[key] !== undefined && userConfig[key] !== null) {
+      result[key] = userConfig[key];
+    }
+  });
+  
+  return result;
 }
 
 // 模拟数据存储
@@ -261,7 +275,7 @@ app.post('/api/text-to-speech', async (req, res) => {
 // Gemini AI 语音合成接口
 app.post('/api/gemini-tts', async (req, res) => {
   try {
-    const { text, apiKey, voice = 'Kore', speaker, config = {} } = req.body;
+    const { text, apiKey, voice, speaker, style, config = {} } = req.body;
     
     if (!text) {
       return res.status(400).json({ error: '文本不能为空' });
@@ -271,21 +285,75 @@ app.post('/api/gemini-tts', async (req, res) => {
     const userConfig = { apiKey, ...config };
     const effectiveConfig = getEffectiveConfig('gemini', userConfig);
     
+    console.log('有效配置:', { hasApiKey: !!effectiveConfig.apiKey, apiKeyPrefix: effectiveConfig.apiKey ? effectiveConfig.apiKey.substring(0, 10) + '...' : 'null' });
+    
     if (!effectiveConfig.apiKey) {
       return res.status(400).json({ error: 'API密鑰不能為空，請在請求中提供或在環境變量中配置 GEMINI_API_KEY' });
     }
     
-    // 構建 Gemini TTS API 請求
+    // 根據官方文檔，可用的預構建語音選項
+    const availableVoices = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Aoede'];
+    
+    // 智能語音選擇：根據文本內容和風格選擇最適合的語音
+    let selectedVoice = voice;
+    if (!selectedVoice || !availableVoices.includes(selectedVoice)) {
+      // 根據風格和內容智能選擇語音
+      if (style === 'cheerful' || style === 'friendly') {
+        selectedVoice = 'Aoede'; // 最適合友好、愉快的語調
+      } else if (style === 'professional' || style === 'formal') {
+        selectedVoice = 'Kore'; // 專業、正式的語調
+      } else if (style === 'warm' || style === 'conversational') {
+        selectedVoice = 'Puck'; // 溫暖、對話式的語調
+      } else if (style === 'authoritative' || style === 'serious') {
+        selectedVoice = 'Charon'; // 權威、嚴肅的語調
+      } else if (style === 'dynamic' || style === 'energetic') {
+        selectedVoice = 'Fenrir'; // 動態、有活力的語調
+      } else {
+        // 默認選擇：根據文本長度和內容類型
+        if (text.length > 200) {
+          selectedVoice = 'Kore'; // 長文本使用清晰、專業的語音
+        } else if (text.includes('!') || text.includes('?')) {
+          selectedVoice = 'Aoede'; // 包含感嘆號或問號的文本使用表達力強的語音
+        } else {
+          selectedVoice = 'Puck'; // 默認使用溫暖、自然的語音
+        }
+      }
+    }
+    
+    console.log(`選擇的語音: ${selectedVoice} (原始請求: ${voice}, 風格: ${style})`);
+    
+    // 構建優化的文本提示，增強語音表現力
+    let enhancedText = text;
+    if (style) {
+      const stylePrompts = {
+        cheerful: 'Say cheerfully and with enthusiasm: ',
+        friendly: 'Say in a warm and friendly tone: ',
+        professional: 'Say in a clear and professional manner: ',
+        formal: 'Say formally and respectfully: ',
+        warm: 'Say with warmth and care: ',
+        conversational: 'Say in a natural, conversational way: ',
+        authoritative: 'Say with confidence and authority: ',
+        serious: 'Say seriously and thoughtfully: ',
+        dynamic: 'Say with energy and dynamism: ',
+        energetic: 'Say with high energy and excitement: '
+      };
+      
+      if (stylePrompts[style]) {
+        enhancedText = stylePrompts[style] + text;
+      }
+    }
+    
+    // 構建 Gemini TTS API 請求 - 根據官方文檔格式
     const geminiRequest = {
       contents: [{
-        parts: [{ text: text }]
+        parts: [{ text: enhancedText }]
       }],
       generationConfig: {
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
-              voiceName: voice
+              voiceName: selectedVoice
             }
           }
         }
@@ -300,13 +368,15 @@ app.post('/api/gemini-tts', async (req, res) => {
             speaker: speaker,
             voiceConfig: {
               prebuiltVoiceConfig: {
-                voiceName: voice
+                voiceName: selectedVoice
               }
             }
           }]
         }
       };
     }
+    
+    console.log('Gemini TTS 請求配置:', JSON.stringify(geminiRequest, null, 2));
     
     // 使用 Gemini 代理服務或官方 API
     const geminiProxyUrl = process.env.GEMINI_PROXY_URL || 'https://gemini.66666618.xyz';
@@ -322,6 +392,8 @@ app.post('/api/gemini-tts', async (req, res) => {
       geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${effectiveConfig.apiKey}`;
       console.log('使用 Gemini 官方 API');
     }
+    
+    console.log('使用的API URL:', geminiUrl);
     
     // 配置代理和請求選項
     const fetchOptions = {
@@ -352,44 +424,54 @@ app.post('/api/gemini-tts', async (req, res) => {
       }
     }
     
-    console.log('正在調用 Gemini TTS API...');
+    console.log('發送請求到 Gemini API...');
     const response = await fetch(geminiUrl, fetchOptions);
+    
+    console.log('API 響應狀態:', response.status);
+    console.log('API 響應頭:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Gemini TTS API error: ${response.status} ${response.statusText} - ${errorText}`);
+      console.error('Gemini API 錯誤響應:', errorText);
+      throw new Error(`Gemini API 錯誤: ${response.status} - ${errorText}`);
     }
-    
-    const geminiResult = await response.json();
-    
-    if (!geminiResult.candidates || geminiResult.candidates.length === 0) {
-      throw new Error('Gemini TTS API 沒有返回有效結果');
+
+    const data = await response.json();
+    console.log('Gemini API 響應數據結構:', JSON.stringify(data, null, 2));
+
+    // 根據官方文檔，音頻數據在 candidates[0].content.parts[0].inlineData.data
+    if (data.candidates && 
+        data.candidates[0] && 
+        data.candidates[0].content && 
+        data.candidates[0].content.parts && 
+        data.candidates[0].content.parts[0] && 
+        data.candidates[0].content.parts[0].inlineData && 
+        data.candidates[0].content.parts[0].inlineData.data) {
+      
+      const audioData = data.candidates[0].content.parts[0].inlineData.data;
+      console.log('成功獲取音頻數據，長度:', audioData.length);
+      
+      res.json({
+        success: true,
+        audioData: audioData,
+        mimeType: data.candidates[0].content.parts[0].inlineData.mimeType || 'audio/wav'
+      });
+    } else {
+      console.error('響應中未找到音頻數據:', data);
+      res.status(500).json({
+        success: false,
+        error: '響應中未找到音頻數據',
+        responseStructure: data
+      });
     }
-    
-    // 檢查是否有音頻數據
-    const candidate = geminiResult.candidates[0];
-    if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
-      throw new Error('Gemini TTS API 沒有返回音頻數據');
-    }
-    
-    const audioPart = candidate.content.parts.find(part => part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith('audio/'));
-    
-    if (!audioPart) {
-      throw new Error('Gemini TTS API 返回的數據中沒有音頻內容');
-    }
-    
-    // 返回音頻數據（Base64 編碼）
-    const result = {
-      audio: audioPart.inlineData.data,
-      mimeType: audioPart.inlineData.mimeType,
-      text: text
-    };
-    
-    res.json(result);
     
   } catch (error) {
-    console.error('Gemini TTS 錯誤:', error);
-    res.status(500).json({ error: `Gemini語音合成失敗: ${error.message}` });
+    console.error('Gemini TTS API 調用失敗:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      details: error.stack
+    });
   }
 });
 
@@ -472,6 +554,24 @@ app.get('/api/stats', (req, res) => {
   }
 });
 
+// 配置检查接口
+app.get('/api/config-check', (req, res) => {
+  try {
+    const config = {
+      geminiApiKey: process.env.GEMINI_API_KEY ? '已配置' : '未配置',
+      geminiApiKeyPrefix: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 10) + '...' : null,
+      useGeminiProxy: process.env.USE_GEMINI_PROXY !== 'false',
+      geminiProxyUrl: process.env.GEMINI_PROXY_URL || 'https://gemini.66666618.xyz',
+      nodeEnv: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || 3001
+    };
+    res.json(config);
+  } catch (error) {
+    console.error('获取配置信息错误:', error);
+    res.status(500).json({ error: '获取配置信息失败' });
+  }
+});
+
 // WebSocket连接处理
 io.on('connection', (socket) => {
   console.log('用户连接:', socket.id);
@@ -526,6 +626,14 @@ server.listen(PORT, () => {
   console.log(`🔌 WebSocket服务已启用`);
   console.log(`📁 文件上传目录: ${path.join(__dirname, 'uploads')}`);
   
+  // 显示环境变量配置状态
+  console.log(`🔑 GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? '已配置' : '未配置'}`);
+  if (process.env.GEMINI_API_KEY) {
+    console.log(`🔑 API密钥前缀: ${process.env.GEMINI_API_KEY.substring(0, 10)}...`);
+  }
+  console.log(`🌐 使用Gemini代理: ${process.env.USE_GEMINI_PROXY !== 'false' ? '是' : '否'}`);
+  console.log(`🌐 代理地址: ${process.env.GEMINI_PROXY_URL || 'https://gemini.66666618.xyz'}`);
+  
   // 创建必要的目录
   const uploadsDir = path.join(__dirname, 'uploads');
   if (!fs.existsSync(uploadsDir)) {
@@ -550,5 +658,3 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
-
-module.exports = app;
