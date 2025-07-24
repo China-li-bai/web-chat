@@ -84,6 +84,7 @@ const Practice = () => {
   const [loading, setLoading] = useState(false);
   const [currentTopic, setCurrentTopic] = useState('日常对话');
   const [practiceText, setPracticeText] = useState('Hello, how are you today? I hope you are having a wonderful day.');
+  const [micPermission, setMicPermission] = useState(false);
   
   // AI導師相關狀態
   const [aiTutorEnabled, setAiTutorEnabled] = useState(true);
