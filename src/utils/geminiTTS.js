@@ -63,7 +63,7 @@ function generateStylePrompt(style, text) {
 // 使用 Gemini 官方 SDK 进行 TTS
 export async function generateSpeechWithGemini(text, userApiKey = null, style = 'professional') {
   // 优先从环境变量获取 API 密钥，然后使用用户设置的密钥
-  const envApiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  const envApiKey = import.meta.env.VITE_GEMINI_API_KEY;
   const apiKey = envApiKey || userApiKey;
   
   if (!apiKey) {
