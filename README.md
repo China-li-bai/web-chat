@@ -7,17 +7,16 @@
 ## 技术架构
 
 ### 前端技术栈
-- **框架**: Tauri + React/Vue.js
-- **UI库**: Ant Design / Element Plus
-- **状态管理**: Redux/Zustand 或 Pinia
+- **框架**: Tauri + React
+- **UI库**: Ant Design
+- **状态管理**: Zustand
 - **音频处理**: Web Audio API + MediaRecorder API
 - **实时通信**: WebSocket
+- **Database**: wa-sqlite (local-first approach)
 
 ### 后端技术栈
-- **框架**: Node.js + Express 或 Python + FastAPI
-- **数据库**: PostgreSQL + Redis
-- **消息队列**: Redis/RabbitMQ
-- **容器化**: Docker
+- **框架**: Node.js + Express
+
 
 ### AI服务集成
 
@@ -36,9 +35,6 @@
 
 #### 发音评分
 **开源方案**:
-1. **SpeechOcean762** - 免费的发音评分数据集
-2. **SpeechSuper API** - 专业的发音评估API
-3. **自研方案** - 基于深度学习的发音评分模型
 
 ## 核心功能模块
 
@@ -66,8 +62,7 @@
 3. **AI对话**: 
    - 开源LLM: ChatGLM、Qwen
    - 或使用通义千问API（低成本）
-4. **服务器**: 阿里云/腾讯云轻量应用服务器
-5. **CDN**: 七牛云/又拍云（有免费额度）
+
 
 ### 开源技术栈
 
@@ -77,48 +72,18 @@
    - ESPnet (端到端语音处理)
 
 2. **发音评分**:
-   - 基于SpeechOcean762数据集训练模型
-   - 使用pronunciation-corrector开源项目
 
 3. **前端框架**: 
    - Tauri (跨平台桌面应用)
    - React/Vue.js (Web界面)
 
-## 部署方案
 
-### 开发环境
-```bash
-# 前端 (Tauri + React)
-npm create tauri-app
-npm install
 
-# 后端 (Node.js)
-npm init
-npm install express socket.io
 
-# AI服务
-pip install openai requests
-```
 
-### 生产环境
-- **容器化**: Docker + Docker Compose
-- **负载均衡**: Nginx
-- **监控**: Prometheus + Grafana
-- **日志**: ELK Stack
 
-## 成本估算
 
-### 初期（1000用户/月）
-- 服务器: ¥200/月
-- 语音API: ¥300/月
-- CDN: ¥50/月
-- **总计**: ¥550/月
 
-### 扩展期（10000用户/月）
-- 服务器: ¥800/月
-- 语音API: ¥2000/月
-- CDN: ¥200/月
-- **总计**: ¥3000/月
 
 ## 开发计划
 

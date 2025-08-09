@@ -1,7 +1,32 @@
 const crypto = require('crypto');
-// 使用 Node.js 18+ 内置的 fetch API，无需额外导入
-const FormData = require('form-data');
-const fs = require('fs');
+const fetch = require('node-fetch');
+
+// 语音服务提供商枚举
+const PROVIDERS = {
+  BAIDU: 'baidu',
+  XUNFEI: 'xunfei',
+  TENCENT: 'tencent',
+  GEMINI: 'gemini'
+};
+
+// 可用的 Gemini 语音选项
+const GEMINI_VOICES = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Aoede'];
+
+// 语音风格映射
+const VOICE_STYLES = {
+  cheerful: 'Say cheerfully and with enthusiasm: ',
+  friendly: 'Say in a warm and friendly tone: ',
+  professional: 'Say in a clear and professional manner: ',
+  formal: 'Say formally and respectfully: ',
+  warm: 'Say with warmth and care: ',
+  conversational: 'Say in a natural, conversational way: ',
+  authoritative: 'Say with confidence and authority: ',
+  serious: 'Say seriously and thoughtfully: ',
+  dynamic: 'Say with energy and dynamism: ',
+  energetic: 'Say with high energy and excitement: '
+};
+
+
 
 /**
  * 语音服务集成模块
@@ -480,4 +505,12 @@ class SpeechServices {
   }
 }
 
+// 支持 ES 模块导入
+export default SpeechServices;
+
+// 同时支持 CommonJS 导入（向后兼容）
 module.exports = SpeechServices;
+module.exports.default = SpeechServices;
+module.exports.PROVIDERS = PROVIDERS;
+module.exports.GEMINI_VOICES = GEMINI_VOICES;
+module.exports.VOICE_STYLES = VOICE_STYLES;
