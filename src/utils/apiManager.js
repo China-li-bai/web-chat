@@ -28,216 +28,12 @@ export const API_TYPES = {
   BACKEND: 'backend'
 };
 
-// 緩存配置
-const CACHE_CONFIG = {
-  PREFIX: 'gemini_tts_cache_',
-  EXPIRY_HOURS: 24*30, // 緩存30天
-  MAX_CACHE_SIZE: 50000, // 最多緩存50000個音頻文件
-  STORAGE_KEY: 'gemini_tts_cache_index'
-};
-
 // API 管理器類
 export class APIManager {
   constructor() {
     this.userApiKey = null;
     this.envApiKey = import.meta.env.VITE_GEMINI_API_KEY;
     this.backendUrl = 'http://localhost:3001';
-    this.cacheEnabled = true;
-    
-    // 初始化緩存
-    this._initCache();
-  }
-
-  /**
-   * 初始化緩存系統
-   * @private
-   */
-  _initCache() {
-    try {
-      // 清理過期緩存
-      this._cleanExpiredCache();
-    } catch (error) {
-      console.warn('緩存初始化失敗:', error);
-    }
-  }
-
-  /**
-   * 生成緩存鍵
-   * @private
-   * @param {string} text - 文本內容
-   * @param {string} style - 語音風格
-   * @param {string} apiType - API類型
-   * @returns {string} 緩存鍵
-   */
-  _generateCacheKey(text, style, apiType) {
-    // 使用文本、風格和API類型生成唯一鍵
-    const content = `${text}_${style}_${apiType}`;
-    // 簡單的哈希函數
-    let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-      const char = content.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // 轉換為32位整數
-    }
-    return `${CACHE_CONFIG.PREFIX}${Math.abs(hash)}`;
-  }
-
-  /**
-   * 從緩存獲取音頻數據
-   * @private
-   * @param {string} cacheKey - 緩存鍵
-   * @returns {Object|null} 緩存的音頻數據
-   */
-  _getCachedAudio(cacheKey) {
-    try {
-      const cachedData = localStorage.getItem(cacheKey);
-      if (!cachedData) return null;
-
-      const parsed = JSON.parse(cachedData);
-      const now = Date.now();
-      
-      // 檢查是否過期
-      if (now > parsed.expiry) {
-        localStorage.removeItem(cacheKey);
-        this._removeCacheIndex(cacheKey);
-        return null;
-      }
-
-      // 將base64轉換回Blob
-      const audioData = Uint8Array.from(atob(parsed.audioData), c => c.charCodeAt(0));
-      const audioBlob = new Blob([audioData], { type: parsed.mimeType });
-
-      return {
-        audioBlob,
-        mimeType: parsed.mimeType,
-        voiceName: parsed.voiceName,
-        style: parsed.style,
-        source: parsed.source + '_cached'
-      };
-    } catch (error) {
-      console.warn('讀取緩存失敗:', error);
-      return null;
-    }
-  }
-
-  /**
-   * 緩存音頻數據
-   * @private
-   * @param {string} cacheKey - 緩存鍵
-   * @param {Object} audioResult - 音頻結果
-   */
-  async _cacheAudio(cacheKey, audioResult) {
-    try {
-      // 檢查緩存大小限制
-      await this._ensureCacheSize();
-
-      // 將Blob轉換為base64
-      const arrayBuffer = await audioResult.audioBlob.arrayBuffer();
-      const audioData = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-      const cacheData = {
-        audioData,
-        mimeType: audioResult.mimeType,
-        voiceName: audioResult.voiceName,
-        style: audioResult.style,
-        source: audioResult.source,
-        timestamp: Date.now(),
-        expiry: Date.now() + (CACHE_CONFIG.EXPIRY_HOURS * 60 * 60 * 1000)
-      };
-
-      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-      this._addCacheIndex(cacheKey);
-      
-      console.log(`音頻已緩存: ${cacheKey}`);
-    } catch (error) {
-      console.warn('緩存音頻失敗:', error);
-    }
-  }
-
-  /**
-   * 獲取緩存索引
-   * @private
-   * @returns {Array} 緩存鍵列表
-   */
-  _getCacheIndex() {
-    try {
-      const index = localStorage.getItem(CACHE_CONFIG.STORAGE_KEY);
-      return index ? JSON.parse(index) : [];
-    } catch (error) {
-      return [];
-    }
-  }
-
-  /**
-   * 添加緩存索引
-   * @private
-   * @param {string} cacheKey - 緩存鍵
-   */
-  _addCacheIndex(cacheKey) {
-    const index = this._getCacheIndex();
-    if (!index.includes(cacheKey)) {
-      index.push(cacheKey);
-      localStorage.setItem(CACHE_CONFIG.STORAGE_KEY, JSON.stringify(index));
-    }
-  }
-
-  /**
-   * 移除緩存索引
-   * @private
-   * @param {string} cacheKey - 緩存鍵
-   */
-  _removeCacheIndex(cacheKey) {
-    const index = this._getCacheIndex();
-    const newIndex = index.filter(key => key !== cacheKey);
-    localStorage.setItem(CACHE_CONFIG.STORAGE_KEY, JSON.stringify(newIndex));
-  }
-
-  /**
-   * 確保緩存大小不超過限制
-   * @private
-   */
-  async _ensureCacheSize() {
-    const index = this._getCacheIndex();
-    if (index.length >= CACHE_CONFIG.MAX_CACHE_SIZE) {
-      // 移除最舊的緩存項
-      const oldestKey = index[0];
-      localStorage.removeItem(oldestKey);
-      this._removeCacheIndex(oldestKey);
-      console.log(`移除舊緩存: ${oldestKey}`);
-    }
-  }
-
-  /**
-   * 清理過期緩存
-   * @private
-   */
-  _cleanExpiredCache() {
-    const index = this._getCacheIndex();
-    const now = Date.now();
-    let cleanedCount = 0;
-
-    index.forEach(cacheKey => {
-      try {
-        const cachedData = localStorage.getItem(cacheKey);
-        if (cachedData) {
-          const parsed = JSON.parse(cachedData);
-          if (now > parsed.expiry) {
-            localStorage.removeItem(cacheKey);
-            this._removeCacheIndex(cacheKey);
-            cleanedCount++;
-          }
-        }
-      } catch (error) {
-        // 如果解析失敗，也移除這個緩存項
-        localStorage.removeItem(cacheKey);
-        this._removeCacheIndex(cacheKey);
-        cleanedCount++;
-      }
-    });
-
-    if (cleanedCount > 0) {
-      console.log(`清理了 ${cleanedCount} 個過期緩存項`);
-    }
   }
 
   /**
@@ -248,58 +44,6 @@ export class APIManager {
     this.userApiKey = apiKey;
   }
 
-  /**
-   * 設置緩存開關
-   * @param {boolean} enabled - 是否啟用緩存
-   */
-  setCacheEnabled(enabled) {
-    this.cacheEnabled = enabled;
-  }
-
-  /**
-   * 清空所有緩存
-   */
-  clearCache() {
-    const index = this._getCacheIndex();
-    index.forEach(cacheKey => {
-      localStorage.removeItem(cacheKey);
-    });
-    localStorage.removeItem(CACHE_CONFIG.STORAGE_KEY);
-    console.log('已清空所有TTS緩存');
-  }
-
-  /**
-   * 獲取緩存統計信息
-   * @returns {Object} 緩存統計
-   */
-  getCacheStats() {
-    const index = this._getCacheIndex();
-    let totalSize = 0;
-    let validCount = 0;
-    const now = Date.now();
-
-    index.forEach(cacheKey => {
-      try {
-        const cachedData = localStorage.getItem(cacheKey);
-        if (cachedData) {
-          const parsed = JSON.parse(cachedData);
-          if (now <= parsed.expiry) {
-            validCount++;
-            totalSize += cachedData.length;
-          }
-        }
-      } catch (error) {
-        // 忽略解析錯誤
-      }
-    });
-
-    return {
-      totalItems: validCount,
-      totalSize: Math.round(totalSize / 1024), // KB
-      maxItems: CACHE_CONFIG.MAX_CACHE_SIZE,
-      expiryHours: CACHE_CONFIG.EXPIRY_HOURS
-    };
-  }
 
   /**
    * 獲取當前有效的API密鑰
@@ -323,6 +67,7 @@ export class APIManager {
   getApiType() {
     // 檢查是否在Tauri環境中
     const isTauri = this.isTauri();
+    console.log({userApiKey: this.userApiKey,envApiKey:this.envApiKey});
     
     if (isTauri) {
       return API_TYPES.TAURI;
@@ -338,7 +83,7 @@ export class APIManager {
   }
 
   /**
-   * 統一的TTS調用接口（帶緩存）
+   * 統一的TTS調用接口（無緩存，純API調用）
    * @param {string} text - 要轉換的文本
    * @param {string} style - 語音風格
    * @param {Object} options - 額外選項
@@ -346,41 +91,18 @@ export class APIManager {
    */
   async generateTTS(text, style = 'professional', options = {}) {
     const apiType = this.getApiType();
+    console.log('[APIManager] 調用API類型:', apiType);
     
-    // 如果啟用緩存，先檢查緩存
-    if (this.cacheEnabled) {
-      const cacheKey = this._generateCacheKey(text, style, apiType);
-      const cachedResult = this._getCachedAudio(cacheKey);
-      
-      if (cachedResult) {
-        console.log(`使用緩存音頻: ${cacheKey}`);
-        return cachedResult;
-      }
-    }
-    
-    // 緩存中沒有，調用API
-    let result;
     switch (apiType) {
       case API_TYPES.TAURI:
-        result = await this._callTauriTTS(text, style, options);
-        break;
+        return await this._callTauriTTS(text, style, options);
       case API_TYPES.OFFICIAL_SDK:
-        result = await this._callOfficialSDK(text, style, options);
-        break;
+        return await this._callOfficialSDK(text, style, options);
       case API_TYPES.BACKEND:
-        result = await this._callBackendTTS(text, style, options);
-        break;
+        return await this._callBackendTTS(text, style, options);
       default:
         throw new Error(`不支持的API類型: ${apiType}`);
     }
-    
-    // 如果啟用緩存，將結果緩存
-    if (this.cacheEnabled && result) {
-      const cacheKey = this._generateCacheKey(text, style, apiType);
-      await this._cacheAudio(cacheKey, result);
-    }
-    
-    return result;
   }
 
   /**
@@ -623,8 +345,3 @@ export const playAudio = (audioBlob, onStart, onEnd, onError) => apiManager.play
 export const setUserApiKey = (apiKey) => apiManager.setUserApiKey(apiKey);
 export const getApiStatus = () => apiManager.getStatus();
 
-// 緩存管理函數
-export const setCacheEnabled = (enabled) => apiManager.setCacheEnabled(enabled);
-export const clearTTSCache = () => apiManager.clearCache();
-export const getTTSCacheStats = () => apiManager.getCacheStats();
-export const cleanExpiredTTSCache = () => apiManager._cleanExpiredCache();

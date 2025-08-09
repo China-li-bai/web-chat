@@ -22,14 +22,15 @@
   "database": "wa-sqlite（IDB VFS）",
   "hash": "SubtleCrypto (SHA-256) + Node fallback",
   "modules": [
-    "APIManager 转发 apiKey 给 /api/gemini-tts（已完成）",
-    "server/index.js 检测 apiKey 强制直连官方（已完成）"
+    "APIManager 纯API调用（已清理localStorage）",
+    "ttsCacheService 统一wa-sqlite缓存管理",
+    "Practice.jsx 使用ttsCacheService缓存"
   ]
 }
 
 ## Design
 
-UI不变；修正调用链：存在 apiKey 时官方直连（前端SDK或后端直连均满足要求）。
+架构重构：APIManager只负责API调用，所有缓存通过wa-sqlite系统进行，避免localStorage与wa-sqlite混用。
 
 ## Plan
 
@@ -53,16 +54,12 @@ Note:
 
 [X] 实现文本+语音参数的SHA-256哈希键
 
-[X] 扩展geminiTTS模块，集成本地缓存查询写入
+[X] 清理APIManager中的localStorage缓存逻辑
 
-[X] 修改Practice页面组件，接入缓存读取/写入
+[/] 修改Practice页面组件，完全使用wa-sqlite缓存
 
-[X] 添加缓存状态UI指示器和用户反馈
+[ ] 测试wa-sqlite缓存在不同场景下的表现
 
-[X] 服务端直连策略修正（有API Key直连官方）
+[ ] 添加缓存统计信息显示功能
 
-[/] 实现缓存管理功能（清理、统计）
-
-[/] 添加错误处理和降级机制
-
-[/] 测试缓存功能在不同场景下的表现
+[ ] 优化错误处理和降级机制

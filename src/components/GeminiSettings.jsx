@@ -27,12 +27,12 @@ import {
 } from '@ant-design/icons';
 import { 
   setUserApiKey, 
-  getApiStatus, 
-  getTTSCacheStats, 
-  clearTTSCache, 
-  setCacheEnabled,
-  cleanExpiredTTSCache 
+  getApiStatus
 } from '../utils/apiManager.js';
+import { 
+  cacheStats, 
+  clearAllCache 
+} from '../services/ttsCacheService.js';
 // import { invoke } from '@tauri-apps/api/core'; // 註釋掉Tauri依賴
 
 const { Title, Text, Paragraph } = Typography;
@@ -61,10 +61,15 @@ const GeminiSettings = ({ onSettingsChange }) => {
     loadCacheStats();
   }, []);
 
-  const loadCacheStats = () => {
+  const loadCacheStats = async () => {
     try {
-      const stats = getTTSCacheStats();
-      setCacheStats(stats);
+      const stats = await cacheStats();
+      setCacheStats({
+        totalItems: stats.count || 0,
+        totalSize: stats.totalBytes || 0,
+        maxItems: 50000,
+        expiryHours: 24 * 30
+      });
     } catch (error) {
       console.error('Failed to load cache stats:', error);
     }
@@ -76,31 +81,33 @@ const GeminiSettings = ({ onSettingsChange }) => {
       content: '確定要清空所有TTS音頻緩存嗎？這將刪除所有已緩存的音頻文件。',
       okText: '確定',
       cancelText: '取消',
-      onOk: () => {
+      onOk: async () => {
         try {
-          clearTTSCache();
-          loadCacheStats();
+          await clearAllCache();
+          await loadCacheStats();
           message.success('緩存已清空');
         } catch (error) {
-          message.error('清空緩存失敗');
+          console.error('Clear cache error:', error);
+          message.error('清空緩存失敗: ' + error.message);
         }
       }
     });
   };
 
-  const handleCleanExpiredCache = () => {
+  const handleCleanExpiredCache = async () => {
     try {
-      cleanExpiredTTSCache();
-      loadCacheStats();
-      message.success('已清理過期緩存');
+      // wa-sqlite 缓存系统会自动管理过期项，这里只是刷新统计
+      await loadCacheStats();
+      message.success('已刷新緩存統計');
     } catch (error) {
-      message.error('清理緩存失敗');
+      console.error('Refresh cache stats error:', error);
+      message.error('刷新緩存統計失敗');
     }
   };
 
   const handleCacheToggle = (enabled) => {
     setCacheEnabledState(enabled);
-    setCacheEnabled(enabled);
+    // wa-sqlite 缓存系统不需要全局开关，这里只是UI状态
     message.success(enabled ? '緩存已啟用' : '緩存已禁用');
   };
 

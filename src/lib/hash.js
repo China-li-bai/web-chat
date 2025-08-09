@@ -88,5 +88,20 @@ export async function buildTtsKey(p) {
 
   // Use a simple, readable payload string; avoid ambiguity with explicit separators.
   const payload = `${text}||${voiceStyle}||${lang}||${provider}:${version}`;
-  return sha256Hex(payload);
+  
+  // 添加详细的调试日志
+  console.log('[buildTtsKey] 🔑 缓存键生成详情:');
+  console.log('  输入参数:', {
+    text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+    voiceStyle,
+    lang,
+    provider,
+    version
+  });
+  console.log('  生成载荷:', payload);
+  
+  const hash = await sha256Hex(payload);
+  console.log('  最终哈希:', hash);
+  
+  return hash;
 }

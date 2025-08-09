@@ -33,7 +33,7 @@ import { invoke } from '@tauri-apps/api/core';
 import AITutorFeedback from '../components/AITutorFeedback';
 import GeminiSettings from '../components/GeminiSettings';
 import { generateTTS, playAudio } from '../utils/apiManager.js';
-import { getOrGenerateTTS, clearAllCache } from '../services/ttsCacheService.js';
+import { getOrGenerateTTS, clearAllCache, preInitCache, getCacheInitStatus } from '../services/ttsCacheService.js';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -123,9 +123,18 @@ const Practice = () => {
     return typeof window !== 'undefined' && window.__TAURI__;
   };
 
-  // 加載AI設置
+  // 加載AI設置和初始化缓存系统
   useEffect(() => {
     loadAISettings();
+    
+    // 预初始化缓存系统
+    preInitCache().then(success => {
+      if (success) {
+        console.log('缓存系统初始化成功');
+      } else {
+        console.warn('缓存系统初始化可能不完整，将使用降级策略');
+      }
+    });
   }, []);
 
   const loadAISettings = () => {
@@ -483,13 +492,28 @@ const Practice = () => {
     
     try {
       message.loading({ content: '🤖 正在查找本地缓存/生成语音...', key: messageKey, duration: 0 });
+      
+      // 检查缓存系统状态
+      const cacheStatus = getCacheInitStatus();
+      console.log('[playGeminiExample] 缓存系统状态:', cacheStatus);
+      
+      // 如果缓存系统未初始化，尝试初始化
+      if (!cacheStatus.initialized) {
+        console.log('[playGeminiExample] 缓存系统未初始化，尝试初始化...');
+        await preInitCache();
+      }
+      
       const lang = 'en-US';
       const params = { text: practiceText, voiceStyle, lang, provider: 'gemini', version: 'v2.5-flash-preview-tts' };
+      console.log('[playGeminiExample] 缓存参数:', params);
+      
       const result = await getOrGenerateTTS(params, async () => {
+        console.log('[playGeminiExample] 缓存未命中，调用生成器...');
         const r = await generateTTS(practiceText, voiceStyle);
         return { audioBlob: r.audioBlob, mimeType: r.mimeType, voiceName: r.voiceName, style: r.style };
       });
       
+      console.log('[playGeminiExample] TTS 结果来源:', result.source);
       setTtsSource(result.source);
       message.destroy(messageKey);
       
@@ -533,12 +557,13 @@ const Practice = () => {
 
   const handleClearCache = async () => {
     try {
+      console.log('[handleClearCache] 开始清理缓存...');
       await clearAllCache();
       setTtsSource(null);
       message.success('已清理本地AI语音缓存');
     } catch (e) {
-      console.error(e);
-      message.error('清理缓存失败');
+      console.error('[handleClearCache] 清理缓存失败:', e);
+      message.error('清理缓存失败: ' + e.message);
     }
   };
 

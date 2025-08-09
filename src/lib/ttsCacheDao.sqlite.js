@@ -43,51 +43,65 @@ export class TtsCacheDaoSqlite {
   }
 
   async init() {
+    console.log('[ttsCacheDao.sqlite] 🚀 开始初始化缓存系统...');
+    console.log('  配置:', { dbName: this.dbName, maxBytes: this.maxBytes, vfs: this.vfs, forceMemory: this.forceMemory });
+    
     if (this._usingMemory) {
+      console.log('[ttsCacheDao.sqlite] 💾 使用内存模式');
       await this._mem.init();
       return true;
     }
 
     try {
+      console.log('[ttsCacheDao.sqlite] 📦 导入 wa-sqlite 模块...');
       // Dynamically import wa-sqlite. If any step fails, fallback to memory.
       const mod = await import('wa-sqlite');
 
       const sqlite3InitModule = mod.default || mod.sqlite3InitModule || mod;
       if (!sqlite3InitModule) throw new Error('wa-sqlite init module not found');
 
+      console.log('[ttsCacheDao.sqlite] 🔧 初始化 SQLite WASM...');
       // Initialize SQLite WASM
       const sqlite3 = await sqlite3InitModule({
         print: () => {},
         printErr: () => {}
       });
 
+      console.log('[ttsCacheDao.sqlite] 🗄️ 设置 VFS:', this.vfs);
       // Choose VFS (IDB is preferred cross-platform)
       if (this.vfs === 'idb') {
         // Use IDBBatchAtomicVFS for durability
         const { IDBBatchAtomicVFS } = await import('wa-sqlite/src/examples/IDBBatchAtomicVFS.js');
-        const vfs = new IDBBatchAtomicVFS(this.dbName);
+        // 使用固定的数据库名称，确保持久化
+        const vfs = new IDBBatchAtomicVFS('tts-cache-db', { durability: 'strict' });
         sqlite3.vfs_register(vfs, true);
+        console.log('[ttsCacheDao.sqlite] 🔧 IDBBatchAtomicVFS 注册成功，数据库名: tts-cache-db');
       } else {
         // OPFS 在本构建中禁用，统一回退到 IDB VFS，避免 Vite import 分析报错
         const { IDBBatchAtomicVFS } = await import('wa-sqlite/src/examples/IDBBatchAtomicVFS.js');
-        const vfs = new IDBBatchAtomicVFS(this.dbName);
+        const vfs = new IDBBatchAtomicVFS('tts-cache-db', { durability: 'strict' });
         sqlite3.vfs_register(vfs, true);
+        console.log('[ttsCacheDao.sqlite] 🔧 IDBBatchAtomicVFS 注册成功（回退模式），数据库名: tts-cache-db');
       }
 
-      // Open database using oo1 wrapper
-      const db = new sqlite3.oo1.DB(this.dbName, 'ct'); // create + read/write
+      console.log('[ttsCacheDao.sqlite] 🔓 打开数据库: tts-cache-db');
+      // 使用固定的数据库名称，确保持久化
+      const db = new sqlite3.oo1.DB('tts-cache-db', 'ct'); // create + read/write
 
       // Ensure schema
       this._sqlite = sqlite3;
       this._db = db;
       await this._ensureSchema();
 
+      console.log('[ttsCacheDao.sqlite] ✅ SQLite 初始化成功！');
       return true;
     } catch (err) {
       // Fallback to memory
-      console.warn('[ttsCacheDao.sqlite] init failed, fallback to memory:', err?.message || err);
+      console.error('[ttsCacheDao.sqlite] ❌ SQLite 初始化失败，回退到内存模式:', err?.message || err);
+      console.error('  错误详情:', err);
       this._usingMemory = true;
       await this._mem.init();
+      console.log('[ttsCacheDao.sqlite] 💾 内存模式初始化完成');
       return true;
     }
   }
@@ -95,6 +109,7 @@ export class TtsCacheDaoSqlite {
   async _ensureSchema() {
     if (!this._db) return;
 
+    console.log('[ttsCacheDao.sqlite] 📋 创建数据库表结构...');
     const ddl = `
       CREATE TABLE IF NOT EXISTS audio_cache (
         key TEXT PRIMARY KEY,
@@ -111,6 +126,17 @@ export class TtsCacheDaoSqlite {
     `;
 
     this._db.exec(ddl);
+    
+    // 检查表是否创建成功
+    const tableCount = await this._selectOne(
+      "SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='audio_cache'",
+      []
+    );
+    console.log('[ttsCacheDao.sqlite] 📋 表结构检查:', tableCount?.count > 0 ? '✅ 表已存在' : '❌ 表创建失败');
+    
+    // 检查现有数据
+    const existingCount = await this._selectOne('SELECT COUNT(*) as count FROM audio_cache', []);
+    console.log('[ttsCacheDao.sqlite] 📊 现有缓存数据:', existingCount?.count || 0, '条');
   }
 
   _ensureMemoryMode() {
@@ -118,8 +144,13 @@ export class TtsCacheDaoSqlite {
   }
 
   async get(key) {
+    console.log('[ttsCacheDao.sqlite] 🔍 查找缓存:', key);
+    
     if (this._ensureMemoryMode()) {
-      return this._mem.get(key);
+      console.log('[ttsCacheDao.sqlite] 💾 使用内存模式查找');
+      const result = await this._mem.get(key);
+      console.log('[ttsCacheDao.sqlite] 内存查找结果:', result ? '命中' : '未命中');
+      return result;
     }
 
     try {
@@ -127,7 +158,11 @@ export class TtsCacheDaoSqlite {
         'SELECT key, text, voice_style, lang, provider, version, created_at, size, audio_blob FROM audio_cache WHERE key = ?1',
         [key]
       );
-      if (!row) return null;
+      
+      if (!row) {
+        console.log('[ttsCacheDao.sqlite] 🚫 SQLite 缓存未命中');
+        return null;
+      }
 
       const {
         key: k,
@@ -142,6 +177,15 @@ export class TtsCacheDaoSqlite {
       } = row;
 
       const blob = new Blob([audio_blob], { type: 'audio/wav' });
+      
+      console.log('[ttsCacheDao.sqlite] ✅ SQLite 缓存命中:', {
+        key: k,
+        text: text.substring(0, 30) + '...',
+        voiceStyle: voice_style,
+        lang,
+        provider,
+        size
+      });
 
       return {
         audioBlob: blob,
@@ -157,14 +201,26 @@ export class TtsCacheDaoSqlite {
         }
       };
     } catch (e) {
-      console.warn('[ttsCacheDao.sqlite] get failed, delegate to memory:', e?.message || e);
+      console.error('[ttsCacheDao.sqlite] ❌ SQLite 查找失败，回退到内存:', e?.message || e);
       return this._mem.get(key);
     }
   }
 
   async put(p) {
+    console.log('[ttsCacheDao.sqlite] 💾 存储缓存:', {
+      key: p.key,
+      text: (p.text || '').substring(0, 30) + '...',
+      voiceStyle: p.voiceStyle,
+      lang: p.lang,
+      provider: p.provider,
+      audioSize: p.audioBlob?.size || 0
+    });
+    
     if (this._ensureMemoryMode()) {
-      return this._mem.put(p);
+      console.log('[ttsCacheDao.sqlite] 💾 使用内存模式存储');
+      const result = await this._mem.put(p);
+      console.log('[ttsCacheDao.sqlite] 内存存储完成');
+      return result;
     }
 
     try {
@@ -173,6 +229,7 @@ export class TtsCacheDaoSqlite {
       const size = audioBlob.size || 0;
       const bytes = new Uint8Array(await audioBlob.arrayBuffer());
 
+      console.log('[ttsCacheDao.sqlite] 🗄️ 写入 SQLite 数据库...');
       this._db.exec(
         'INSERT INTO audio_cache (key, text, voice_style, lang, provider, version, created_at, size, audio_blob) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) ON CONFLICT(key) DO UPDATE SET text=excluded.text, voice_style=excluded.voice_style, lang=excluded.lang, provider=excluded.provider, version=excluded.version, created_at=excluded.created_at, size=excluded.size, audio_blob=excluded.audio_blob;',
         {
@@ -191,8 +248,9 @@ export class TtsCacheDaoSqlite {
       );
 
       await this._enforceMaxBytes();
+      console.log('[ttsCacheDao.sqlite] ✅ SQLite 存储成功');
     } catch (e) {
-      console.warn('[ttsCacheDao.sqlite] put failed, delegate to memory:', e?.message || e);
+      console.error('[ttsCacheDao.sqlite] ❌ SQLite 存储失败，回退到内存:', e?.message || e);
       return this._mem.put(p);
     }
   }

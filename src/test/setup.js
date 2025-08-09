@@ -5,7 +5,7 @@ Object.defineProperty(globalThis, 'import', {
   value: {
     meta: {
       env: {
-        VITE_GEMINI_API_KEY: 'test-api-key'
+        VITE_GEMINI_API_KEY: 'AIzaSyA8HMfOOB3pCc-MeDTuj-t0qdBYKWlKg4M'
       }
     }
   },

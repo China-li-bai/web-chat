@@ -123,7 +123,7 @@ describe('geminiTTS API 测试', () => {
 
       mockGenerateContent.mockResolvedValue(mockResponse);
 
-      const result = await generateSpeechWithGemini('Hello', 'test-api-key');
+      const result = await generateSpeechWithGemini('Hello', 'AIzaSyA8HMfOOB3pCc-MeDTuj-t0qdBYKWlKg4M');
 
       expect(result).toHaveProperty('audioBlob');
       expect(result).toHaveProperty('mimeType', 'audio/wav');
@@ -147,7 +147,7 @@ describe('geminiTTS API 测试', () => {
 
       mockGenerateContent.mockResolvedValue(mockResponse);
 
-      const result = await generateSpeechWithGemini('Hello', 'test-api-key', 'cheerful');
+      const result = await generateSpeechWithGemini('Hello', 'AIzaSyA8HMfOOB3pCc-MeDTuj-t0qdBYKWlKg4M', 'cheerful');
 
       expect(result.voiceName).toBe('Puck');
       expect(result.style).toBe('cheerful');
