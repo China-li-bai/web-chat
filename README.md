@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-一个基于AI的口语练习产品，支持自然交流、发音纠正和评分机制，适配Web/App/H5应用，使用Tauri框架开发。
+一个基于AI的口语练习产品，支持自然交流、发音纠正和评分机制，适配Web/App/H5应用，使用Tauri框架和 wa-sqlite 数据库的local-first approach。
 
 ## 技术架构
 
@@ -14,8 +14,6 @@
 - **实时通信**: WebSocket
 - **Database**: wa-sqlite (local-first approach)
 
-### 后端技术栈
-- **框架**: Node.js + Express
 
 
 ### AI服务集成

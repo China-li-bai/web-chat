@@ -389,12 +389,20 @@ app.post('/api/gemini-tts', async (req, res) => {
     const useProxy = process.env.USE_GEMINI_PROXY !== 'false'; // 默認使用代理
     
     let geminiUrl;
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    };
     if (useProxy) {
-      // 使用代理服務
-      geminiUrl = `${geminiProxyUrl}/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${effectiveConfig.apiKey}`;
+      // 使用代理服務（由 Worker 注入金鑰）
+      geminiUrl = `${geminiProxyUrl}/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`;
+      // 可選：向 Worker 提供內部鑑權，避免端點被濫用
+      if (process.env.WORKER_SHARED_SECRET) {
+        headers['X-Internal-Auth'] = process.env.WORKER_SHARED_SECRET;
+      }
       console.log('使用 Gemini 代理服務:', geminiProxyUrl);
     } else {
-      // 使用官方 API
+      // 使用官方 API（直接攜帶 key）
       geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${effectiveConfig.apiKey}`;
       console.log('使用 Gemini 官方 API');
     }
@@ -404,10 +412,7 @@ app.post('/api/gemini-tts', async (req, res) => {
     // 配置代理和請求選項
     const fetchOptions = {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      },
+      headers,
       body: JSON.stringify(geminiRequest),
       timeout: 30000 // 30秒超時
     };
@@ -637,8 +642,17 @@ server.listen(PORT, () => {
   if (process.env.GEMINI_API_KEY) {
     console.log(`🔑 API密钥前缀: ${process.env.GEMINI_API_KEY.substring(0, 10)}...`);
   }
-  console.log(`🌐 使用Gemini代理: ${process.env.USE_GEMINI_PROXY !== 'false' ? '是' : '否'}`);
-  console.log(`🌐 代理地址: ${process.env.GEMINI_PROXY_URL || 'https://gemini.66666618.xyz'}`);
+  const useProxyAtBoot = process.env.USE_GEMINI_PROXY !== 'false';
+  console.log(`🌐 使用Gemini代理: ${useProxyAtBoot ? '是' : '否'}`);
+  console.log(`🌐 代理地址: ${process.env.GEMINI_PROXY_URL || '未配置（將使用默認或直連）'}`);
+
+  // 環境檢查與提示
+  if (useProxyAtBoot && !process.env.GEMINI_PROXY_URL) {
+    console.warn('⚠️ 檢測到 USE_GEMINI_PROXY=true 但未配置 GEMINI_PROXY_URL。請在 .env 中設置你的 Cloudflare Worker URL。');
+  }
+  if (useProxyAtBoot && !process.env.WORKER_SHARED_SECRET) {
+    console.warn('ℹ️ 建議設置 WORKER_SHARED_SECRET 以啟用後端與 Worker 的來源校驗（X-Internal-Auth）。');
+  }
   
   // 创建必要的目录
   const uploadsDir = path.join(__dirname, 'uploads');

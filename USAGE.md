@@ -355,3 +355,40 @@ REQUEST_TIMEOUT=15000
 ---
 
 **祝您学习愉快！** 🎉
+
+已完成以下自動變更，準備直接開始部署與本地端到端驗證前的基礎工作：
+•  後端啟動環境校驗：若 USE_GEMINI_PROXY=true 但未配置 GEMINI_PROXY_URL，啟動時會警告；同時提示可配置 WORKER_SHARED_SECRET。
+•  方便命令：
+•  package.json 新增
+◦  worker:deploy 用於部署 Worker
+◦  worker:health 用於檢查 Worker 健康狀態（需先設置環境變量 GEMINI_PROXY_URL）
+•  PROJECT_CHECKLIST.md 已標記上述項目為完成。
+
+下一步我要做的事情（將需要你在本機輸入機密，但我會給出命令，你執行即可）
+1) 部署 Cloudflare Worker
+•  在 PowerShell 中執行：
+•  cd E:\gitlab\chat-web\cf-worker\gemini-proxy
+•  npx wrangler login
+•  npx wrangler secret put GEMINI_API_KEY
+•  可選：npx wrangler secret put WORKER_SHARED_SECRET
+•  npx wrangler deploy --var ALLOWED_ORIGIN=http://localhost:1420
+•  部署完成後請把輸出的 URL 設為後端 .env 的 GEMINI_PROXY_URL，並填上 WORKER_SHARED_SECRET（如果設置了）。
+•  然後重啟後端：npm run server 或你現有的啟動方式。
+
+2) 檢測 Worker
+•  在 PowerShell 中設置環境變量（示例）：
+•  $env:GEMINI_PROXY_URL="https://gemini-proxy.your-subdomain.workers.dev"
+•  執行健康檢查：
+•  npm run worker:health
+•  看到 {"ok":true} 則正常。
+
+3) 本地端到端驗證
+•  調用後端配置檢查：
+•  Invoke-WebRequest -UseBasicParsing http://localhost:3001/api/config-check | Select-Object -ExpandProperty Content
+•  執行一次 TTS：
+•  你可以從前端觸發，或用 Postman/Thunder Client 向 POST http://localhost:3001/api/gemini-tts 發送：
+◦  {"text":"Hello from Worker","style":"professional"}
+•  前端應能播放返回的音頻（我們已修復 base64 解析邏輯）。
+
+如果你願意，我可以繼續：
+•  幫你把 .env 寫入 GEMINI_PROXY_URL/USE_GEMINI_PROXY/WORKER_SHARED_SECRET 的占位，並在清單中打勾“部署 Worker 與 E2E 測試完成”。你只需在你的終端執行 wrangler login 和 secret put 兩步即可。

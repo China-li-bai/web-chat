@@ -1,9 +1,7 @@
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to ai when working with code in this repository.
 
 ## Summary instructions
 
@@ -18,7 +16,7 @@ When you are using compact, please focus on test output and code changes
 「老虎机」式重构：面对那些用编辑器宏太复杂、又不足以投入大量开发精力去解决的重构任务。先提交当前状态，然后放手让 Claude 自主工作 30 分钟。如果结果令人满意，就接受；如果不满意，就直接回滚重来
 
 ## Documentation
-- 编写 .md 文档时
+- 開始複雜任務時需要编写 .md 文档
 - 正式文档写到项目的 docs/ 目录下
 - 用于讨论和评审的计划、方案等文档，写到项目的 discuss/ 目录下
 

@@ -513,17 +513,44 @@ export class APIManager {
         })
       });
 
+      const contentType = response.headers.get('Content-Type') || '';
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        // 優先嘗試解析服務端錯誤信息
+        if (contentType.includes('application/json')) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+        const text = await response.text().catch(() => '');
+        throw new Error(text || `HTTP ${response.status}`);
       }
 
+      // 服務端返回 JSON: { success, audioData (base64), mimeType }
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        if (!data || !data.success || !data.audioData) {
+          throw new Error(data?.error || '後端返回數據不完整');
+        }
+        const binary = atob(data.audioData);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const mimeType = data.mimeType || 'audio/wav';
+        const audioBlob = new Blob([bytes], { type: mimeType });
+        return {
+          audioBlob,
+          mimeType,
+          voiceName: 'Unknown',
+          style,
+          source: API_TYPES.BACKEND
+        };
+      }
+
+      // 兼容：如果服務端直接回傳二進制
       const audioBlob = await response.blob();
-      
+      const mimeType = audioBlob.type || 'audio/wav';
       return {
         audioBlob,
-        mimeType: 'audio/wav',
-        voiceName: response.headers.get('X-Voice-Name') || 'Unknown',
+        mimeType,
+        voiceName: 'Unknown',
         style,
         source: API_TYPES.BACKEND
       };

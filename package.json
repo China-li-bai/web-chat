@@ -1,4 +1,13 @@
 {
+  "name": "chat-web",
+  "private": true,
+  "scripts": {
+    "worker:deploy": "cd cf-worker/gemini-proxy && npx wrangler deploy",
+    "worker:health": "powershell -NoProfile -Command \"(Invoke-WebRequest -UseBasicParsing $env:GEMINI_PROXY_URL+'/health').Content\""
+  }
+}
+
+{
   "name": "ai-speech-practice",
   "version": "0.1.0",
   "description": "AI口语练习产品 - 基于Tauri的跨平台应用",

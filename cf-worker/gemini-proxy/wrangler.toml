@@ -1,0 +1,15 @@
+name = "gemini-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+
+# 部署到你的帳號的自動子域，例如 https://gemini-proxy.your-subdomain.workers.dev
+# 若你有綁定自定義域名，可另行配置 routes。
+
+[observability]
+enabled = true
+
+# 可選的純量配置（建議使用 secret 管理 API key）
+# [vars]
+# ALLOWED_ORIGIN = "http://localhost:1420"
+# RATE_LIMIT_PER_MIN = "60"
+

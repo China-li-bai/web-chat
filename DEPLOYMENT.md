@@ -230,3 +230,55 @@ ssh root@192.227.177.133 "free -h"
 ---
 
 **注意**: 首次部署後，請及時配置 API 密鑰並測試各項功能是否正常工作。
+
+---
+
+## ☁️ 使用 Cloudflare Worker 作為 Gemini 代理
+
+本項目已支持通過 Cloudflare Worker 代理轉發到 Google Generative Language（Gemini）API，避免在 URL 中暴露 API Key，並便於增加限流/觀測與來源校驗。
+
+### 變更摘要
+- 後端（server/index.js）在 `USE_GEMINI_PROXY=true` 時，不再將 `?key=...` 附加到 URL；改為請求代理端點。
+- 若配置 `WORKER_SHARED_SECRET`，後端會在請求頭帶上 `X-Internal-Auth`，Worker 校驗後才放行。
+- 新增 Worker 專案：`cf-worker/gemini-proxy`（包含 wrangler 配置與代碼）。
+
+### 部署步驟
+1. 前置條件
+   - 擁有 Cloudflare 帳號
+   - Node.js 已安裝（本地）
+   - 使用 `npx` 來運行 wrangler
+
+2. 部署 Worker
+   - 進入目錄：
+     - Windows PowerShell: `cd E:\gitlab\chat-web\cf-worker\gemini-proxy`
+   - 登入 Cloudflare：
+     - `npx wrangler login`
+   - 配置機密（Secrets）：
+     - 設置 Gemini API Key：`npx wrangler secret put GEMINI_API_KEY`（按提示輸入值）
+     - 可選：設置共享密鑰：`npx wrangler secret put WORKER_SHARED_SECRET`
+   - 可選：設置 CORS 允許來源（預設 http://localhost:1420）：
+     - `npx wrangler deploy --var ALLOWED_ORIGIN=http://localhost:1420`
+     - 或將 `ALLOWED_ORIGIN` 寫入 wrangler.toml 的 [vars]
+   - 發佈：
+     - `npx wrangler deploy`
+   - 記下 Workers URL，例如：`https://gemini-proxy.<your-subdomain>.workers.dev`
+
+3. 後端配置
+   - 編輯 `.env`：
+     - `USE_GEMINI_PROXY=true`
+     - `GEMINI_PROXY_URL=https://gemini-proxy.<your-subdomain>.workers.dev`
+     - `WORKER_SHARED_SECRET=<與 Worker 一致的值>`（若上一步有設置）
+   - 重啟後端並檢查：
+     - `GET /api/config-check` 應顯示 `useGeminiProxy: true` 和正確的 `geminiProxyUrl`
+
+4. 驗證
+   - 調用後端 `POST /api/gemini-tts`，Body 例：`{"text":"Hello world","style":"professional"}`
+   - 成功時返回 `audioData`（base64 音頻）。
+
+5. 切換/回退
+   - 若要直連官方 API：將 `.env` 中 `USE_GEMINI_PROXY=false`，後端會改為 `https://generativelanguage.googleapis.com/...?...key=...` 直連模式。
+
+### 安全與注意事項
+- Worker 端保管 `GEMINI_API_KEY`，後端與前端都無需再攜帶 key。
+- 建議啟用 `WORKER_SHARED_SECRET` 並在 Worker 校驗 `X-Internal-Auth`，防止被外部濫用。
+- 調整 CORS：預設允許 `http://localhost:1420`，如有自定義域名請在部署時傳入或於 wrangler.toml 設置。
