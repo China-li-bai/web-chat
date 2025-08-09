@@ -12,6 +12,9 @@ import dotenv from 'dotenv';
 // 加載環境變量
 dotenv.config();
 
+// 导入语音服务类
+const SpeechServices = require('./services/speechServices.js');
+
 // ES模块中获取__dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
