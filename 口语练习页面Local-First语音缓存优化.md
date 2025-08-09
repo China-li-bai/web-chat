@@ -2,15 +2,13 @@
 
 ## Core Features
 
-- 本地语音缓存系统
+- 本地语音缓存（wa-sqlite + 内存回退）
 
-- 智能缓存策略（文本+参数哈希键）
+- 智能缓存键（SHA-256: text|voiceStyle|lang|provider:version）
 
-- 缓存管理功能（清理、统计、设置）
+- 按钮来源指示（本地缓存/网络生成）与一键清理
 
-- 降级处理机制（无缓存时再调接口）
-
-- 性能优化（优先本地、异步更新）
+- 降级与错误处理（失败不崩溃，提示友好）
 
 ## Tech Stack
 
@@ -19,14 +17,21 @@
     "arch": "react",
     "component": null
   },
-  "database": "wa-sqlite",
-  "hash": "Web Crypto API SubtleCrypto (SHA-256)",
-  "tools": "扩展 TTS 服务模块；在 /practice 接入缓存"
+  "database": "wa-sqlite（IDB VFS，失败回退内存）",
+  "hash": "SubtleCrypto (SHA-256) + Node crypto fallback",
+  "modules": [
+    "src/lib/hash.js + 测试",
+    "src/lib/ttsCacheDao.memory.js + 测试",
+    "src/lib/ttsCacheDao.sqlite.js + 测试（默认强制回退供CI）",
+    "src/services/ttsWithCache.js + 测试",
+    "src/services/ttsCacheService.js（对外封装）",
+    "src/pages/Practice.jsx 集成"
+  ]
 }
 
 ## Design
 
-AI 语音按钮旁显示来源指示（本地/网络），快速反馈；可选缓存管理面板（统计/清理）
+在“🤖 AI语音”按钮旁用 Tooltip 显示来源（本地缓存/网络），提供“清理缓存”按钮；交互保持现状不打扰用户。
 
 ## Plan
 
@@ -42,22 +47,22 @@ Note:
 
 [X] 生成todos任务文档
 
-[ ] 安装和配置wa-sqlite依赖包
+[X] 安装和配置wa-sqlite依赖包
 
-[ ] 创建SQLite数据库初始化脚本和表结构
+[X] 创建SQLite数据库初始化脚本和表结构
 
-[ ] 实现语音缓存数据库操作类（增删改查）
+[X] 实现语音缓存数据库操作类（增删改查）
 
-[ ] 实现文本+语音参数的SHA-256哈希键
+[X] 实现文本+语音参数的SHA-256哈希键
 
-[ ] 扩展geminiTTS模块，集成本地缓存查询写入
+[X] 扩展geminiTTS模块，集成本地缓存查询写入
 
-[ ] 修改Practice页面组件，接入缓存读取/写入
+[X] 修改Practice页面组件，接入缓存读取/写入
 
-[ ] 添加缓存状态UI指示器和用户反馈
+[X] 添加缓存状态UI指示器和用户反馈
 
-[ ] 实现缓存管理功能（清理、统计）
+[/] 实现缓存管理功能（清理、统计）
 
-[ ] 添加错误处理和降级机制
+[/] 添加错误处理和降级机制
 
-[ ] 测试缓存功能在不同场景下的表现
+[/] 测试缓存功能在不同场景下的表现

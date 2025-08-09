@@ -33,6 +33,7 @@ import { invoke } from '@tauri-apps/api/core';
 import AITutorFeedback from '../components/AITutorFeedback';
 import GeminiSettings from '../components/GeminiSettings';
 import { generateTTS, playAudio } from '../utils/apiManager.js';
+import { getOrGenerateTTS, clearAllCache } from '../services/ttsCacheService.js';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -61,6 +62,7 @@ const Practice = () => {
   
   // 語音風格選擇
   const [voiceStyle, setVoiceStyle] = useState('professional');
+  const [ttsSource, setTtsSource] = useState(null);
   
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -470,7 +472,7 @@ const Practice = () => {
     }
   };
 
-  // 播放Gemini示例 - 使用API管理器
+  // 播放Gemini示例 - Local-first（优先本地缓存）
   const playGeminiExample = async () => {
     if (!practiceText) {
       message.warning('请先选择练习内容');
@@ -480,21 +482,32 @@ const Practice = () => {
     const messageKey = 'gemini-tts';
     
     try {
-      message.loading({ content: '🤖 Gemini AI 語音生成中...', key: messageKey, duration: 0 });
+      message.loading({ content: '🤖 正在查找本地缓存/生成语音...', key: messageKey, duration: 0 });
+      const lang = 'en-US';
+      const params = { text: practiceText, voiceStyle, lang, provider: 'gemini', version: 'v2.5-flash-preview-tts' };
+      const result = await getOrGenerateTTS(params, async () => {
+        const r = await generateTTS(practiceText, voiceStyle);
+        return { audioBlob: r.audioBlob, mimeType: r.mimeType, voiceName: r.voiceName, style: r.style };
+      });
       
-      // 使用API管理器生成語音
-      const result = await generateTTS(practiceText, voiceStyle);
-      
+      setTtsSource(result.source);
       message.destroy(messageKey);
       
-      // 使用API管理器播放音頻
       await playAudio(
         result.audioBlob,
         () => {
-          message.info(`🤖 Gemini AI 語音播放中... (${voiceStyle})`);
+          if (result.source === 'cache') {
+            message.info('使用本地缓存语音播放中...');
+          } else {
+            message.info(`🤖 Gemini AI 語音播放中... (${voiceStyle})`);
+          }
         },
         () => {
-          message.success('🤖 Gemini AI 語音播放完成');
+          if (result.source === 'cache') {
+            message.success('本地缓存语音播放完成');
+          } else {
+            message.success('🤖 Gemini AI 語音播放完成');
+          }
         },
         (error) => {
           console.error('語音播放錯誤:', error);
@@ -506,7 +519,6 @@ const Practice = () => {
       message.destroy(messageKey);
       console.error('Gemini TTS 错误:', error);
       
-      // 根據錯誤類型給出具體的提示
       if (error.message.includes('API密鑰') || error.message.includes('401')) {
         message.error('Gemini API 密鑰無效或未配置，請檢查設置中的API密鑰配置');
       } else if (error.message.includes('配額') || error.message.includes('429')) {
@@ -516,6 +528,17 @@ const Practice = () => {
       } else {
         message.error(`Gemini TTS 生成失敗: ${error.message}`);
       }
+    }
+  };
+
+  const handleClearCache = async () => {
+    try {
+      await clearAllCache();
+      setTtsSource(null);
+      message.success('已清理本地AI语音缓存');
+    } catch (e) {
+      console.error(e);
+      message.error('清理缓存失败');
     }
   };
 
@@ -648,7 +671,8 @@ const Practice = () => {
                         >
                           播放示例
                         </Button>
-                        <Button 
+                        <Tooltip title={ttsSource ? (ttsSource === 'cache' ? '来源：本地缓存' : '来源：网络生成') : '点击生成/播放AI语音'}>
+                          <Button 
                             type="primary"
                             ghost
                             icon={<ThunderboltOutlined />} 
@@ -656,6 +680,12 @@ const Practice = () => {
                           >
                             🤖 AI語音
                           </Button>
+                        </Tooltip>
+                        <Tooltip title="清理本地AI语音缓存">
+                          <Button onClick={handleClearCache}>
+                            清理缓存
+                          </Button>
+                        </Tooltip>
                       </Space>
                     </div>
                   </div>

@@ -16,13 +16,13 @@
 ## Todos
 - [x] ~~需求确认（移除第三方哈希库，采用 SubtleCrypto SHA-256）~~
 - [x] ~~生成本 todos 文档~~
-- [ ] 安装并配置 wa-sqlite 依赖（Vite WASM 资源处理验证）
-- [ ] 初始化数据库与表（audio_cache）及必要索引（created_at）
-- [ ] 实现哈希键工具（SubtleCrypto + TextEncoder）
-- [ ] 实现缓存 DAO：getByKey、put、stats、clearAll、clearExpired(可选)
-- [ ] 扩展 TTS 服务模块：生成前先查缓存，未命中再调接口，成功后写缓存
-- [ ] 集成到 /practice 页面 “🤖 AI语音” 按钮（状态提示：本地/网络）
-- [ ] UI 指示与反馈：本地缓存命中（绿色）、网络生成（蓝色）、错误降级
+- [x] ~~安装并配置 wa-sqlite 依赖（Vite WASM 资源处理验证）~~
+- [x] ~~初始化数据库与表（audio_cache）及必要索引（created_at）~~
+- [x] ~~实现哈希键工具（SubtleCrypto + TextEncoder）~~
+- [x] ~~实现缓存 DAO：getByKey、put、stats、clearAll、clearExpired(可选)~~
+- [x] ~~扩展 TTS 服务模块：生成前先查缓存，未命中再调接口，成功后写缓存~~
+- [x] ~~集成到 /practice 页面 “🤖 AI语音” 按钮（状态提示：本地/网络）~~
+- [x] ~~UI 指示与反馈：本地缓存命中（绿色）、网络生成（蓝色）、错误降级~~
 - [ ] 缓存管理入口（可选）：统计（数量/空间）、清理全部
 - [ ] 测试用例：命中/未命中、参数变化、异常降级、离线播放
 - [ ] 文档补充：使用说明与注意事项（浏览器/tauri 环境差异）
