@@ -509,6 +509,7 @@ export class APIManager {
         body: JSON.stringify({
           text,
           style,
+          apiKey: this.getEffectiveApiKey(),
           ...options
         })
       });

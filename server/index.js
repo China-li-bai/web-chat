@@ -386,7 +386,9 @@ app.post('/api/gemini-tts', async (req, res) => {
     
     // 使用 Gemini 代理服務或官方 API
     const geminiProxyUrl = process.env.GEMINI_PROXY_URL || 'https://gemini.66666618.xyz';
-    const useProxy = process.env.USE_GEMINI_PROXY !== 'false'; // 默認使用代理
+    const hasApiKey = !!effectiveConfig.apiKey;
+    // 若已配置 API Key（请求体或环境变量），强制直连官方；否则按环境开关决定是否走代理
+    const useProxy = hasApiKey ? false : (process.env.USE_GEMINI_PROXY !== 'false');
     
     let geminiUrl;
     const headers = {
@@ -404,7 +406,7 @@ app.post('/api/gemini-tts', async (req, res) => {
     } else {
       // 使用官方 API（直接攜帶 key）
       geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${effectiveConfig.apiKey}`;
-      console.log('使用 Gemini 官方 API');
+      console.log('使用 Gemini 官方 API（已配置 API Key）');
     }
     
     console.log('使用的API URL:', geminiUrl);

@@ -10,6 +10,8 @@
 
 - 降级与错误处理（失败不崩溃，提示友好）
 
+- 服务端直连策略优化（有API Key直连Google官方）
+
 ## Tech Stack
 
 {
@@ -17,21 +19,17 @@
     "arch": "react",
     "component": null
   },
-  "database": "wa-sqlite（IDB VFS，失败回退内存）",
-  "hash": "SubtleCrypto (SHA-256) + Node crypto fallback",
+  "database": "wa-sqlite（IDB VFS）",
+  "hash": "SubtleCrypto (SHA-256) + Node fallback",
   "modules": [
-    "src/lib/hash.js + 测试",
-    "src/lib/ttsCacheDao.memory.js + 测试",
-    "src/lib/ttsCacheDao.sqlite.js + 测试（默认强制回退供CI）",
-    "src/services/ttsWithCache.js + 测试",
-    "src/services/ttsCacheService.js（对外封装）",
-    "src/pages/Practice.jsx 集成"
+    "APIManager 转发 apiKey 给 /api/gemini-tts（已完成）",
+    "server/index.js 检测 apiKey 强制直连官方（已完成）"
   ]
 }
 
 ## Design
 
-在“🤖 AI语音”按钮旁用 Tooltip 显示来源（本地缓存/网络），提供“清理缓存”按钮；交互保持现状不打扰用户。
+UI不变；修正调用链：存在 apiKey 时官方直连（前端SDK或后端直连均满足要求）。
 
 ## Plan
 
@@ -60,6 +58,8 @@ Note:
 [X] 修改Practice页面组件，接入缓存读取/写入
 
 [X] 添加缓存状态UI指示器和用户反馈
+
+[X] 服务端直连策略修正（有API Key直连官方）
 
 [/] 实现缓存管理功能（清理、统计）
 
