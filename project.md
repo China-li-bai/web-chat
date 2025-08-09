@@ -67,8 +67,8 @@ retention = e^(-t/S)  // t 為已過天數，S 為 SuperMemo 計算出的穩定�
 STEP 5　技術 MVP（6–8 週可完成）  
  
 - 關鍵套件：  
-  - `flutter_pomodoro`（番茄鐘）  
-  - `flutter_anki`（間隔重複）  
+  - （番茄鐘）  
+  - （間隔重複）  
   - `audioplayers`（白噪音）  
   - `image_picker`（拍照建卡）  
 - 付費牆：免費 50 張卡，超限後訂閱制 $1.99/月。
