@@ -32,6 +32,7 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import AITutorFeedback from '../components/AITutorFeedback';
 import GeminiSettings from '../components/GeminiSettings';
+import { generateTTS, playAudio } from '../utils/apiManager.js';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -469,7 +470,7 @@ const Practice = () => {
     }
   };
 
-  // 播放Gemini示例 - 使用后端API
+  // 播放Gemini示例 - 使用API管理器
   const playGeminiExample = async () => {
     if (!practiceText) {
       message.warning('请先选择练习内容');
@@ -481,52 +482,25 @@ const Practice = () => {
     try {
       message.loading({ content: '🤖 Gemini AI 語音生成中...', key: messageKey, duration: 0 });
       
-      // 调用后端 Gemini TTS API
-      const response = await fetch('http://localhost:3001/api/gemini-tts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: practiceText,
-          voiceName: voiceStyle === 'professional' ? 'Charon' : 
-                    voiceStyle === 'cheerful' ? 'Puck' : 
-                    voiceStyle === 'calm' ? 'Kore' : 
-                    voiceStyle === 'energetic' ? 'Fenrir' : 
-                    voiceStyle === 'friendly' ? 'Aoede' : 'Kore'
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '网络请求失败' }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-      }
-
-      // 获取音频数据
-      const audioBlob = await response.blob();
+      // 使用API管理器生成語音
+      const result = await generateTTS(practiceText, voiceStyle);
       
       message.destroy(messageKey);
       
-      // 播放生成的音频
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      
-      audio.onloadstart = () => {
-        message.info(`🤖 Gemini AI 語音播放中... (${voiceStyle})`);
-      };
-      
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        message.success('🤖 Gemini AI 語音播放完成');
-      };
-      
-      audio.onerror = (error) => {
-        URL.revokeObjectURL(audioUrl);
-        console.error('語音播放錯誤:', error);
-        message.error('語音播放失敗');
-      };
-      
-      await audio.play();
+      // 使用API管理器播放音頻
+      await playAudio(
+        result.audioBlob,
+        () => {
+          message.info(`🤖 Gemini AI 語音播放中... (${voiceStyle})`);
+        },
+        () => {
+          message.success('🤖 Gemini AI 語音播放完成');
+        },
+        (error) => {
+          console.error('語音播放錯誤:', error);
+          message.error('語音播放失敗');
+        }
+      );
       
     } catch (error) {
       message.destroy(messageKey);
@@ -534,7 +508,7 @@ const Practice = () => {
       
       // 根據錯誤類型給出具體的提示
       if (error.message.includes('API密鑰') || error.message.includes('401')) {
-        message.error('Gemini API 密鑰無效或未配置，請檢查後端配置');
+        message.error('Gemini API 密鑰無效或未配置，請檢查設置中的API密鑰配置');
       } else if (error.message.includes('配額') || error.message.includes('429')) {
         message.error('API 配額已用完，請稍後再試');
       } else if (error.message.includes('超时') || error.message.includes('timeout')) {

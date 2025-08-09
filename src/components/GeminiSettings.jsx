@@ -20,8 +20,19 @@ import {
   RobotOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
-  ApiOutlined
+  ApiOutlined,
+  DeleteOutlined,
+  DatabaseOutlined,
+  ClearOutlined
 } from '@ant-design/icons';
+import { 
+  setUserApiKey, 
+  getApiStatus, 
+  getTTSCacheStats, 
+  clearTTSCache, 
+  setCacheEnabled,
+  cleanExpiredTTSCache 
+} from '../utils/apiManager.js';
 // import { invoke } from '@tauri-apps/api/core'; // 註釋掉Tauri依賴
 
 const { Title, Text, Paragraph } = Typography;
@@ -34,6 +45,8 @@ const GeminiSettings = ({ onSettingsChange }) => {
   const [testingConnection, setTestingConnection] = useState(false);
   const [interests, setInterests] = useState([]);
   const [newInterest, setNewInterest] = useState('');
+  const [cacheStats, setCacheStats] = useState({ totalItems: 0, totalSize: 0, maxItems: 50, expiryHours: 24 });
+  const [cacheEnabled, setCacheEnabledState] = useState(true);
 
   // 預設興趣標籤
   const defaultInterests = [
@@ -44,7 +57,52 @@ const GeminiSettings = ({ onSettingsChange }) => {
   useEffect(() => {
     // 從本地存儲加載設置
     loadSettings();
+    // 加載緩存狀態
+    loadCacheStats();
   }, []);
+
+  const loadCacheStats = () => {
+    try {
+      const stats = getTTSCacheStats();
+      setCacheStats(stats);
+    } catch (error) {
+      console.error('Failed to load cache stats:', error);
+    }
+  };
+
+  const handleClearCache = () => {
+    Modal.confirm({
+      title: '清空緩存',
+      content: '確定要清空所有TTS音頻緩存嗎？這將刪除所有已緩存的音頻文件。',
+      okText: '確定',
+      cancelText: '取消',
+      onOk: () => {
+        try {
+          clearTTSCache();
+          loadCacheStats();
+          message.success('緩存已清空');
+        } catch (error) {
+          message.error('清空緩存失敗');
+        }
+      }
+    });
+  };
+
+  const handleCleanExpiredCache = () => {
+    try {
+      cleanExpiredTTSCache();
+      loadCacheStats();
+      message.success('已清理過期緩存');
+    } catch (error) {
+      message.error('清理緩存失敗');
+    }
+  };
+
+  const handleCacheToggle = (enabled) => {
+    setCacheEnabledState(enabled);
+    setCacheEnabled(enabled);
+    message.success(enabled ? '緩存已啟用' : '緩存已禁用');
+  };
 
   const loadSettings = () => {
     try {
@@ -54,6 +112,11 @@ const GeminiSettings = ({ onSettingsChange }) => {
         form.setFieldsValue(settings);
         setInterests(settings.interests || []);
         setApiKeyConfigured(!!settings.apiKey);
+        
+        // 同步API密鑰到API管理器
+        if (settings.apiKey) {
+          setUserApiKey(settings.apiKey);
+        }
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -88,7 +151,14 @@ const GeminiSettings = ({ onSettingsChange }) => {
         // 在no-cors模式下，response是opaque的，無法檢查status或讀取內容
         // 如果fetch沒有拋出錯誤，說明請求已發送成功
         setApiKeyConfigured(true);
+        
+        // 通知API管理器更新用戶API密鑰
+        setUserApiKey(values.apiKey);
+        
         message.success('Gemini AI導師設置成功！');
+      } else {
+        // 如果清空了API密鑰，也要通知API管理器
+        setUserApiKey(null);
       }
       
       // 保存設置
@@ -322,6 +392,65 @@ const GeminiSettings = ({ onSettingsChange }) => {
               ))}
             </div>
           </div>
+        </Card>
+
+        {/* 緩存管理 */}
+        <Card size="small" title="緩存管理" style={{ marginBottom: '16px' }}>
+          <Paragraph type="secondary">
+            管理TTS音頻緩存，減少API調用次數並提升響應速度
+          </Paragraph>
+          
+          {/* 緩存開關 */}
+          <div style={{ marginBottom: '16px' }}>
+            <Space>
+              <DatabaseOutlined style={{ color: '#1890ff' }} />
+              <Text strong>啟用緩存：</Text>
+              <Switch 
+                checked={cacheEnabled} 
+                onChange={handleCacheToggle}
+                checkedChildren="開啟"
+                unCheckedChildren="關閉"
+              />
+            </Space>
+          </div>
+
+          {/* 緩存統計 */}
+          <div style={{ marginBottom: '16px' }}>
+            <Text strong>緩存統計：</Text>
+            <div style={{ marginTop: '8px', marginLeft: '16px' }}>
+              <div><Text type="secondary">已緩存項目：</Text> {cacheStats.totalItems} / {cacheStats.maxItems}</div>
+              <div><Text type="secondary">緩存大小：</Text> {(cacheStats.totalSize / 1024 / 1024).toFixed(2)} MB</div>
+              <div><Text type="secondary">過期時間：</Text> {cacheStats.expiryHours} 小時</div>
+            </div>
+          </div>
+
+          {/* 緩存操作 */}
+          <Space>
+            <Button 
+              icon={<ClearOutlined />}
+              onClick={handleCleanExpiredCache}
+              type="default"
+              size="small"
+            >
+              清理過期緩存
+            </Button>
+            <Button 
+              icon={<DeleteOutlined />}
+              onClick={handleClearCache}
+              danger
+              size="small"
+            >
+              清空所有緩存
+            </Button>
+            <Button 
+              icon={<DatabaseOutlined />}
+              onClick={loadCacheStats}
+              type="default"
+              size="small"
+            >
+              刷新統計
+            </Button>
+          </Space>
         </Card>
 
         <Divider />
