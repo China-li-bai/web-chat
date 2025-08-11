@@ -1,11 +1,10 @@
 import{
   TableNameImpl,
-  type DatabaseAdapter as DatabaseAdapterInterface,
   type RunResult,
   type Transaction as Tx,
-} from '../electric/adapter'
+} from '../wa-sqlite-adapter/databaseAdapter'
 import { Mutex } from 'async-mutex'
-import type { Statement,Row } from '../types'
+import type { Statement,Row,DatabaseAdapterInterface } from '../types'
 /**
  * A generic database adapter.
  * Uses a mutex to ensure that transactions are not interleaved.

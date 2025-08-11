@@ -15,9 +15,9 @@ export type SQLiteCompatibleType = number | string | Uint8Array | Array<number> 
 
 
 
-// A `DatabaseAdapter` adapts a database client to provide the
+// A `DatabaseAdapterInterface` adapts a database client to provide the
 // normalised interface defined here.
-export interface DatabaseAdapter {
+export interface DatabaseAdapterInterface {
   // Runs the provided sql statement
   run(statement: Statement): Promise<RunResult>
 
