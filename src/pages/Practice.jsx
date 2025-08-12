@@ -71,6 +71,10 @@ const Practice = () => {
   const [voiceStyle, setVoiceStyle] = useState('professional');
   const [ttsSource, setTtsSource] = useState(null);
   
+  // 缓存统计相关状态
+  const [showCacheStats, setShowCacheStats] = useState(false);
+  const [cacheStats, setCacheStats] = useState(null);
+  
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const audioRef = useRef(null);
@@ -571,6 +575,20 @@ const Practice = () => {
     } catch (e) {
       console.error('[handleClearCache] 清理缓存失败:', e);
       message.error('清理缓存失败: ' + e.message);
+    }
+  };
+
+  // 显示缓存统计信息
+  const handleShowCacheStats = async () => {
+    try {
+      console.log('[handleShowCacheStats] 获取缓存统计信息...');
+      const stats = await getComprehensiveStats();
+      setCacheStats(stats);
+      setShowCacheStats(true);
+      console.log('[handleShowCacheStats] 缓存统计信息:', stats);
+    } catch (e) {
+      console.error('[handleShowCacheStats] 获取缓存统计失败:', e);
+      message.error('获取缓存统计失败: ' + e.message);
     }
   };
 

@@ -33,6 +33,27 @@ function hexFromArrayBuffer(buffer) {
 }
 
 /**
+ * SHA-256 hash function with fallback support
+ * @param {string} input - Input string to hash
+ * @returns {Promise<string>} - Hex string hash
+ */
+async function sha256(input) {
+  const data = new TextEncoder().encode(input);
+  
+  // Prefer Web Crypto API
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
+    return hexFromArrayBuffer(digest);
+  }
+
+  // Node fallback (for vitest)
+  const { createHash } = await import('node:crypto');
+  const hash = createHash('sha256');
+  hash.update(input, 'utf8');
+  return hash.digest('hex');
+}
+
+/**
  * 构建 TTS 缓存键
  * 基于文本内容、语音风格、语言、提供商和版本生成唯一的缓存键
  * 
@@ -50,7 +71,7 @@ export async function buildTtsKey(params) {
   const normalized = {
     schema: SCHEMA_VERSION,
     env: ENV_INFO,
-    text: (params.text || '').trim(),
+    text: normalizeText(params.text || ''),
     voiceStyle: params.voiceStyle || 'professional',
     lang: params.lang || 'en-US',
     provider: params.provider || 'gemini',
@@ -103,56 +124,4 @@ export function isCacheKeyCompatible(key, metadata) {
   
   // 检查架构版本是否匹配
   return metadata.schemaVersion === currentSchema;
-}
-
-  // Prefer Web Crypto API
-  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
-    const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
-    return hexFromArrayBuffer(digest);
-  }
-
-  // Node fallback (for vitest)
-  const { createHash } = await import('node:crypto');
-  const hash = createHash('sha256');
-  if (typeof input === 'string') {
-    hash.update(input, 'utf8');
-  } else if (data instanceof Uint8Array) {
-    hash.update(Buffer.from(data));
-  } else {
-    hash.update(Buffer.from(data));
-  }
-  return hash.digest('hex');
-}
-
-/**
- * Build stable TTS cache key from payload parameters.
- * Include provider/version to avoid cross-engine or model-version collisions.
- * @param {{text:string, voiceStyle:string, lang:string, provider?:string, version?:string}} p
- * @returns {Promise<string>}
- */
-export async function buildTtsKey(p) {
-  const text = normalizeText(p?.text || '');
-  const voiceStyle = p?.voiceStyle || '';
-  const lang = p?.lang || '';
-  const provider = p?.provider || 'unknown';
-  const version = p?.version || '1';
-
-  // Use a simple, readable payload string; avoid ambiguity with explicit separators.
-  const payload = `${text}||${voiceStyle}||${lang}||${provider}:${version}`;
-  
-  // 添加详细的调试日志
-  console.log('[buildTtsKey] 🔑 缓存键生成详情:');
-  console.log('  输入参数:', {
-    text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
-    voiceStyle,
-    lang,
-    provider,
-    version
-  });
-  console.log('  生成载荷:', payload);
-  
-  const hash = await sha256Hex(payload);
-  console.log('  最终哈希:', hash);
-  
-  return hash;
 }
