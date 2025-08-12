@@ -197,7 +197,9 @@ export class TtsCacheDaoSqlite {
           provider,
           version,
           createdAt: created_at,
-          size
+          size,
+          // 添加架构版本信息用于兼容性检查
+          schemaVersion: version?.includes('v2.') ? 'v2.1' : 'v1.0' // 基于version推断架构版本
         }
       };
     } catch (e) {

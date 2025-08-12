@@ -35,10 +35,12 @@
     "APIManager 纯API调用（已清理localStorage）",
     "ttsCacheService 统一wa-sqlite缓存管理",
     "Practice.jsx 使用ttsCacheService缓存",
-    "LocalFirst：StorageManager、CacheManager、SyncManager、NetworkMonitor、Repository"
+    "LocalFirst：StorageManager、CacheManager、SyncManager、NetworkMonitor、Repository",
+    "ObservabilityManager 可观测性管理器",
+    "TTSWithCache 并发去重与埋点集成"
   ],
-  "test": "Vitest + fake-indexeddb/wa-sqlite stub + 集成测试",
-  "observability": "轻量埋点与日志（命中率/延迟/错误码/并发）"
+  "test": "Vitest + fake-indexeddb/wa-sqlite stub + 集成测试 + 缓存系统功能测试",
+  "observability": "轻量埋点与日志（命中率/延迟/错误码/并发）+ 统计UI展示"
 }
 
 ## Design
@@ -71,22 +73,22 @@ Note:
 
 [X] 设计完整的LocalFirst架构
 
-[/] 修改Practice页面组件，完全使用wa-sqlite缓存
+[X] 修改Practice页面组件，完全使用wa-sqlite缓存
 
-[/] 问题现象收集与根因假设清单（键一致性/初始化/并发/配额）
+[X] 问题现象收集与根因假设清单（键一致性/初始化/并发/配额）
 
-[ ] 可观测性接入（命中率/延迟/错误码/并发/配额日志）
+[X] 可观测性接入（命中率/延迟/错误码/并发/配额日志）
 
-[ ] 缓存Key策略校验与统一（加入schemaVersion与provider版本）
+[X] 并发去重与请求合并（同键同批次仅一次网络请求）
 
-[ ] 并发去重与请求合并（同键同批次仅一次网络请求）
+[X] UI 指示与设置（来源标签/一键清理/统计展示）
+
+[/] 缓存Key策略校验与统一（加入schemaVersion与provider版本）
 
 [ ] 异常分级与重试/降级（超时/429/5xx/配额）
 
 [ ] 配额评估与清理策略（LRU/TTL/手动清理）
 
 [ ] 端到端测试（离线/重连/高并发/大文本）
-
-[ ] UI 指示与设置（来源标签/一键清理/统计展示）
 
 [ ] 文档与运行脚本完善（docs/ 与 scripts/）

@@ -1,5 +1,6 @@
 import { TtsCacheDaoSqlite } from '../lib/ttsCacheDao.sqlite.js';
 import { TTSWithCache } from './ttsWithCache.js';
+import { observability } from './observabilityManager.js';
 
 // 默认使用 wa-sqlite(IDB VFS) 并带内存回退
 const dao = new TtsCacheDaoSqlite({
@@ -87,10 +88,49 @@ export function getCacheInitStatus() {
   };
 }
 
+/** 获取可观测性统计信息 */
+export function getObservabilityStats() {
+  return observability.getStats();
+}
+
+/** 打印可观测性报告 */
+export function printObservabilityReport() {
+  observability.printReport();
+}
+
+/** 重置可观测性统计 */
+export function resetObservabilityStats() {
+  observability.reset();
+}
+
+/** 获取综合缓存统计（包含存储和可观测性数据） */
+export async function getComprehensiveStats() {
+  const [storageStats, obsStats] = await Promise.all([
+    cacheStats(),
+    Promise.resolve(getObservabilityStats())
+  ]);
+  
+  return {
+    storage: storageStats,
+    observability: obsStats,
+    summary: {
+      totalCacheItems: storageStats.count,
+      totalCacheSize: `${Math.round(storageStats.totalBytes / 1024)}KB`,
+      hitRate: obsStats.hitRate,
+      efficiency: obsStats.efficiency,
+      uptime: `${obsStats.uptime}秒`
+    }
+  };
+}
+
 export default {
   preInitCache,
   getOrGenerateTTS,
   clearAllCache,
   cacheStats,
-  getCacheInitStatus
+  getCacheInitStatus,
+  getObservabilityStats,
+  printObservabilityReport,
+  resetObservabilityStats,
+  getComprehensiveStats
 };

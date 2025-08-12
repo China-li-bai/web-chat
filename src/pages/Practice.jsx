@@ -33,7 +33,14 @@ import { invoke } from '@tauri-apps/api/core';
 import AITutorFeedback from '../components/AITutorFeedback';
 import GeminiSettings from '../components/GeminiSettings';
 import { generateTTS, playAudio } from '../utils/apiManager.js';
-import { getOrGenerateTTS, clearAllCache, preInitCache, getCacheInitStatus } from '../services/ttsCacheService.js';
+import { 
+  getOrGenerateTTS, 
+  clearAllCache, 
+  preInitCache, 
+  getCacheInitStatus,
+  getComprehensiveStats,
+  printObservabilityReport 
+} from '../services/ttsCacheService.js';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -711,6 +718,11 @@ const Practice = () => {
                             清理缓存
                           </Button>
                         </Tooltip>
+                        <Tooltip title="查看缓存统计信息">
+                          <Button onClick={handleShowCacheStats}>
+                            缓存统计
+                          </Button>
+                        </Tooltip>
                       </Space>
                     </div>
                   </div>
@@ -866,6 +878,94 @@ const Practice = () => {
         width={800}
       >
         <GeminiSettings onSettingsChange={handleSettingsChange} />
+      </Modal>
+
+      {/* 缓存统计信息模态框 */}
+      <Modal
+        title="🚀 TTS缓存系统统计"
+        open={showCacheStats}
+        onCancel={() => setShowCacheStats(false)}
+        footer={[
+          <Button key="close" onClick={() => setShowCacheStats(false)}>
+            关闭
+          </Button>
+        ]}
+        width={600}
+      >
+        {cacheStats && (
+          <div>
+            <Row gutter={[16, 16]}>
+              <Col span={12}>
+                <Card size="small" title="📊 性能指标">
+                  <div style={{ lineHeight: '2' }}>
+                    <div><strong>缓存命中率:</strong> <span style={{ color: '#52c41a', fontSize: '16px' }}>{cacheStats.observability.hitRate}</span></div>
+                    <div><strong>平均延迟:</strong> {cacheStats.observability.averageLatency}</div>
+                    <div><strong>运行时间:</strong> {cacheStats.summary.uptime}</div>
+                    <div><strong>效率提升:</strong> <span style={{ color: '#1890ff' }}>{cacheStats.observability.efficiency}</span></div>
+                  </div>
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card size="small" title="💾 存储状态">
+                  <div style={{ lineHeight: '2' }}>
+                    <div><strong>缓存项数:</strong> {cacheStats.summary.totalCacheItems}</div>
+                    <div><strong>存储大小:</strong> {cacheStats.summary.totalCacheSize}</div>
+                    <div><strong>当前并发:</strong> {cacheStats.observability.concurrentRequests}</div>
+                    <div><strong>合并请求:</strong> <span style={{ color: '#faad14' }}>{cacheStats.observability.mergedRequests}</span></div>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+            
+            <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
+              <Col span={24}>
+                <Card size="small" title="📈 请求统计">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                    <div><strong>总请求:</strong> {cacheStats.observability.totalRequests}</div>
+                    <div><strong>缓存命中:</strong> <span style={{ color: '#52c41a' }}>{cacheStats.observability.cacheHits}</span></div>
+                    <div><strong>缓存未命中:</strong> <span style={{ color: '#faad14' }}>{cacheStats.observability.cacheMisses}</span></div>
+                    <div><strong>网络请求:</strong> <span style={{ color: '#f5222d' }}>{cacheStats.observability.networkRequests}</span></div>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+
+            {Object.keys(cacheStats.observability.errors).length > 0 && (
+              <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
+                <Col span={24}>
+                  <Card size="small" title="⚠️ 错误统计">
+                    <div>
+                      {Object.entries(cacheStats.observability.errors).map(([errorType, count]) => (
+                        <div key={errorType} style={{ marginBottom: '4px' }}>
+                          <strong>{errorType}:</strong> <span style={{ color: '#f5222d' }}>{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+            )}
+
+            <Alert
+              message="💡 优化建议"
+              description={
+                <div>
+                  {parseFloat(cacheStats.observability.hitRate) < 50 && 
+                    <div>• 缓存命中率较低，建议检查缓存键策略或增加缓存时间</div>
+                  }
+                  {cacheStats.observability.mergedRequests > 0 && 
+                    <div>• 并发去重功能正常工作，已节省 {cacheStats.observability.mergedRequests} 次重复请求</div>
+                  }
+                  {Object.keys(cacheStats.observability.errors).length > 0 && 
+                    <div>• 检测到错误，请查看控制台日志了解详情</div>
+                  }
+                </div>
+              }
+              type="info"
+              style={{ marginTop: '16px' }}
+            />
+          </div>
+        )}
       </Modal>
     </div>
   );
