@@ -12,12 +12,12 @@ import { resultToRows } from '../util/results'
 import type { Row, SqlValue, Statement } from '../types'
 
 export type Database = Pick<
-  ElectricDatabase,
+  BasicDatabase,
   'name' | 'exec' | 'getRowsModified'
 >
 type SQLiteCompatibleType = number | string | Uint8Array | Array<number> | bigint | null;
 
-export class ElectricDatabase {
+export class BasicDatabase {
   #mutex: Mutex
 
   // Do not use this constructor directly.
@@ -86,7 +86,7 @@ export class ElectricDatabase {
     locateSqliteDist?: string | ((path: string) => string)
   ) {
 
-    return ElectricDatabase._init(
+    return BasicDatabase._init(
       dbName,
       locateSqliteDist
     )
@@ -100,7 +100,7 @@ export class ElectricDatabase {
     vfs: SQLiteVFS,
     locateSqliteDist?: string | ((path: string) => string)
   ) {
-    return ElectricDatabase._init(dbName, locateSqliteDist)
+    return BasicDatabase._init(dbName, locateSqliteDist)
   }
 
   private static async _init(
@@ -134,6 +134,6 @@ export class ElectricDatabase {
       // dbName
     )
 
-    return new ElectricDatabase(dbName, sqlite3, db)
+    return new BasicDatabase(dbName, sqlite3, db)
   }
 }
