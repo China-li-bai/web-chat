@@ -75,11 +75,17 @@ export class FSRSAlgorithm implements SpacedRepetitionAlgorithm {
       return state;
     }
 
-    const sortedRecords = [...records].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const sortedRecords = [...records].sort((a, b) => {
+  // 确保timestamp是Date对象
+  const timestampA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+  const timestampB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+  return timestampA.getTime() - timestampB.getTime();
+});
 
     for (const record of sortedRecords) {
       state = this.applyFSRSAlgorithm(state, record.response);
-      state.lastReview = record.timestamp;
+      // 确保timestamp是Date对象
+      state.lastReview = record.timestamp instanceof Date ? record.timestamp : new Date(record.timestamp);
       state.reviewCount++;
     }
 
@@ -162,10 +168,13 @@ export class FSRSAlgorithm implements SpacedRepetitionAlgorithm {
       stability = Math.max(0.1, Math.min(36500, stability));
       difficulty = Math.max(1, Math.min(10, difficulty));
 
+      // 确保lastReview是Date对象
+      const lastReview = state.lastReview instanceof Date ? state.lastReview : new Date(state.lastReview);
+
       return {
         stability,
         difficulty,
-        lastReview: state.lastReview,
+        lastReview,
         reviewCount: state.reviewCount
       };
     }
@@ -195,7 +204,9 @@ export class FSRSAlgorithm implements SpacedRepetitionAlgorithm {
     const now = new Date();
     const nextReview = new Date(now.getTime() + Math.max(1, state.stability) * 24 * 60 * 60 * 1000);
 
-    const daysSinceReview = daysBetween(state.lastReview, now);
+    // 确保lastReview是Date对象
+    const lastReview = state.lastReview instanceof Date ? state.lastReview : new Date(state.lastReview);
+    const daysSinceReview = daysBetween(lastReview, now);
     const retrievability = this.estimateRetention(
       { stability: state.stability } as MemoryStrength,
       daysSinceReview * 24 * 60 * 60 * 1000
@@ -207,7 +218,7 @@ export class FSRSAlgorithm implements SpacedRepetitionAlgorithm {
       stability: state.stability,
       difficulty: state.difficulty / 10,
       retrievability,
-      lastReview: state.lastReview,
+      lastReview,
       nextReview,
       reviewCount: records.length,
       lapseCount
@@ -270,7 +281,10 @@ export class FSRSAlgorithm implements SpacedRepetitionAlgorithm {
       // 转换回MemoryStrength格式
       const now = new Date();
       const nextReview = new Date(now.getTime() + Math.max(1, updatedState.stability) * 24 * 60 * 60 * 1000);
-      const daysSinceReview = daysBetween(updatedState.lastReview, now);
+      
+      // 确保lastReview是Date对象
+      const lastReview = updatedState.lastReview instanceof Date ? updatedState.lastReview : new Date(updatedState.lastReview);
+      const daysSinceReview = daysBetween(lastReview, now);
       const retrievability = this.estimateRetention(
         { stability: updatedState.stability } as MemoryStrength,
         daysSinceReview * 24 * 60 * 60 * 1000
@@ -280,7 +294,7 @@ export class FSRSAlgorithm implements SpacedRepetitionAlgorithm {
         stability: updatedState.stability,
         difficulty: updatedState.difficulty / 10, // 转换回0-1范围
         retrievability,
-        lastReview: updatedState.lastReview,
+        lastReview,
         nextReview,
         reviewCount: updatedState.reviewCount,
         lapseCount: currentStrength.lapseCount + (response === 'again' ? 1 : 0)

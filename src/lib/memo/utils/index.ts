@@ -97,9 +97,12 @@ export function calculateLearningTrend(records: StudyRecord[]): number {
   if (records.length < 2) return 0;
   
   // 按时间排序
-  const sortedRecords = [...records].sort((a, b) => 
-    a.timestamp.getTime() - b.timestamp.getTime()
-  );
+  const sortedRecords = [...records].sort((a, b) => {
+    // 确保timestamp是Date对象
+    const timestampA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+    const timestampB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+    return timestampA.getTime() - timestampB.getTime();
+  });
   
   // 计算前半部分和后半部分的平均分数
   const midPoint = Math.floor(sortedRecords.length / 2);

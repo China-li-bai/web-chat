@@ -225,8 +225,12 @@ export class DifficultyAdaptiveAlgorithm {
     if (sessions.length === 0) return 0.7;
 
     // 基于会话时长、正确率和认知负荷
-    const avgDuration = sessions.reduce((sum, s) => 
-      sum + (s.endTime.getTime() - s.startTime.getTime()), 0) / sessions.length;
+    const avgDuration = sessions.reduce((sum, s) => {
+      // 确保endTime和startTime是Date对象
+      const endTime = s.endTime instanceof Date ? s.endTime : new Date(s.endTime);
+      const startTime = s.startTime instanceof Date ? s.startTime : new Date(s.startTime);
+      return sum + (endTime.getTime() - startTime.getTime());
+    }, 0) / sessions.length;
     const avgAccuracy = sessions.reduce((sum, s) => 
       sum + (s.correctResponses / s.itemsStudied), 0) / sessions.length;
     const avgCognitiveLoad = sessions.reduce((sum, s) => 
@@ -260,7 +264,9 @@ export class DifficultyAdaptiveAlgorithm {
 
     // 基于长期记忆表现
     const longTermRecords = records.filter(r => {
-      const daysSince = daysBetween(r.timestamp, new Date());
+      // 确保timestamp是Date对象
+      const timestamp = r.timestamp instanceof Date ? r.timestamp : new Date(r.timestamp);
+      const daysSince = daysBetween(timestamp, new Date());
       return daysSince >= 1; // 至少1天前的记录
     });
 

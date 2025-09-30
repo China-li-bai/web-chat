@@ -270,6 +270,7 @@ export class MemoryLearningManager {
    * 完成学习会话
    */
   completeSession(session: LearningSession): StudySession {
+    // 确保endTime是Date对象
     session.endTime = new Date();
     
     const duration = session.endTime.getTime() - session.startTime.getTime();

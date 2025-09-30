@@ -323,7 +323,9 @@ export class ActiveRetrievalAlgorithm {
     
     const lastRecord = records[records.length - 1];
     const now = new Date();
-    return Math.floor((now.getTime() - lastRecord.timestamp.getTime()) / (24 * 60 * 60 * 1000));
+    // 确保timestamp是Date对象
+    const timestamp = lastRecord.timestamp instanceof Date ? lastRecord.timestamp : new Date(lastRecord.timestamp);
+    return Math.floor((now.getTime() - timestamp.getTime()) / (24 * 60 * 60 * 1000));
   }
 
   private getDefaultStrategy(item: LearningItem): RetrievalStrategy {

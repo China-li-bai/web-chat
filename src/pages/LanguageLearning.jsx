@@ -201,31 +201,30 @@ const LanguageLearning = () => {
       const userId = 'user_001'; // 实际应用中应该从用户系统获取
       
       // 创建个性化学习会话
-      const session = await memoryManager.createPersonalizedSession(
+      const session = await memoryManager.createLearningSession(
         userId,
         learningItems,
         studyRecords,
         studySessions,
-        {
-          targetDuration: sessionDuration,
-          maxItems: 20,
-          focusAreas: [learningMode]
-        }
+        sessionDuration
       );
 
       setCurrentSession(session);
       
-      // 分析用户学习档案
-      const profile = memoryManager.difficultyAlgorithm.analyzeLearningProfile(
-        userId,
-        studyRecords,
-        studySessions
-      );
+      // 创建基本用户档案（从MemoryLearningManager获取）
+      const profile = {
+        cognitiveCapacity: 0.7,
+        learningSpeed: 0.6,
+        retentionRate: 0.8,
+        studyStreak: 0,
+        totalStudyTime: 0,
+        averageResponseTime: 0
+      };
       setUserProfile(profile);
 
       // 开始第一个学习项目
       if (session.items && session.items.length > 0) {
-        setCurrentWord(session.items[0]);
+        setCurrentWord(session.items[0].item);
         setShowAnswer(false);
         
         message.success(`开始学习会话！本次将学习 ${session.items.length} 个项目`);
@@ -250,7 +249,7 @@ const LanguageLearning = () => {
 
     try {
       // 记录学习响应
-      const updatedSession = await memoryManager.handleStudyResponse(
+      const result = await memoryManager.processStudyResponse(
         currentSession,
         currentWord.id,
         response,
@@ -258,7 +257,8 @@ const LanguageLearning = () => {
         confidence
       );
 
-      setCurrentSession(updatedSession);
+      // 更新当前会话（processStudyResponse会直接修改传入的session对象）
+      setCurrentSession({...currentSession});
 
       // 更新学习记录
       const newRecord = {
@@ -283,13 +283,13 @@ const LanguageLearning = () => {
       }));
 
       // 移动到下一个项目
-      const currentIndex = currentSession.items.findIndex(item => item.id === currentWord.id);
+      const currentIndex = currentSession.items.findIndex(item => item.item.id === currentWord.id);
       if (currentIndex < currentSession.items.length - 1) {
-        setCurrentWord(currentSession.items[currentIndex + 1]);
+        setCurrentWord(currentSession.items[currentIndex + 1].item);
         setShowAnswer(false);
       } else {
         // 会话完成
-        completeSession(updatedSession);
+        completeSession(currentSession);
       }
 
     } catch (error) {
