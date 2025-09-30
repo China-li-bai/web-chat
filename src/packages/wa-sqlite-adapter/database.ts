@@ -85,9 +85,11 @@ export class BasicDatabase {
     dbName: string,
     locateSqliteDist?: string | ((path: string) => string)
   ) {
+    const vfs: SQLiteVFS = await new IDBBatchAtomicVFS(dbName)
 
     return BasicDatabase._init(
       dbName,
+      vfs,
       locateSqliteDist
     )
   }
@@ -100,12 +102,13 @@ export class BasicDatabase {
     vfs: SQLiteVFS,
     locateSqliteDist?: string | ((path: string) => string)
   ) {
-    return BasicDatabase._init(dbName, locateSqliteDist)
+
+    return BasicDatabase._init(dbName, vfs, locateSqliteDist)
   }
 
   private static async _init(
     dbName: string,
-
+    vfs: SQLiteVFS,
     locateSqliteDist?: string | ((path: string) => string)
   ) {
     // Initialize SQLite
@@ -119,7 +122,6 @@ export class BasicDatabase {
     const SQLiteAsyncModule = await SQLiteAsyncESMFactory({
       locateFile: locateFile,
     })
-    const vfs: SQLiteVFS = await IDBBatchAtomicVFS.create(dbName, SQLiteAsyncModule, { lockPolicy: 'shared+hint' })
     // Build API objects for the module
     const sqlite3 = SQLite.Factory(SQLiteAsyncModule)
 

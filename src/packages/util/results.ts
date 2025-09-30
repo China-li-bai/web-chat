@@ -1,4 +1,4 @@
-import { Row, SqlValue } from '../types'
+import type { Row, SqlValue } from '../types'
 
 export interface Results {
   rows: {

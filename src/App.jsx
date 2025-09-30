@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Home from './pages/Home';
 import Practice from './pages/Practice';
+import LanguageLearning from './pages/LanguageLearning';
 import Progress from './pages/Progress';
 import Settings from './pages/Settings';
 import './styles/App.css';
@@ -21,6 +22,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/practice" element={<Practice />} />
+            <Route path="/language-learning" element={<LanguageLearning />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

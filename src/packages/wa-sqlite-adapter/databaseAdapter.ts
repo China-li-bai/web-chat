@@ -1,4 +1,4 @@
-import { SqlValue, DbNamespace } from '../types'
+import { type SqlValue, type DbNamespace } from '../types'
 import { QualifiedTablename } from '../util/tablename'
 
 const _ensureQualified = (

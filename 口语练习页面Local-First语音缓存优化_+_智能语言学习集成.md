@@ -1,4 +1,4 @@
-# 口语练习页面Local-First语音缓存优化
+# 口语练习页面Local-First语音缓存优化 + 智能语言学习集成
 
 ## Core Features
 
@@ -12,32 +12,34 @@
 
 - 服务端直连策略优化（有API Key直连Google官方）
 
-- 记忆学习算法栈完整实现（FSRS + 难度自适应 + 主动检索）
+- 智能语言学习系统（FSRS + 难度自适应 + 主动检索）
 
-- 实际应用场景完整代码实例（语言学习、编程训练、医学教育等）
+- 个性化学习会话管理
+
+- 实时学习档案分析与统计
 
 ## Tech Stack
 
 {
   "Web": {
     "arch": "react",
-    "component": null
+    "component": "antd"
   },
   "database": "wa-sqlite（IDB VFS）",
   "hash": "SubtleCrypto (SHA-256) + Node fallback",
+  "algorithms": "FSRS + DifficultyAdaptive + ActiveRetrieval",
   "modules": [
     "APIManager 纯API调用（已清理localStorage）",
     "ttsCacheService 统一wa-sqlite缓存管理",
     "Practice.jsx 使用ttsCacheService缓存",
-    "记忆学习算法栈（FSRS + DifficultyAdaptive + ActiveRetrieval）",
-    "MemoryLearningManager 统一协调管理",
-    "实际应用场景（语言学习、编程训练、医学教育、演示系统）"
+    "LanguageLearning.jsx 智能学习页面",
+    "MemoryLearningManager 算法协调器"
   ]
 }
 
 ## Design
 
-架构重构：APIManager只负责API调用，所有缓存通过wa-sqlite系统进行，避免localStorage与wa-sqlite混用。记忆学习算法栈采用模块化设计，支持多领域应用场景，提供完整的实际代码实例和演示系统。
+架构重构：APIManager只负责API调用，所有缓存通过wa-sqlite系统进行，避免localStorage与wa-sqlite混用。集成完整记忆学习算法栈到React应用中。
 
 ## Plan
 
@@ -71,8 +73,4 @@ Note:
 
 [X] 优化错误处理和降级机制
 
-[X] 实现记忆学习算法栈核心模块
-
-[X] 创建完整的API文档和使用指南
-
-[X] 编写实际应用场景+代码实例
+[X] 集成智能语言学习功能到chat-web项目

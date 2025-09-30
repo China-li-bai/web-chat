@@ -1,14 +1,11 @@
-import type{ Database } from './database'
-  
-
+import type { Database } from './database'
 import { SerialDatabaseAdapter as GenericDatabaseAdapter } from '../generic'
-import type {Row,Statement} from "../types"
-
-
+import type { Row, Statement } from '../types'
 
 export interface RunResult {
   rowsAffected: number
 }
+
 export class DatabaseAdapter extends GenericDatabaseAdapter {
   readonly db: Database
 
