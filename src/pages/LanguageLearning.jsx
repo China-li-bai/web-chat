@@ -33,7 +33,9 @@ import {
   ReloadOutlined,
   BarChartOutlined,
   FireOutlined,
-  ThunderboltOutlined
+  ThunderboltOutlined,
+  LineChartOutlined,
+  FolderOutlined
 } from '@ant-design/icons';
 
 // 导入记忆学习算法栈
@@ -66,11 +68,22 @@ const LanguageLearning = () => {
   const [learningMode, setLearningMode] = useState('vocabulary'); // vocabulary, grammar, listening
   const [difficultyLevel, setDifficultyLevel] = useState('intermediate');
   const [sessionDuration, setSessionDuration] = useState(1800); // 30分钟
+  
+  // 响应式布局
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // 初始化记忆学习系统
   useEffect(() => {
     initializeMemorySystem();
     loadUserData();
+    
+    // 响应式布局监听
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const initializeMemorySystem = () => {
@@ -564,32 +577,61 @@ const LanguageLearning = () => {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: isMobile ? '16px' : '24px' }}>
       <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <Title level={2} style={{ margin: 0 }}>
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between', 
+          alignItems: isMobile ? 'flex-start' : 'center',
+          marginBottom: '24px',
+          gap: isMobile ? '16px' : '0'
+        }}>
+          <Title level={isMobile ? 3 : 2} style={{ margin: 0 }}>
             <BookOutlined style={{ marginRight: '12px', color: '#1890ff' }} />
             智能语言学习
           </Title>
-          <Space>
-            <Select
-              value={learningMode}
-              onChange={setLearningMode}
-              style={{ width: 120 }}
-            >
-              <Option value="vocabulary">词汇</Option>
-              <Option value="grammar">语法</Option>
-              <Option value="listening">听力</Option>
-            </Select>
-            <Select
-              value={difficultyLevel}
-              onChange={setDifficultyLevel}
-              style={{ width: 120 }}
-            >
-              <Option value="beginner">初级</Option>
-              <Option value="intermediate">中级</Option>
-              <Option value="advanced">高级</Option>
-            </Select>
+          <Space direction={isMobile ? 'vertical' : 'horizontal'} style={{ width: isMobile ? '100%' : 'auto' }}>
+            <Space>
+              <Select
+                value={learningMode}
+                onChange={setLearningMode}
+                style={{ width: isMobile ? '100px' : '120px' }}
+                size={isMobile ? 'small' : 'default'}
+              >
+                <Option value="vocabulary">词汇</Option>
+                <Option value="grammar">语法</Option>
+                <Option value="listening">听力</Option>
+              </Select>
+              <Select
+                value={difficultyLevel}
+                onChange={setDifficultyLevel}
+                style={{ width: isMobile ? '100px' : '120px' }}
+                size={isMobile ? 'small' : 'default'}
+              >
+                <Option value="beginner">初级</Option>
+                <Option value="intermediate">中级</Option>
+                <Option value="advanced">高级</Option>
+              </Select>
+            </Space>
+            <Space>
+              <Button 
+                type="link" 
+                icon={<LineChartOutlined />}
+                onClick={() => window.location.href = '/long-term-statistics'}
+                size={isMobile ? 'small' : 'default'}
+              >
+                长期统计
+              </Button>
+              <Button 
+                type="link" 
+                icon={<FolderOutlined />}
+                onClick={() => window.location.href = '/wordbook-manager'}
+                size={isMobile ? 'small' : 'default'}
+              >
+                单词本管理
+              </Button>
+            </Space>
           </Space>
         </div>
 

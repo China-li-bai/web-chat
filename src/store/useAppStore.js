@@ -82,6 +82,55 @@ const useAppStore = create(
         }
       },
 
+      // 单词本管理
+      wordbooks: [
+        {
+          id: 'oxford3000',
+          name: '牛津3000',
+          description: '牛津3000核心词汇',
+          category: 'academic',
+          wordCount: 3000,
+          difficulty: 'intermediate',
+          tags: ['academic', 'core', 'english'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isActive: true
+        },
+        {
+          id: 'cet4',
+          name: '四级英语',
+          description: '大学英语四级词汇',
+          category: 'exam',
+          wordCount: 4500,
+          difficulty: 'intermediate',
+          tags: ['exam', 'college', 'english'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isActive: true
+        }
+      ],
+
+      // 单词数据
+      vocabulary: [
+        {
+          id: 'word_1',
+          wordbookId: 'oxford3000',
+          word: 'abandon',
+          pronunciation: '/əˈbændən/',
+          meaning: '放弃，抛弃',
+          example: 'He decided to abandon his studies and travel the world.',
+          difficulty: 0.6,
+          tags: ['verb', 'common'],
+          createdAt: new Date().toISOString(),
+          lastReviewed: null,
+          reviewCount: 0,
+          masteryLevel: 0
+        }
+      ],
+
+      // 单词学习记录
+      wordLearningRecords: [],
+
       // 可用练习主题
       practiceTopics: [
         {
@@ -245,6 +294,76 @@ const useAppStore = create(
         }
       })),
 
+      // 单词本相关 Actions
+      addWordbook: (wordbook) => set((state) => ({
+        wordbooks: [...state.wordbooks, { 
+          ...wordbook, 
+          id: wordbook.id || Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isActive: true
+        }]
+      })),
+
+      updateWordbook: (wordbookId, updates) => set((state) => ({
+        wordbooks: state.wordbooks.map(wb =>
+          wb.id === wordbookId ? { ...wb, ...updates, updatedAt: new Date().toISOString() } : wb
+        )
+      })),
+
+      deleteWordbook: (wordbookId) => set((state) => ({
+        wordbooks: state.wordbooks.filter(wb => wb.id !== wordbookId),
+        vocabulary: state.vocabulary.filter(word => word.wordbookId !== wordbookId)
+      })),
+
+      // 单词相关 Actions
+      addVocabulary: (wordData) => set((state) => ({
+        vocabulary: [...state.vocabulary, { 
+          ...wordData, 
+          id: wordData.id || `word_${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          lastReviewed: null,
+          reviewCount: 0,
+          masteryLevel: 0
+        }]
+      })),
+
+      updateVocabulary: (wordId, updates) => set((state) => ({
+        vocabulary: state.vocabulary.map(word =>
+          word.id === wordId ? { ...word, ...updates, updatedAt: new Date().toISOString() } : word
+        )
+      })),
+
+      deleteVocabulary: (wordId) => set((state) => ({
+        vocabulary: state.vocabulary.filter(word => word.id !== wordId)
+      })),
+
+      // 批量导入单词
+      importVocabulary: (wordbookId, words) => set((state) => ({
+        vocabulary: [
+          ...state.vocabulary,
+          ...words.map((word, index) => ({
+            id: `import_${wordbookId}_${Date.now()}_${index}`,
+            wordbookId,
+            word: word.word,
+            pronunciation: word.pronunciation || '',
+            meaning: word.meaning,
+            example: word.example || '',
+            difficulty: word.difficulty || 0.5,
+            tags: word.tags || [],
+            createdAt: new Date().toISOString(),
+            lastReviewed: null,
+            reviewCount: 0,
+            masteryLevel: 0
+          }))
+        ]
+      })),
+
+      // 添加学习记录
+      addWordLearningRecord: (record) => set((state) => ({
+        wordLearningRecords: [record, ...state.wordLearningRecords].slice(0, 1000)
+      })),
+
       // 主题相关 Actions
       addCustomTopic: (topic) => set((state) => ({
         practiceTopics: [...state.practiceTopics, { ...topic, id: Date.now().toString() }]
@@ -368,6 +487,9 @@ const useAppStore = create(
         user: state.user,
         practiceHistory: state.practiceHistory,
         userStats: state.userStats,
+        wordbooks: state.wordbooks,
+        vocabulary: state.vocabulary,
+        wordLearningRecords: state.wordLearningRecords,
         settings: {
           ...state.settings,
           apiKeys: {

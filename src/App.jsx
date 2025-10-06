@@ -8,6 +8,8 @@ import Practice from './pages/Practice';
 import LanguageLearning from './pages/LanguageLearning';
 import Progress from './pages/Progress';
 import Settings from './pages/Settings';
+import LongTermStatistics from './pages/LongTermStatistics';
+import WordbookManager from './pages/WordbookManager';
 import './styles/App.css';
 
 const { Content } = Layout;
@@ -25,6 +27,8 @@ function App() {
             <Route path="/language-learning" element={<LanguageLearning />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/long-term-statistics" element={<LongTermStatistics />} />
+            <Route path="/wordbook-manager" element={<WordbookManager />} />
           </Routes>
         </Content>
       </Layout>

@@ -7,7 +7,8 @@ import {
   BarChartOutlined,
   SettingOutlined,
   AudioOutlined,
-  BookOutlined
+  BookOutlined,
+  LineChartOutlined
 } from '@ant-design/icons';
 
 const { Sider } = Layout;
@@ -28,9 +29,21 @@ const Sidebar = () => {
       label: '口语练习',
     },
     {
-      key: '/language-learning',
+      key: 'language-learning',
       icon: <BookOutlined />,
       label: '智能学习',
+      children: [
+        {
+          key: '/language-learning',
+          icon: <BookOutlined />,
+          label: '本次学习统计',
+        },
+        {
+          key: '/language-learning/statistics',
+          icon: <LineChartOutlined />,
+          label: '长期学习统计',
+        },
+      ],
     },
     {
       key: '/progress',
