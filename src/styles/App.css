@@ -2,53 +2,126 @@
 .app-layout {
   height: 100vh;
   overflow: hidden;
+  background: #f0f2f5;
+}
+
+/* 主布局容器 */
+.main-layout {
+  transition: margin-left 0.3s ease;
+}
+
+/* 桌面端布局 */
+.desktop-layout {
+  margin-left: 200px;
+}
+
+.desktop-layout.collapsed {
+  margin-left: 80px;
+}
+
+/* 移动端布局 */
+.mobile-layout {
+  margin-left: 0;
+}
+
+/* 主内容区域 */
+.main-content {
+  margin: 24px 16px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  min-height: calc(100vh - 112px);
+  overflow-y: auto;
 }
 
 /* 侧边栏样式 */
-.sidebar {
+.desktop-sidebar {
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  border-right: 1px solid #f0f0f0;
   z-index: 100;
 }
 
-.sidebar .logo {
+.sidebar-logo {
   height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  padding: 0 16px;
   border-bottom: 1px solid #f0f0f0;
+  background: #fff;
   font-size: 16px;
   font-weight: 600;
   color: #1890ff;
 }
 
-.sidebar .ant-menu {
+.sidebar-menu {
+  background: #fff;
   height: calc(100vh - 64px);
   overflow-y: auto;
 }
 
-.sidebar .ant-menu-item {
+.sidebar-menu .ant-menu-item {
+  height: 48px;
+  line-height: 48px;
   margin: 4px 8px;
   border-radius: 6px;
-  height: 40px;
-  line-height: 40px;
 }
 
-.sidebar .ant-menu-item:hover {
+.sidebar-menu .ant-menu-item:hover {
   background: #e6f7ff;
 }
 
-.sidebar .ant-menu-item-selected {
+.sidebar-menu .ant-menu-item-selected {
   background: #1890ff;
   color: #fff;
 }
 
-.sidebar .ant-menu-item-selected:hover {
+.sidebar-menu .ant-menu-item-selected:hover {
   background: #40a9ff;
 }
 
-.sidebar .ant-menu-item-selected .anticon {
+.sidebar-menu .ant-menu-item-selected .anticon {
   color: #fff;
+}
+
+.sidebar-menu .ant-menu-submenu {
+  margin: 4px 8px;
+}
+
+.sidebar-menu .ant-menu-submenu-title {
+  height: 48px;
+  line-height: 48px;
+  border-radius: 6px;
+}
+
+/* 移动端样式 */
+.mobile-menu-trigger {
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  background: #fff !important;
+}
+
+.mobile-sidebar-drawer .ant-drawer-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mobile-sidebar-drawer .ant-drawer-body {
+  padding: 0;
+}
+
+.mobile-sidebar-drawer .sidebar-menu .ant-menu-item {
+  height: 56px;
+  line-height: 56px;
+  margin: 4px 12px;
+  font-size: 16px;
+}
+
+.mobile-sidebar-drawer .sidebar-menu .ant-menu-submenu-title {
+  height: 56px;
+  line-height: 56px;
+  font-size: 16px;
 }
 
 /* 头部样式 */
@@ -59,6 +132,10 @@
   left: 200px;
   z-index: 99;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  padding: 0 24px;
+  height: 64px;
+  line-height: 64px;
 }
 
 .header-left {
@@ -73,16 +150,6 @@
 
 .header-right .ant-avatar {
   background: #1890ff;
-}
-
-/* 内容区域样式 */
-.app-content {
-  margin-left: 200px;
-  margin-top: 64px;
-  height: calc(100vh - 64px);
-  overflow-y: auto;
-  background: #f0f2f5;
-  padding: 0;
 }
 
 /* 页面容器样式 */
@@ -200,40 +267,20 @@
 }
 
 /* 响应式布局 */
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    left: -200px;
-    transition: left 0.3s ease;
-    z-index: 1001;
-  }
-  
-  .sidebar.mobile-open {
-    left: 0;
+@media (max-width: 767px) {
+  .main-content {
+    margin: 16px 8px;
+    padding: 16px;
+    min-height: calc(100vh - 96px);
   }
   
   .app-header {
     left: 0;
-    margin-left: 0;
-  }
-  
-  .app-content {
-    margin-left: 0;
-  }
-  
-  .sidebar .logo {
-    justify-content: flex-start;
-    padding-left: 24px;
-  }
-}
-
-@media (max-width: 576px) {
-  .app-header {
     padding: 0 16px;
   }
   
-  .app-content {
-    padding: 0;
+  .desktop-sidebar {
+    display: none;
   }
   
   .page-container {
@@ -249,19 +296,68 @@
   }
 }
 
+@media (min-width: 768px) and (max-width: 1023px) {
+  .main-content {
+    margin: 20px 12px;
+    padding: 20px;
+  }
+  
+  .app-header {
+    padding: 0 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .main-content {
+    margin: 24px 16px;
+    padding: 24px;
+  }
+}
+
+/* 触摸优化 */
+@media (hover: none) and (pointer: coarse) {
+  .sidebar-menu .ant-menu-item,
+  .sidebar-menu .ant-menu-submenu-title {
+    min-height: 48px;
+    padding: 12px 16px;
+  }
+  
+  .mobile-menu-trigger {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* 动画效果 */
+.ant-layout-sider-trigger {
+  transition: all 0.3s ease;
+}
+
+.ant-drawer {
+  z-index: 1001;
+}
+
+.ant-drawer-mask {
+  z-index: 1000;
+}
+
 /* 深色主题支持 */
 .app-layout.dark {
   background: #141414;
 }
 
-.app-layout.dark .sidebar {
+.app-layout.dark .desktop-sidebar {
   background: #001529;
 }
 
-.app-layout.dark .sidebar .logo {
+.app-layout.dark .sidebar-logo {
   background: #001529;
   color: #fff;
   border-bottom-color: #303030;
+}
+
+.app-layout.dark .sidebar-menu {
+  background: #001529;
 }
 
 .app-layout.dark .app-header {
@@ -269,8 +365,9 @@
   border-bottom-color: #303030;
 }
 
-.app-layout.dark .app-content {
-  background: #000;
+.app-layout.dark .main-content {
+  background: #1f1f1f;
+  color: #fff;
 }
 
 .app-layout.dark .ant-card {
@@ -342,19 +439,19 @@
 }
 
 /* 自定义滚动条 */
-.app-content::-webkit-scrollbar {
+.main-content::-webkit-scrollbar {
   width: 8px;
 }
 
-.app-content::-webkit-scrollbar-track {
+.main-content::-webkit-scrollbar-track {
   background: #f1f1f1;
 }
 
-.app-content::-webkit-scrollbar-thumb {
+.main-content::-webkit-scrollbar-thumb {
   background: #c1c1c1;
   border-radius: 4px;
 }
 
-.app-content::-webkit-scrollbar-thumb:hover {
+.main-content::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }

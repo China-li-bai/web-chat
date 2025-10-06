@@ -59,12 +59,14 @@ export class WordbookService {
     const statsPromises = wordbooks.map(async (wordbook) => {
       const stats = await this.getWordbookStats(wordbook.id);
       return {
-        ...stats,
-        wordbookName: wordbook.name,
-        wordbookCategory: wordbook.category,
-        wordbookSource: wordbook.source
+        ...wordbook,
+        ...stats
       };
     });
+    
     return await Promise.all(statsPromises);
   }
 }
+
+// 导出实例以保持向后兼容性
+export const wordbookService = WordbookService;

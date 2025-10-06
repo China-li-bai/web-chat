@@ -1,11 +1,11 @@
 import React from 'react';
-import { Layout, Avatar, Dropdown, Space, Typography } from 'antd';
-import { UserOutlined, LogoutOutlined, SettingOutlined } from '@ant-design/icons';
+import { Layout, Avatar, Dropdown, Space, Typography, Button } from 'antd';
+import { UserOutlined, LogoutOutlined, SettingOutlined, MenuOutlined } from '@ant-design/icons';
 
 const { Header: AntHeader } = Layout;
 const { Text } = Typography;
 
-const Header = () => {
+const Header = ({ isMobile, onMobileMenuClick }) => {
   const userMenuItems = [
     {
       key: 'profile',
@@ -57,18 +57,38 @@ const Header = () => {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginLeft: 200, // 为侧边栏留出空间
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        left: isMobile ? 0 : 200,
+        zIndex: 99,
+        transition: 'left 0.3s ease',
       }}
     >
       <div className="header-left">
-        <Text strong style={{ fontSize: '16px' }}>
-          欢迎使用AI口语练习系统
+        {isMobile && (
+          <Button
+            type="text"
+            icon={<MenuOutlined />}
+            onClick={onMobileMenuClick}
+            className="mobile-menu-trigger"
+            style={{
+              marginRight: '16px',
+              border: 'none',
+              boxShadow: 'none',
+            }}
+          />
+        )}
+        <Text strong style={{ fontSize: isMobile ? '14px' : '16px' }}>
+          {isMobile ? 'AI口语练习' : '欢迎使用AI口语练习系统'}
         </Text>
       </div>
       
       <div className="header-right">
-        <Space size="middle">
-          <Text type="secondary">今日练习时间: 25分钟</Text>
+        <Space size={isMobile ? "small" : "middle"}>
+          {!isMobile && (
+            <Text type="secondary">今日练习时间: 25分钟</Text>
+          )}
           <Dropdown
             menu={{
               items: userMenuItems,
@@ -78,8 +98,8 @@ const Header = () => {
             arrow
           >
             <Space style={{ cursor: 'pointer' }}>
-              <Avatar size="small" icon={<UserOutlined />} />
-              <Text>用户名</Text>
+              <Avatar size={isMobile ? "small" : "default"} icon={<UserOutlined />} />
+              {!isMobile && <Text>用户名</Text>}
             </Space>
           </Dropdown>
         </Space>
