@@ -43,6 +43,7 @@ import { MemoryLearningManager } from '../lib/memo/MemoryLearningManager';
 // 导入数据服务层
 import learningDataService from '../services/learningDataServiceSQLite';
 import dataMigrationService from '../services/dataMigrationToSQLite';
+import { wordbookService } from '../services/wordbookService';
 import WordbookSelector from '../components/WordbookSelector';
 
 const { Title, Text, Paragraph } = Typography;
@@ -200,15 +201,38 @@ const LanguageLearning = () => {
   // 从指定词书加载词汇
   const loadVocabulariesFromWordbook = async (wordbookId) => {
     try {
-      const vocabularies = await learningDataService.getVocabularies(wordbookId);
-      const learningItems = vocabularies.map(vocabularyToLearningItem);
-      setLearningItems(learningItems);
+      console.log(`开始加载单词本 ${wordbookId} 的词汇`);
       
-      console.log(`从词书 ${wordbookId} 加载了 ${learningItems.length} 个词汇`);
+      // 使用统一的 wordbookService 获取词汇数据
+      const vocabularies = await wordbookService.getVocabularyByWordbook(wordbookId);
+      console.log(`从 wordbookService 获取到 ${vocabularies.length} 个词汇`);
+      
+      if (vocabularies.length === 0) {
+        console.warn(`单词本 ${wordbookId} 中没有词汇数据`);
+        setLearningItems([]);
+        return;
+      }
+
+      // 转换为学习项目格式
+      const learningItems = vocabularies.map(vocab => ({
+        id: vocab.id,
+        word: vocab.word,
+        pronunciation: vocab.pronunciation || '',
+        meaning: vocab.meaning,
+        example: vocab.example || '',
+        difficulty: vocab.difficulty || 'beginner',
+        masteryLevel: vocab.masteryLevel || 0,
+        lastReviewed: vocab.lastReviewed,
+        reviewCount: vocab.reviewCount || 0,
+        tags: vocab.tags || []
+      }));
+
+      setLearningItems(learningItems);
+      console.log(`成功加载 ${learningItems.length} 个学习项目`);
+      
     } catch (error) {
-      console.error('从词书加载词汇失败:', error);
-      message.error('加载词汇失败');
-      // 如果加载失败，使用默认词汇
+      console.error('加载词汇失败:', error);
+      // 如果加载失败，初始化默认词汇
       initializeDefaultVocabulary();
     }
   };

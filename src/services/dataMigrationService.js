@@ -116,7 +116,7 @@ class DataMigrationService {
           updatedAt: new Date().toISOString()
         };
 
-        await wordbookService.addVocabulary(wordbookId, vocabulary);
+        await wordbookService.importVocabulary(wordbookId, [vocabulary]);
       }
 
       console.log('学习项目迁移完成');

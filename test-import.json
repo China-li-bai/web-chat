@@ -1,0 +1,23 @@
+[
+  {
+    "word": "hello",
+    "translation": "你好",
+    "pronunciation": "/həˈloʊ/",
+    "example": "Hello, how are you?",
+    "exampleTranslation": "你好，你好吗？"
+  },
+  {
+    "word": "world",
+    "translation": "世界",
+    "pronunciation": "/wɜːrld/",
+    "example": "Welcome to the world of programming.",
+    "exampleTranslation": "欢迎来到编程世界。"
+  },
+  {
+    "word": "test",
+    "translation": "测试",
+    "pronunciation": "/test/",
+    "example": "This is a test file.",
+    "exampleTranslation": "这是一个测试文件。"
+  }
+]
