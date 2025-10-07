@@ -6,6 +6,8 @@ import dayjs from 'dayjs';
 import { calculateKPIs } from '../utils/statisticsDataGenerator';
 import { generateStatisticsFromWordbooks } from '../utils/realStatisticsGenerator';
 
+import WordbookSelector from '../components/WordbookSelector';
+
 // 错误边界组件
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -98,13 +100,6 @@ const LongTermStatistics = () => {
     const initializeData = async () => {
       try {
         setLoading(true);
-        
-        // 加载真实单词本数据
-        const wordbooks = await wordbookService.getWordbooks();
-        setAvailableWordbooks(wordbooks.map(wb => ({
-          label: wb.name,
-          value: wb.id
-        })));
         
         // 使用真实数据生成器生成统计信息
         const endDate = dayjs();
@@ -549,14 +544,19 @@ const LongTermStatistics = () => {
                 style={{ width: 240 }}
                 disabled={loading}
               />
-              <Select
-                mode="multiple"
+              <WordbookSelector
+                multiple={true}
                 placeholder="选择单词本"
                 value={selectedWordbooks}
                 onChange={setSelectedWordbooks}
-                options={availableWordbooks}
                 style={{ minWidth: 200 }}
                 disabled={loading}
+                onLoad={(wordbooks) => {
+                  setAvailableWordbooks(wordbooks.map(wb => ({
+                    value: wb.id,
+                    label: wb.name
+                  })));
+                }}
               />
               <Button onClick={handleReset} disabled={loading}>重置</Button>
             </Space>
@@ -583,12 +583,11 @@ const LongTermStatistics = () => {
               </div>
               <div>
                 <Text strong>单词本选择:</Text>
-                <Select
-                  mode="multiple"
+                <WordbookSelector
+                  multiple={true}
                   placeholder="选择单词本"
                   value={selectedWordbooks}
                   onChange={setSelectedWordbooks}
-                  options={availableWordbooks}
                   style={{ width: '100%', marginTop: 8 }}
                   disabled={loading}
                 />

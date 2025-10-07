@@ -41,8 +41,9 @@ import {
 // 导入记忆学习算法栈
 import { MemoryLearningManager } from '../lib/memo/MemoryLearningManager';
 // 导入数据服务层
-import learningDataService from '../services/learningDataService';
-import dataMigrationService from '../services/dataMigrationService';
+import learningDataService from '../services/learningDataServiceSQLite';
+import dataMigrationService from '../services/dataMigrationToSQLite';
+import WordbookSelector from '../components/WordbookSelector';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -56,10 +57,16 @@ const LanguageLearning = () => {
   const [studySessions, setStudySessions] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
   
+  // 数据库初始化状态
+  const [dbInitialized, setDbInitialized] = useState(false);
+  const [dbInitializing, setDbInitializing] = useState(false);
+  const [dbInitError, setDbInitError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRY_COUNT = 3;
+  
   // 词书相关状态
   const [availableWordbooks, setAvailableWordbooks] = useState([]);
   const [selectedWordbookId, setSelectedWordbookId] = useState(null);
-  const [loadingWordbooks, setLoadingWordbooks] = useState(false);
   
   // UI状态
   const [loading, setLoading] = useState(false);
@@ -80,19 +87,32 @@ const LanguageLearning = () => {
   // 响应式布局
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // 初始化记忆学习系统
+  // 等待页面完全加载后初始化数据库
   useEffect(() => {
-    const initialize = async () => {
-      // 1. 检查并执行数据迁移
-      await performDataMigration();
-      
-      // 2. 初始化系统
-      initializeMemorySystem();
-      loadAvailableWordbooks();
-      loadUserData();
+    const initializeWhenReady = () => {
+      if (document.readyState === 'complete') {
+        // 页面已完全加载，延迟一点时间确保所有资源都准备好
+        setTimeout(() => {
+          initializeDatabase();
+        }, 500);
+      } else {
+        // 页面还在加载，等待load事件
+        const handleLoad = () => {
+          setTimeout(() => {
+            initializeDatabase();
+          }, 500);
+          window.removeEventListener('load', handleLoad);
+        };
+        window.addEventListener('load', handleLoad);
+        
+        // 清理函数
+        return () => {
+          window.removeEventListener('load', handleLoad);
+        };
+      }
     };
-    
-    initialize();
+
+    initializeWhenReady();
     
     // 响应式布局监听
     const handleResize = () => {
@@ -110,6 +130,60 @@ const LanguageLearning = () => {
     }
   }, [selectedWordbookId]);
 
+  // 数据库初始化函数（带重试机制）
+  const initializeDatabase = async () => {
+    if (dbInitialized || dbInitializing) {
+      return;
+    }
+
+    setDbInitializing(true);
+    setDbInitError(null);
+
+    try {
+      console.log('开始初始化数据库...');
+      
+      // 1. 检查并执行数据迁移
+      await performDataMigration();
+      
+      // 2. 初始化系统
+      initializeMemorySystem();
+      
+      // 3. 初始化示例数据（如果需要）
+      await learningDataService.initializeWithSampleData();
+      
+      // 4. 加载用户数据
+      loadUserData();
+      
+      setDbInitialized(true);
+      setRetryCount(0);
+      console.log('数据库初始化成功');
+      
+    } catch (error) {
+      console.error('数据库初始化失败:', error);
+      setDbInitError(error.message || '数据库初始化失败');
+      
+      // 自动重试机制
+      if (retryCount < MAX_RETRY_COUNT) {
+        console.log(`将在3秒后进行第${retryCount + 1}次重试...`);
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          setDbInitializing(false);
+          initializeDatabase();
+        }, 3000);
+      } else {
+        setDbInitializing(false);
+        message.error('数据库初始化失败，请刷新页面重试');
+      }
+    }
+  };
+
+  // 手动重试数据库初始化
+  const retryDatabaseInit = () => {
+    setRetryCount(0);
+    setDbInitError(null);
+    initializeDatabase();
+  };
+
   const initializeMemorySystem = () => {
     try {
       const manager = new MemoryLearningManager();
@@ -121,28 +195,7 @@ const LanguageLearning = () => {
     }
   };
 
-  // 加载可用的词书列表
-  const loadAvailableWordbooks = async () => {
-    setLoadingWordbooks(true);
-    try {
-      // 初始化示例数据（如果需要）
-      await learningDataService.initializeWithSampleData();
-      
-      const wordbooks = await learningDataService.getWordbooks();
-      setAvailableWordbooks(wordbooks);
-      
-      // 如果有词书且没有选择，默认选择第一个激活的词书
-      if (wordbooks.length > 0 && !selectedWordbookId) {
-        const activeWordbook = wordbooks.find(wb => wb.isActive) || wordbooks[0];
-        setSelectedWordbookId(activeWordbook.id);
-      }
-    } catch (error) {
-      console.error('加载词书列表失败:', error);
-      message.error('加载词书列表失败');
-    } finally {
-      setLoadingWordbooks(false);
-    }
-  };
+
 
   // 从指定词书加载词汇
   const loadVocabulariesFromWordbook = async (wordbookId) => {
@@ -184,18 +237,8 @@ const LanguageLearning = () => {
   // 执行数据迁移
   const performDataMigration = async () => {
     try {
-      if (dataMigrationService.needsMigration()) {
-        console.log('检测到需要数据迁移，开始迁移...');
-        const result = await dataMigrationService.migrate();
-        
-        if (result.success) {
-          message.success('历史学习数据已成功迁移到新系统');
-          console.log('数据迁移成功');
-        } else {
-          message.warning('数据迁移失败: ' + result.message);
-          console.error('数据迁移失败:', result.message);
-        }
-      }
+      // 根据用户要求，不需要迁移数据，直接使用本地数据库的数据
+      console.log('跳过数据迁移，直接使用本地数据库数据');
     } catch (error) {
       console.error('数据迁移过程中发生错误:', error);
       message.error('数据迁移失败，但不影响正常使用');
@@ -712,6 +755,61 @@ const LanguageLearning = () => {
   return (
     <div style={{ padding: isMobile ? '16px' : '24px' }}>
       <Card>
+        {/* 数据库初始化状态显示 */}
+        {!dbInitialized && (
+          <div style={{ marginBottom: '24px' }}>
+            {dbInitializing ? (
+              <Alert
+                message="正在初始化数据库..."
+                description={
+                  <div>
+                    <Spin size="small" style={{ marginRight: '8px' }} />
+                    请稍候，正在加载学习数据
+                    {retryCount > 0 && (
+                      <div style={{ marginTop: '8px', color: '#666' }}>
+                        重试次数: {retryCount}/{MAX_RETRY_COUNT}
+                      </div>
+                    )}
+                  </div>
+                }
+                type="info"
+                showIcon
+              />
+            ) : dbInitError ? (
+              <Alert
+                message="数据库初始化失败"
+                description={
+                  <div>
+                    <div style={{ marginBottom: '12px' }}>
+                      错误信息: {dbInitError}
+                    </div>
+                    <div>
+                      <Button 
+                        type="primary" 
+                        size="small" 
+                        onClick={retryDatabaseInit}
+                        loading={dbInitializing}
+                      >
+                        重试初始化
+                      </Button>
+                      <Button 
+                        type="link" 
+                        size="small" 
+                        onClick={() => window.location.reload()}
+                        style={{ marginLeft: '8px' }}
+                      >
+                        刷新页面
+                      </Button>
+                    </div>
+                  </div>
+                }
+                type="error"
+                showIcon
+              />
+            ) : null}
+          </div>
+        )}
+
         <div style={{ 
           display: 'flex', 
           flexDirection: isMobile ? 'column' : 'row',
@@ -726,25 +824,28 @@ const LanguageLearning = () => {
           </Title>
           <Space direction={isMobile ? 'vertical' : 'horizontal'} style={{ width: isMobile ? '100%' : 'auto' }}>
             <Space>
-              <Select
+              <WordbookSelector
                 value={selectedWordbookId}
                 onChange={setSelectedWordbookId}
                 placeholder="选择词书"
                 style={{ width: isMobile ? '120px' : '150px' }}
                 size={isMobile ? 'small' : 'default'}
-                loading={loadingWordbooks}
-              >
-                {availableWordbooks.map(wordbook => (
-                  <Option key={wordbook.id} value={wordbook.id}>
-                    {wordbook.name}
-                  </Option>
-                ))}
-              </Select>
+                disabled={!dbInitialized}
+                onLoad={(wordbooks) => {
+                  setAvailableWordbooks(wordbooks);
+                  // 如果有词书且没有选择，默认选择第一个激活的词书
+                  if (wordbooks.length > 0 && !selectedWordbookId) {
+                    const activeWordbook = wordbooks.find(wb => wb.isActive) || wordbooks[0];
+                    setSelectedWordbookId(activeWordbook.id);
+                  }
+                }}
+              />
               <Select
                 value={learningMode}
                 onChange={setLearningMode}
                 style={{ width: isMobile ? '100px' : '120px' }}
                 size={isMobile ? 'small' : 'default'}
+                disabled={!dbInitialized}
               >
                 <Option value="vocabulary">词汇</Option>
                 <Option value="grammar">语法</Option>
@@ -755,6 +856,7 @@ const LanguageLearning = () => {
                 onChange={setDifficultyLevel}
                 style={{ width: isMobile ? '100px' : '120px' }}
                 size={isMobile ? 'small' : 'default'}
+                disabled={!dbInitialized}
               >
                 <Option value="beginner">初级</Option>
                 <Option value="intermediate">中级</Option>
@@ -767,6 +869,7 @@ const LanguageLearning = () => {
                 icon={<LineChartOutlined />}
                 onClick={() => window.location.href = '/long-term-statistics'}
                 size={isMobile ? 'small' : 'default'}
+                disabled={!dbInitialized}
               >
                 长期统计
               </Button>
@@ -775,6 +878,7 @@ const LanguageLearning = () => {
                 icon={<FolderOutlined />}
                 onClick={() => window.location.href = '/wordbook-manager'}
                 size={isMobile ? 'small' : 'default'}
+                disabled={!dbInitialized}
               >
                 单词本管理
               </Button>
@@ -783,14 +887,14 @@ const LanguageLearning = () => {
         </div>
 
         {/* 用户档案 */}
-        {userProfile && (
+        {userProfile && dbInitialized && (
           <div style={{ marginBottom: '24px' }}>
             {renderUserProfile()}
           </div>
         )}
 
         {/* 学习统计 */}
-        {currentSession && (
+        {currentSession && dbInitialized && (
           <div style={{ marginBottom: '24px' }}>
             {renderLearningStats()}
           </div>
@@ -798,116 +902,130 @@ const LanguageLearning = () => {
 
         <Divider />
 
-        {!currentSession ? (
-          // 开始学习界面
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <div style={{ marginBottom: '32px' }}>
-              <BookOutlined style={{ fontSize: '64px', color: '#1890ff' }} />
-            </div>
-            <Title level={3}>准备开始智能学习</Title>
-            <Paragraph style={{ fontSize: '16px', color: '#666', marginBottom: '32px' }}>
-              基于记忆科学的个性化学习系统，让学习更高效
-            </Paragraph>
-            
-            {/* 词书选择提示 */}
-            {!selectedWordbookId && (
-              <Alert
-                message="请先选择词书"
-                description="在页面顶部选择一个词书开始学习"
-                type="warning"
-                showIcon
-                style={{ marginBottom: '24px', textAlign: 'left' }}
-              />
-            )}
-            
-            {/* 词书信息显示 */}
-            {selectedWordbookId && (
-              <div style={{ marginBottom: '24px' }}>
-                <Text strong>当前词书：</Text>
-                <Tag color="blue" style={{ marginLeft: '8px' }}>
-                  {availableWordbooks.find(wb => wb.id === selectedWordbookId)?.name || '未知词书'}
-                </Tag>
-                <br />
-                <Text type="secondary">
-                  词汇数量：{learningItems.length} 个
-                </Text>
+        {/* 主要内容区域 - 只有在数据库初始化完成后才显示 */}
+        {dbInitialized ? (
+          !currentSession ? (
+            // 开始学习界面
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ marginBottom: '32px' }}>
+                <BookOutlined style={{ fontSize: '64px', color: '#1890ff' }} />
               </div>
-            )}
-            
-            <div style={{ marginBottom: '32px' }}>
-              <Text strong>会话时长：</Text>
-              <Select
-                value={sessionDuration}
-                onChange={setSessionDuration}
-                style={{ width: 150, marginLeft: '12px' }}
-              >
-                <Option value={900}>15分钟</Option>
-                <Option value={1800}>30分钟</Option>
-                <Option value={2700}>45分钟</Option>
-                <Option value={3600}>60分钟</Option>
-              </Select>
-            </div>
-
-            <Button
-              type="primary"
-              size="large"
-              icon={<ThunderboltOutlined />}
-              onClick={startLearningSession}
-              loading={loading}
-              disabled={!selectedWordbookId || learningItems.length === 0}
-              style={{ minWidth: '200px' }}
-            >
-              开始智能学习
-            </Button>
-
-            <div style={{ marginTop: '32px' }}>
-              <Alert
-                message="智能学习特色"
-                description={
-                  <ul style={{ textAlign: 'left', marginTop: '12px' }}>
-                    <li>🧠 基于FSRS算法的科学复习调度</li>
-                    <li>📊 个性化难度自适应调整</li>
-                    <li>🎯 主动检索策略优化记忆</li>
-                    <li>📈 实时学习档案分析</li>
-                  </ul>
-                }
-                type="info"
-                showIcon
-              />
-            </div>
-          </div>
-        ) : (
-          // 学习进行中界面
-          <div>
-            {currentWord && renderLearningCard()}
-            
-            <div style={{ marginTop: '24px', textAlign: 'center' }}>
-              <Space>
-                <Text>
-                  进度: {sessionStats.itemsStudied} / {currentSession.items?.length || 0}
-                </Text>
-                <Progress 
-                  percent={Math.round((sessionStats.itemsStudied / (currentSession.items?.length || 1)) * 100)}
-                  style={{ width: '200px' }}
+              <Title level={3}>准备开始智能学习</Title>
+              <Paragraph style={{ fontSize: '16px', color: '#666', marginBottom: '32px' }}>
+                基于记忆科学的个性化学习系统，让学习更高效
+              </Paragraph>
+              
+              {/* 词书选择提示 */}
+              {!selectedWordbookId && (
+                <Alert
+                  message="请先选择词书"
+                  description="在页面顶部选择一个词书开始学习"
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: '24px', textAlign: 'left' }}
                 />
-                <Button 
-                  icon={<ReloadOutlined />}
-                  onClick={() => {
-                    Modal.confirm({
-                      title: '确认结束学习？',
-                      content: '当前学习进度将会保存',
-                      onOk: () => {
-                        setCurrentSession(null);
-                        setCurrentWord(null);
-                        setSessionStats({ itemsStudied: 0, correctAnswers: 0, totalTime: 0, streak: 0 });
-                      }
-                    });
-                  }}
+              )}
+              
+              {/* 词书信息显示 */}
+              {selectedWordbookId && (
+                <div style={{ marginBottom: '24px' }}>
+                  <Text strong>当前词书：</Text>
+                  <Tag color="blue" style={{ marginLeft: '8px' }}>
+                    {availableWordbooks.find(wb => wb.id === selectedWordbookId)?.name || '未知词书'}
+                  </Tag>
+                  <br />
+                  <Text type="secondary">
+                    词汇数量：{learningItems.length} 个
+                  </Text>
+                </div>
+              )}
+              
+              <div style={{ marginBottom: '32px' }}>
+                <Text strong>会话时长：</Text>
+                <Select
+                  value={sessionDuration}
+                  onChange={setSessionDuration}
+                  style={{ width: 150, marginLeft: '12px' }}
                 >
-                  结束学习
-                </Button>
-              </Space>
+                  <Option value={900}>15分钟</Option>
+                  <Option value={1800}>30分钟</Option>
+                  <Option value={2700}>45分钟</Option>
+                  <Option value={3600}>60分钟</Option>
+                </Select>
+              </div>
+
+              <Button
+                type="primary"
+                size="large"
+                icon={<ThunderboltOutlined />}
+                onClick={startLearningSession}
+                loading={loading}
+                disabled={!selectedWordbookId || learningItems.length === 0}
+                style={{ minWidth: '200px' }}
+              >
+                开始智能学习
+              </Button>
+
+              <div style={{ marginTop: '32px' }}>
+                <Alert
+                  message="智能学习特色"
+                  description={
+                    <ul style={{ textAlign: 'left', marginTop: '12px' }}>
+                      <li>🧠 基于FSRS算法的科学复习调度</li>
+                      <li>📊 个性化难度自适应调整</li>
+                      <li>🎯 主动检索策略优化记忆</li>
+                      <li>📈 实时学习档案分析</li>
+                    </ul>
+                  }
+                  type="info"
+                  showIcon
+                />
+              </div>
             </div>
+          ) : (
+            // 学习进行中界面
+            <div>
+              {currentWord && renderLearningCard()}
+              
+              <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                <Space>
+                  <Text>
+                    进度: {sessionStats.itemsStudied} / {currentSession.items?.length || 0}
+                  </Text>
+                  <Progress 
+                    percent={Math.round((sessionStats.itemsStudied / (currentSession.items?.length || 1)) * 100)}
+                    style={{ width: '200px' }}
+                  />
+                  <Button 
+                    icon={<ReloadOutlined />}
+                    onClick={() => {
+                      Modal.confirm({
+                        title: '确认结束学习？',
+                        content: '当前学习进度将会保存',
+                        onOk: () => {
+                          setCurrentSession(null);
+                          setCurrentWord(null);
+                          setSessionStats({ itemsStudied: 0, correctAnswers: 0, totalTime: 0, streak: 0 });
+                        }
+                      });
+                    }}
+                  >
+                    结束学习
+                  </Button>
+                </Space>
+              </div>
+            </div>
+          )
+        ) : (
+          // 数据库未初始化时显示的占位内容
+          <div style={{ textAlign: 'center', padding: '60px' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <BookOutlined style={{ fontSize: '48px', color: '#d9d9d9' }} />
+            </div>
+            <Title level={4} type="secondary">系统准备中...</Title>
+            <Paragraph type="secondary">
+              正在初始化学习系统，请稍候
+            </Paragraph>
           </div>
         )}
       </Card>

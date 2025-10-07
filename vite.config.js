@@ -4,7 +4,9 @@ import react from "@vitejs/plugin-react";
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
-
+ optimizeDeps: {
+    exclude: ['wa-sqlite'],
+  },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent vite from obscuring rust errors
@@ -12,7 +14,7 @@ export default defineConfig(async () => ({
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
-    strictPort: true,
+    strictPort: false,
     proxy: {
       // Proxy API calls to the backend server
       '/api': {

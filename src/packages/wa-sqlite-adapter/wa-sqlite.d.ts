@@ -1,6 +1,5 @@
 declare module 'wa-sqlite/dist/wa-sqlite-async.mjs' {
-  function ModuleFactory(config?: object): Promise<any>
-  export = ModuleFactory
+ export function ModuleFactory(config?: object): Promise<any>
 }
 
 declare interface VFSOptions {
@@ -20,5 +19,14 @@ declare module 'wa-sqlite/src/examples/IDBBatchAtomicVFS.js' {
   interface IDBBatchAtomicVFS extends SQLiteVFS {}
   export class IDBBatchAtomicVFS {
     constructor(idbDatabaseName: string, options?: VFSOptions)
+  }
+}
+
+declare module 'wa-sqlite/src/examples/IDBMinimalVFS.js' {
+  // IDBMinimalVFS - 轻量级IndexedDB VFS，适用于iOS Safari兼容性
+  /* eslint-disable @typescript-eslint/no-empty-interface */
+  interface IDBMinimalVFS extends SQLiteVFS {}
+  export class IDBMinimalVFS {
+    constructor(idbDatabaseName: string, options?: Partial<VFSOptions>)
   }
 }

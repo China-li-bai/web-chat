@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { learningDataService } from '../services/learningDataService';
+import learningDataService from '../services/learningDataServiceSQLite';
 
 /**
  * 基于真实学习数据生成统计信息
@@ -10,15 +10,14 @@ import { learningDataService } from '../services/learningDataService';
 export const generateStatisticsFromWordbooks = async (startDate, endDate) => {
   try {
     // 获取所有单词本数据
-    const wordbooks = await learningDataService.getAllWordbooks();
+    const wordbooks = await learningDataService.getWordbooks();
     
     const statistics = {};
     
     for (const wordbook of wordbooks) {
       // 获取该词书的真实学习数据
-      const learningRecords = await learningDataService.getLearningRecordsByWordbook(wordbook.id);
-      const learningSessions = await learningDataService.getLearningSessionsByWordbook(wordbook.id);
-      const vocabularies = await learningDataService.getVocabulariesByWordbook(wordbook.id);
+      const learningRecords = await learningDataService.getLearningRecords(wordbook.id);
+      const vocabularies = await learningDataService.getVocabularies(wordbook.id);
       
       // 过滤日期范围内的记录
       const filteredRecords = learningRecords.filter(record => {
@@ -27,14 +26,7 @@ export const generateStatisticsFromWordbooks = async (startDate, endDate) => {
                recordDate.isBefore(dayjs(endDate).add(1, 'day'));
       });
       
-      const filteredSessions = learningSessions.filter(session => {
-        const sessionDate = dayjs(session.startTime);
-        return sessionDate.isAfter(dayjs(startDate).subtract(1, 'day')) && 
-               sessionDate.isBefore(dayjs(endDate).add(1, 'day'));
-      });
-      
       // 计算统计信息
-      const totalSessions = filteredSessions.length;
       const totalWords = vocabularies.length;
       const correctRecords = filteredRecords.filter(r => r.result === 'correct').length;
       const accuracy = filteredRecords.length > 0 ? correctRecords / filteredRecords.length : 0;
@@ -62,7 +54,6 @@ export const generateStatisticsFromWordbooks = async (startDate, endDate) => {
         wordbookId: wordbook.id,
         dailyStats: generateDailyStatsFromRecords(filteredRecords, startDate, endDate),
         rawRecords: convertRecordsFormat(filteredRecords, wordbook.id),
-        totalSessions,
         totalWords,
         accuracy,
         avgInterval,
