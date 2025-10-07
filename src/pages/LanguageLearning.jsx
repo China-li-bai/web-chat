@@ -40,6 +40,9 @@ import {
 
 // 导入记忆学习算法栈
 import { MemoryLearningManager } from '../lib/memo/MemoryLearningManager';
+// 导入数据服务层
+import learningDataService from '../services/learningDataService';
+import dataMigrationService from '../services/dataMigrationService';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -52,6 +55,11 @@ const LanguageLearning = () => {
   const [studyRecords, setStudyRecords] = useState([]);
   const [studySessions, setStudySessions] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
+  
+  // 词书相关状态
+  const [availableWordbooks, setAvailableWordbooks] = useState([]);
+  const [selectedWordbookId, setSelectedWordbookId] = useState(null);
+  const [loadingWordbooks, setLoadingWordbooks] = useState(false);
   
   // UI状态
   const [loading, setLoading] = useState(false);
@@ -74,8 +82,17 @@ const LanguageLearning = () => {
 
   // 初始化记忆学习系统
   useEffect(() => {
-    initializeMemorySystem();
-    loadUserData();
+    const initialize = async () => {
+      // 1. 检查并执行数据迁移
+      await performDataMigration();
+      
+      // 2. 初始化系统
+      initializeMemorySystem();
+      loadAvailableWordbooks();
+      loadUserData();
+    };
+    
+    initialize();
     
     // 响应式布局监听
     const handleResize = () => {
@@ -85,6 +102,13 @@ const LanguageLearning = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // 当选择的词书改变时，重新加载词汇
+  useEffect(() => {
+    if (selectedWordbookId) {
+      loadVocabulariesFromWordbook(selectedWordbookId);
+    }
+  }, [selectedWordbookId]);
 
   const initializeMemorySystem = () => {
     try {
@@ -97,19 +121,92 @@ const LanguageLearning = () => {
     }
   };
 
+  // 加载可用的词书列表
+  const loadAvailableWordbooks = async () => {
+    setLoadingWordbooks(true);
+    try {
+      // 初始化示例数据（如果需要）
+      await learningDataService.initializeWithSampleData();
+      
+      const wordbooks = await learningDataService.getWordbooks();
+      setAvailableWordbooks(wordbooks);
+      
+      // 如果有词书且没有选择，默认选择第一个激活的词书
+      if (wordbooks.length > 0 && !selectedWordbookId) {
+        const activeWordbook = wordbooks.find(wb => wb.isActive) || wordbooks[0];
+        setSelectedWordbookId(activeWordbook.id);
+      }
+    } catch (error) {
+      console.error('加载词书列表失败:', error);
+      message.error('加载词书列表失败');
+    } finally {
+      setLoadingWordbooks(false);
+    }
+  };
+
+  // 从指定词书加载词汇
+  const loadVocabulariesFromWordbook = async (wordbookId) => {
+    try {
+      const vocabularies = await learningDataService.getVocabularies(wordbookId);
+      const learningItems = vocabularies.map(vocabularyToLearningItem);
+      setLearningItems(learningItems);
+      
+      console.log(`从词书 ${wordbookId} 加载了 ${learningItems.length} 个词汇`);
+    } catch (error) {
+      console.error('从词书加载词汇失败:', error);
+      message.error('加载词汇失败');
+      // 如果加载失败，使用默认词汇
+      initializeDefaultVocabulary();
+    }
+  };
+
+  // 将Vocabulary转换为LearningItem格式
+  const vocabularyToLearningItem = (vocabulary) => {
+    return {
+      id: vocabulary.id,
+      content: vocabulary.word,
+      type: 'vocabulary',
+      difficulty: vocabulary.difficulty,
+      createdAt: new Date(vocabulary.createdAt),
+      metadata: {
+        definition: vocabulary.meaning,
+        pronunciation: vocabulary.pronunciation || '',
+        example: vocabulary.example || '',
+        synonyms: [], // 可以后续扩展
+        category: vocabulary.difficulty > 0.7 ? 'advanced' : vocabulary.difficulty > 0.4 ? 'intermediate' : 'beginner',
+        wordbookId: vocabulary.wordbookId,
+        masteryLevel: vocabulary.masteryLevel,
+        reviewCount: vocabulary.reviewCount
+      }
+    };
+  };
+
+  // 执行数据迁移
+  const performDataMigration = async () => {
+    try {
+      if (dataMigrationService.needsMigration()) {
+        console.log('检测到需要数据迁移，开始迁移...');
+        const result = await dataMigrationService.migrate();
+        
+        if (result.success) {
+          message.success('历史学习数据已成功迁移到新系统');
+          console.log('数据迁移成功');
+        } else {
+          message.warning('数据迁移失败: ' + result.message);
+          console.error('数据迁移失败:', result.message);
+        }
+      }
+    } catch (error) {
+      console.error('数据迁移过程中发生错误:', error);
+      message.error('数据迁移失败，但不影响正常使用');
+    }
+  };
+
   const loadUserData = () => {
     try {
-      // 从localStorage加载用户数据
-      const savedItems = localStorage.getItem('language_learning_items');
+      // 从localStorage加载用户数据（保持向后兼容）
       const savedRecords = localStorage.getItem('language_learning_records');
       const savedSessions = localStorage.getItem('language_learning_sessions');
-      
-      if (savedItems) {
-        setLearningItems(JSON.parse(savedItems));
-      } else {
-        // 初始化默认词汇
-        initializeDefaultVocabulary();
-      }
       
       if (savedRecords) {
         setStudyRecords(JSON.parse(savedRecords));
@@ -117,6 +214,16 @@ const LanguageLearning = () => {
       
       if (savedSessions) {
         setStudySessions(JSON.parse(savedSessions));
+      }
+
+      // 如果没有选择词书，使用默认词汇（向后兼容）
+      if (!selectedWordbookId) {
+        const savedItems = localStorage.getItem('language_learning_items');
+        if (savedItems) {
+          setLearningItems(JSON.parse(savedItems));
+        } else {
+          initializeDefaultVocabulary();
+        }
       }
     } catch (error) {
       console.error('加载用户数据失败:', error);
@@ -273,7 +380,33 @@ const LanguageLearning = () => {
       // 更新当前会话（processStudyResponse会直接修改传入的session对象）
       setCurrentSession({...currentSession});
 
-      // 更新学习记录
+      // 保存学习记录到新的数据服务层
+      if (selectedWordbookId && currentWord.metadata?.wordbookId) {
+        try {
+          // 创建学习会话（如果还没有）
+          if (!currentSession.dataServiceSessionId) {
+            const dataSession = await learningDataService.createLearningSession(selectedWordbookId);
+            currentSession.dataServiceSessionId = dataSession.id;
+          }
+
+          // 创建学习记录
+          await learningDataService.createLearningRecord({
+            wordbookId: selectedWordbookId,
+            vocabularyId: currentWord.id,
+            sessionId: currentSession.dataServiceSessionId,
+            result: response === 'easy' || response === 'good' ? 'correct' : 'incorrect',
+            timeSpent: Math.round(responseTime / 1000), // 转换为秒
+            timestamp: new Date().toISOString()
+          });
+
+          console.log('学习记录已保存到数据服务层');
+        } catch (error) {
+          console.error('保存学习记录到数据服务层失败:', error);
+          // 不影响学习流程，继续使用原有的localStorage保存
+        }
+      }
+
+      // 更新学习记录（保持向后兼容）
       const newRecord = {
         itemId: currentWord.id,
         timestamp: new Date(),
@@ -594,6 +727,20 @@ const LanguageLearning = () => {
           <Space direction={isMobile ? 'vertical' : 'horizontal'} style={{ width: isMobile ? '100%' : 'auto' }}>
             <Space>
               <Select
+                value={selectedWordbookId}
+                onChange={setSelectedWordbookId}
+                placeholder="选择词书"
+                style={{ width: isMobile ? '120px' : '150px' }}
+                size={isMobile ? 'small' : 'default'}
+                loading={loadingWordbooks}
+              >
+                {availableWordbooks.map(wordbook => (
+                  <Option key={wordbook.id} value={wordbook.id}>
+                    {wordbook.name}
+                  </Option>
+                ))}
+              </Select>
+              <Select
                 value={learningMode}
                 onChange={setLearningMode}
                 style={{ width: isMobile ? '100px' : '120px' }}
@@ -662,6 +809,31 @@ const LanguageLearning = () => {
               基于记忆科学的个性化学习系统，让学习更高效
             </Paragraph>
             
+            {/* 词书选择提示 */}
+            {!selectedWordbookId && (
+              <Alert
+                message="请先选择词书"
+                description="在页面顶部选择一个词书开始学习"
+                type="warning"
+                showIcon
+                style={{ marginBottom: '24px', textAlign: 'left' }}
+              />
+            )}
+            
+            {/* 词书信息显示 */}
+            {selectedWordbookId && (
+              <div style={{ marginBottom: '24px' }}>
+                <Text strong>当前词书：</Text>
+                <Tag color="blue" style={{ marginLeft: '8px' }}>
+                  {availableWordbooks.find(wb => wb.id === selectedWordbookId)?.name || '未知词书'}
+                </Tag>
+                <br />
+                <Text type="secondary">
+                  词汇数量：{learningItems.length} 个
+                </Text>
+              </div>
+            )}
+            
             <div style={{ marginBottom: '32px' }}>
               <Text strong>会话时长：</Text>
               <Select
@@ -682,6 +854,7 @@ const LanguageLearning = () => {
               icon={<ThunderboltOutlined />}
               onClick={startLearningSession}
               loading={loading}
+              disabled={!selectedWordbookId || learningItems.length === 0}
               style={{ minWidth: '200px' }}
             >
               开始智能学习

@@ -1,8 +1,8 @@
 import dayjs from 'dayjs';
-import { wordbookService } from '../services/wordbookService';
+import { learningDataService } from '../services/learningDataService';
 
 /**
- * 基于真实单词本数据生成统计信息
+ * 基于真实学习数据生成统计信息
  * @param {string} startDate - 开始日期 YYYY-MM-DD
  * @param {string} endDate - 结束日期 YYYY-MM-DD
  * @returns {Promise<Object>} 统计数据结构
@@ -10,22 +10,63 @@ import { wordbookService } from '../services/wordbookService';
 export const generateStatisticsFromWordbooks = async (startDate, endDate) => {
   try {
     // 获取所有单词本数据
-    const wordbooks = await wordbookService.getWordbooks();
+    const wordbooks = await learningDataService.getAllWordbooks();
     
     const statistics = {};
     
     for (const wordbook of wordbooks) {
-      // 为每个单词本生成统计信息
+      // 获取该词书的真实学习数据
+      const learningRecords = await learningDataService.getLearningRecordsByWordbook(wordbook.id);
+      const learningSessions = await learningDataService.getLearningSessionsByWordbook(wordbook.id);
+      const vocabularies = await learningDataService.getVocabulariesByWordbook(wordbook.id);
+      
+      // 过滤日期范围内的记录
+      const filteredRecords = learningRecords.filter(record => {
+        const recordDate = dayjs(record.timestamp);
+        return recordDate.isAfter(dayjs(startDate).subtract(1, 'day')) && 
+               recordDate.isBefore(dayjs(endDate).add(1, 'day'));
+      });
+      
+      const filteredSessions = learningSessions.filter(session => {
+        const sessionDate = dayjs(session.startTime);
+        return sessionDate.isAfter(dayjs(startDate).subtract(1, 'day')) && 
+               sessionDate.isBefore(dayjs(endDate).add(1, 'day'));
+      });
+      
+      // 计算统计信息
+      const totalSessions = filteredSessions.length;
+      const totalWords = vocabularies.length;
+      const correctRecords = filteredRecords.filter(r => r.result === 'correct').length;
+      const accuracy = filteredRecords.length > 0 ? correctRecords / filteredRecords.length : 0;
+      
+      // 计算平均间隔和稳定度
+      let totalInterval = 0;
+      let totalStability = 0;
+      let intervalCount = 0;
+      
+      filteredRecords.forEach(record => {
+        if (record.interval !== undefined) {
+          totalInterval += record.interval;
+          intervalCount++;
+        }
+        if (record.stability !== undefined) {
+          totalStability += record.stability;
+        }
+      });
+      
+      const avgInterval = intervalCount > 0 ? totalInterval / intervalCount : 0;
+      const avgStability = filteredRecords.length > 0 ? totalStability / filteredRecords.length : 0;
+      
       statistics[wordbook.id] = {
         wordbookName: wordbook.name,
         wordbookId: wordbook.id,
-        dailyStats: generateDailyStats(wordbook, startDate, endDate),
-        rawRecords: generateLearningRecords(wordbook, startDate, endDate),
-        totalSessions: Math.floor(Math.random() * 50) + 10, // 基于单词本大小生成
-        totalWords: wordbook.totalWords,
-        accuracy: Math.random() * 0.3 + 0.6, // 60%-90% 正确率
-        avgInterval: Math.random() * 5 + 2, // 2-7天平均间隔
-        avgStability: Math.random() * 0.4 + 0.5 // 50%-90% 稳定度
+        dailyStats: generateDailyStatsFromRecords(filteredRecords, startDate, endDate),
+        rawRecords: convertRecordsFormat(filteredRecords, wordbook.id),
+        totalSessions,
+        totalWords,
+        accuracy,
+        avgInterval,
+        avgStability
       };
     }
     
@@ -37,33 +78,58 @@ export const generateStatisticsFromWordbooks = async (startDate, endDate) => {
 };
 
 /**
- * 生成每日统计数据
+ * 基于真实学习记录生成每日统计数据
  */
-const generateDailyStats = (wordbook, startDate, endDate) => {
+const generateDailyStatsFromRecords = (learningRecords, startDate, endDate) => {
   const stats = [];
   const start = dayjs(startDate);
   const end = dayjs(endDate);
   const days = end.diff(start, 'day');
   
-  // 基于单词本大小和学习频率生成数据
-  const baseFrequency = Math.max(1, Math.floor(wordbook.totalWords / 100));
+  // 按日期分组学习记录
+  const recordsByDate = {};
+  learningRecords.forEach(record => {
+    const date = dayjs(record.timestamp).format('YYYY-MM-DD');
+    if (!recordsByDate[date]) {
+      recordsByDate[date] = [];
+    }
+    recordsByDate[date].push(record);
+  });
   
+  // 为每一天生成统计数据
   for (let i = 0; i <= days; i++) {
     const currentDate = start.add(i, 'day');
+    const dateStr = currentDate.format('YYYY-MM-DD');
+    const dayRecords = recordsByDate[dateStr] || [];
     
-    // 模拟学习活动 - 周末学习频率较低
-    const isWeekend = currentDate.day() === 0 || currentDate.day() === 6;
-    const dailySessions = isWeekend ? 
-      Math.floor(Math.random() * baseFrequency) : 
-      Math.floor(Math.random() * baseFrequency * 2);
-    
-    if (dailySessions > 0) {
+    if (dayRecords.length > 0) {
+      const correctRecords = dayRecords.filter(r => r.result === 'correct').length;
+      const accuracy = correctRecords / dayRecords.length;
+      
+      // 计算平均间隔和稳定度
+      let totalInterval = 0;
+      let totalStability = 0;
+      let intervalCount = 0;
+      
+      dayRecords.forEach(record => {
+        if (record.interval !== undefined) {
+          totalInterval += record.interval;
+          intervalCount++;
+        }
+        if (record.stability !== undefined) {
+          totalStability += record.stability;
+        }
+      });
+      
+      const avgInterval = intervalCount > 0 ? totalInterval / intervalCount : 0;
+      const avgStability = dayRecords.length > 0 ? totalStability / dayRecords.length : 0;
+      
       stats.push({
-        date: currentDate.format('YYYY-MM-DD'),
-        totalSessions: dailySessions,
-        accuracy: Math.random() * 0.2 + 0.7, // 70%-90% 正确率
-        avgInterval: Math.random() * 3 + 2, // 2-5天间隔
-        avgStability: Math.random() * 0.3 + 0.6 // 60%-90% 稳定度
+        date: dateStr,
+        totalSessions: dayRecords.length,
+        accuracy,
+        avgInterval,
+        avgStability
       });
     }
   }
@@ -72,33 +138,18 @@ const generateDailyStats = (wordbook, startDate, endDate) => {
 };
 
 /**
- * 生成学习记录数据
+ * 转换学习记录格式以适配统计组件
  */
-const generateLearningRecords = (wordbook, startDate, endDate) => {
-  const records = [];
-  const start = dayjs(startDate);
-  const end = dayjs(endDate);
-  const days = end.diff(start, 'day');
-  
-  // 基于单词本大小生成学习记录
-  const totalRecords = Math.min(wordbook.totalWords * 2, 1000); // 最多1000条记录
-  
-  for (let i = 0; i < totalRecords; i++) {
-    const randomDay = Math.floor(Math.random() * days);
-    const sessionDate = start.add(randomDay, 'day');
-    
-    records.push({
-      sessionDate: sessionDate.format('YYYY-MM-DD'),
-      wordbookId: wordbook.id,
-      wordId: `word_${Math.floor(Math.random() * wordbook.totalWords)}`,
-      isCorrect: Math.random() > 0.3, // 70% 正确率
-      interval: Math.floor(Math.random() * 10) + 1, // 1-10天间隔
-      stability: Math.random() * 0.5 + 0.5, // 50%-100% 稳定度
-      difficulty: Math.random() * 0.8 + 0.2 // 20%-100% 难度
-    });
-  }
-  
-  return records.sort((a, b) => a.sessionDate.localeCompare(b.sessionDate));
+const convertRecordsFormat = (learningRecords, wordbookId) => {
+  return learningRecords.map(record => ({
+    sessionDate: dayjs(record.timestamp).format('YYYY-MM-DD'),
+    wordbookId: wordbookId,
+    wordId: record.vocabularyId,
+    isCorrect: record.result === 'correct',
+    interval: record.interval || 1,
+    stability: record.stability || 0.5,
+    difficulty: record.difficulty || 0.5
+  }));
 };
 
 /**

@@ -77,6 +77,7 @@ const getIntervalGroup = (interval) => {
 };
 
 import { wordbookService } from '../services/wordbookService';
+import { learningDataService } from '../services/learningDataService';
 
 const LongTermStatistics = () => {
   const [selectedWordbooks, setSelectedWordbooks] = useState([]);

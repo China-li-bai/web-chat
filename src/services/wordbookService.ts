@@ -53,6 +53,11 @@ export class WordbookService {
     return await MockDataService.getWordbookStats(wordbookId);
   }
 
+  // 创建新单词本
+  static async createWordbook(wordbook: Omit<Wordbook, 'id' | 'createdAt' | 'updatedAt'>): Promise<Wordbook> {
+    return await MockDataService.addWordbook(wordbook);
+  }
+
   // 获取所有单词本的统计信息（用于长期统计页面）
   static async getAllWordbookStats(): Promise<any[]> {
     const wordbooks = await this.getWordbooks();
