@@ -3,7 +3,7 @@
  * 负责将现有的 localStorage 数据安全地迁移到 SQLite 数据库
  */
 
-import { learningDataServiceSQLite } from './learningDataServiceSQLite';
+import learningDataService from './learningDataServiceSQLite';
 import type { 
   Wordbook, 
   Vocabulary, 
@@ -229,7 +229,7 @@ class DataMigrationToSQLite {
 
       try {
         // 检查是否已存在
-        const existing = await learningDataServiceSQLite.getWordbookById(cleanWordbook.id);
+        const existing = await learningDataService.getWordbookById(cleanWordbook.id);
         if (existing) {
           console.log(`词书 ${cleanWordbook.name} 已存在，跳过迁移`);
           continue;
@@ -237,7 +237,7 @@ class DataMigrationToSQLite {
 
         // 创建词书（不包含自动生成的字段）
         const { id, createdAt, updatedAt, wordCount, ...wordbookToCreate } = cleanWordbook;
-        await learningDataServiceSQLite.createWordbook(wordbookToCreate);
+        await learningDataService.createWordbook(wordbookToCreate);
         migratedCount++;
         
         console.log(`成功迁移词书: ${cleanWordbook.name}`);
@@ -265,14 +265,14 @@ class DataMigrationToSQLite {
 
       try {
         // 检查词书是否存在
-        const wordbook = await learningDataServiceSQLite.getWordbookById(cleanVocabulary.wordbookId);
+        const wordbook = await learningDataService.getWordbookById(cleanVocabulary.wordbookId);
         if (!wordbook) {
           console.warn(`词汇 ${cleanVocabulary.word} 的词书不存在，跳过迁移`);
           continue;
         }
 
         // 检查是否已存在
-        const existing = await learningDataServiceSQLite.getVocabularyById(cleanVocabulary.id);
+        const existing = await learningDataService.getVocabularyById(cleanVocabulary.id);
         if (existing) {
           console.log(`词汇 ${cleanVocabulary.word} 已存在，跳过迁移`);
           continue;
@@ -280,7 +280,7 @@ class DataMigrationToSQLite {
 
         // 创建词汇（不包含自动生成的字段）
         const { id, createdAt, updatedAt, masteryLevel, reviewCount, ...vocabularyToCreate } = cleanVocabulary;
-        await learningDataServiceSQLite.createVocabulary({
+        await learningDataService.createVocabulary({
           ...vocabularyToCreate,
           lastReviewed: cleanVocabulary.lastReviewed
         });
@@ -311,8 +311,8 @@ class DataMigrationToSQLite {
 
       try {
         // 检查词书和词汇是否存在
-        const wordbook = await learningDataServiceSQLite.getWordbookById(cleanRecord.wordbookId);
-        const vocabulary = await learningDataServiceSQLite.getVocabularyById(cleanRecord.vocabularyId);
+        const wordbook = await learningDataService.getWordbookById(cleanRecord.wordbookId);
+        const vocabulary = await learningDataService.getVocabularyById(cleanRecord.vocabularyId);
         
         if (!wordbook || !vocabulary) {
           console.warn(`学习记录的词书或词汇不存在，跳过迁移`);
@@ -321,7 +321,7 @@ class DataMigrationToSQLite {
 
         // 创建学习记录（不包含 userId）
         const { userId, ...recordToCreate } = cleanRecord;
-        await learningDataServiceSQLite.createLearningRecord(recordToCreate);
+        await learningDataService.createLearningRecord(recordToCreate);
         migratedCount++;
         
         if (migratedCount % 100 === 0) {
