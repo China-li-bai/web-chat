@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Layout } from 'antd';
 import Sidebar from './components/Sidebar';
@@ -15,45 +15,12 @@ import './styles/App.css';
 const { Content } = Layout;
 
 function App() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-
-  // 检测屏幕尺寸
-  useEffect(() => {
-    const checkScreenSize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      // 移动端默认折叠侧边栏
-      if (mobile) {
-        setCollapsed(true);
-      }
-    };
-
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-
-  const handleCollapse = (collapsed) => {
-    setCollapsed(collapsed);
-  };
-
   return (
     <Layout className="app-layout">
-      <Sidebar 
-        collapsed={collapsed} 
-        onCollapse={handleCollapse}
-        isMobile={isMobile}
-        drawerVisible={drawerVisible}
-        onDrawerClose={() => setDrawerVisible(false)}
-      />
-      <Layout className={`main-layout ${isMobile ? 'mobile-layout' : 'desktop-layout'}`}>
-        <Header 
-          isMobile={isMobile}
-          onMobileMenuClick={() => setDrawerVisible(true)}
-        />
-        <Content className="main-content">
+      <Sidebar />
+      <Layout>
+        <Header />
+        <Content className="app-content">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/practice" element={<Practice />} />
