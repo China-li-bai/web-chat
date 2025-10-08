@@ -1,5 +1,5 @@
 import { getDB } from './db';
-import type { Row } from '@/packages/wa-sqlite-adapter/types';
+type Row = any;
 import cet4Data from '@/data/cet4-core.json';
 import gmatData from '@/data/gmat-core.json';
 import satData from '@/data/sat-advanced.json';
@@ -53,8 +53,8 @@ async function seedFromFile(db: any, fileData: ImportFile) {
     const wordId = wordIdResult[0].id as number;
 
     await db.exec({
-      sql: 'INSERT INTO "learning_progress" ("userId", "itemId", "nextReview") VALUES (?, ?, ?)',
-      args: ['default_user', wordId.toString(), new Date().toISOString()],
+      sql: 'INSERT INTO "learning_progress" ("wordId", "nextReview") VALUES (?, ?)',
+      args: [wordId, new Date().toISOString()],
     });
   }
 }
@@ -80,9 +80,9 @@ export async function seedInitialData() {
 
 export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
   const db = await getDB();
-  const books = await db.exec({
+  const books = (await db.exec({
     sql: 'SELECT * FROM "wordbooks" ORDER BY "createdAt" DESC',
-  });
+  })) as any[];
 
   const statsPromises = (books as Wordbook[]).map(async (book) => {
     const wordCountResult = await db.exec({
@@ -96,7 +96,7 @@ export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
       sql: `
         SELECT COUNT(*) as count
         FROM "learning_progress"
-        WHERE "itemId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
+        WHERE "wordId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
         AND "state" = 'review'
       `,
       args: [book.id],
@@ -109,7 +109,7 @@ export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
       sql: `
         SELECT COUNT(*) as count
         FROM "learning_progress"
-        WHERE "itemId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
+        WHERE "wordId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
         AND "nextReview" <= ?
       `,
       args: [book.id, now],
@@ -189,7 +189,7 @@ export async function importWordbook(jsonContent: string): Promise<void> {
 
     // Create initial learning progress for the new word
     await db.exec({
-      sql: 'INSERT INTO "learning_progress" ("wordId", "dueDate") VALUES (?, ?)',
+      sql: 'INSERT INTO "learning_progress" ("wordId", "nextReview") VALUES (?, ?)',
       args: [wordId, new Date().toISOString()],
     });
   }

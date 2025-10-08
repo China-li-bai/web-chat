@@ -8,16 +8,41 @@ export async function initializeDatabase(): Promise<void> {
   const db = await getDB();
   
   try {
-    // 创建所有必要的表
+    // Migration check: try to access a column from the new schema.
+    // If it fails, assume old schema and wipe the tables.
+    let needsMigration = false;
+    try {
+      const tablesResult = await db.exec({ sql: "SELECT name FROM sqlite_master WHERE type='table' AND name='learning_progress'" });
+      if (tablesResult.length > 0) {
+        await db.exec({ sql: 'SELECT nextReview FROM learning_progress LIMIT 1' });
+      }
+    } catch (e: any) {
+      if (e.message.includes('no such column')) {
+        needsMigration = true;
+      }
+    }
+
+    if (needsMigration) {
+      console.warn('Detected legacy schema. Recreating tables to align with current schema.');
+      await db.exec({ sql: 'DROP TABLE IF EXISTS study_logs' });
+      await db.exec({ sql: 'DROP TABLE IF EXISTS learning_progress' });
+      await db.exec({ sql: 'DROP TABLE IF EXISTS words' });
+      await db.exec({ sql: 'DROP TABLE IF EXISTS wordbooks' });
+      await db.exec({ sql: 'DROP TABLE IF EXISTS learning_statistics' });
+      await db.exec({ sql: 'DROP TABLE IF EXISTS word_type_statistics' });
+    }
+
+    // Create all necessary tables (IF NOT EXISTS)
     await createTables(db);
     
-    // 检查是否已有数据
+    // Check if we need to seed data
     const existingData = await db.exec({
-      sql: 'SELECT COUNT(*) as count FROM learning_statistics'
+      sql: 'SELECT COUNT(*) as count FROM wordbooks'
     });
+    const existingCount = Number((existingData && existingData[0] && (existingData[0] as any).count) ?? 0);
     
-    if (existingData[0]?.count === 0) {
-      // 插入示例数据
+    if (existingCount === 0) {
+      // Insert sample data
       await insertSampleData(db);
       console.log('Sample data initialized successfully');
     } else {
@@ -64,56 +89,63 @@ async function createTables(db: any): Promise<void> {
     )`
   });
 
-  // 创建学习进度表
+  // 创建学习进度表（与 db.ts 对齐）
   await db.exec({
     sql: `CREATE TABLE IF NOT EXISTS learning_progress (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId TEXT NOT NULL,
-      itemId TEXT NOT NULL,
-      state TEXT NOT NULL DEFAULT 'new',
-      nextReview TEXT,
+      wordId INTEGER NOT NULL UNIQUE,
+      stability REAL NOT NULL DEFAULT 0,
+      retrievability REAL NOT NULL DEFAULT 1,
+      difficulty REAL NOT NULL DEFAULT 0.3,
+      nextReview TEXT NOT NULL,
       lastReview TEXT,
       reviewCount INTEGER NOT NULL DEFAULT 0,
-      stability REAL NOT NULL DEFAULT 0,
-      difficulty REAL NOT NULL DEFAULT 0,
-      retrievability REAL NOT NULL DEFAULT 0,
-      UNIQUE(userId, itemId)
+      lapseCount INTEGER NOT NULL DEFAULT 0,
+      state TEXT NOT NULL CHECK(state IN ('new','learning','review','relearning')) DEFAULT 'new',
+      FOREIGN KEY (wordId) REFERENCES words (id) ON DELETE CASCADE
     )`
   });
 
-  // 创建学习日志表
+  // 创建学习日志表（与 db.ts 对齐）
   await db.exec({
     sql: `CREATE TABLE IF NOT EXISTS study_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId TEXT NOT NULL,
-      itemId TEXT NOT NULL,
-      response TEXT NOT NULL,
+      itemId INTEGER NOT NULL,
+      timestamp TEXT NOT NULL,
+      response TEXT NOT NULL CHECK(response IN ('again','hard','good','easy')),
       responseTime INTEGER NOT NULL,
-      timestamp TEXT NOT NULL
+      confidence REAL,
+      previousStability REAL,
+      previousRetrievability REAL,
+      newStability REAL,
+      newRetrievability REAL,
+      FOREIGN KEY (itemId) REFERENCES words (id) ON DELETE CASCADE
     )`
   });
 
-  // 创建单词表（如果不存在）
+  // 创建单词表（与 db.ts 对齐）
   await db.exec({
     sql: `CREATE TABLE IF NOT EXISTS words (
-      id TEXT PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wordbookId INTEGER NOT NULL,
       word TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'vocabulary',
+      phonetic TEXT,
       definition TEXT NOT NULL,
-      pronunciation TEXT,
-      partOfSpeech TEXT,
       example TEXT,
-      wordbookId TEXT NOT NULL
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (wordbookId) REFERENCES wordbooks (id) ON DELETE CASCADE,
+      UNIQUE (wordbookId, word)
     )`
   });
 
-  // 创建单词本表（如果不存在）
+  // 创建单词本表（与 db.ts 对齐）
   await db.exec({
     sql: `CREATE TABLE IF NOT EXISTS wordbooks (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
       description TEXT,
-      totalWords INTEGER DEFAULT 0,
-      createdAt TEXT NOT NULL
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
     )`
   });
 }
@@ -159,61 +191,67 @@ async function insertSampleData(db: any): Promise<void> {
     });
   }
 
-  // 插入学习进度数据
+  // 插入学习进度数据（与 schema 对齐：使用 wordId）
   for (const progress of sampleData.learningProgress) {
     await db.exec({
       sql: `INSERT OR REPLACE INTO learning_progress 
-        (userId, itemId, state, nextReview, lastReview, reviewCount, stability, difficulty, retrievability)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (wordId, state, nextReview, lastReview, reviewCount, stability, difficulty, retrievability)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        progress.userId,
-        progress.itemId,
-        progress.state,
-        progress.nextReview,
-        progress.lastReview,
-        progress.reviewCount,
-        progress.stability,
-        progress.difficulty,
-        progress.retrievability
+        Number(progress.itemId),
+        progress.state ?? 'new',
+        progress.nextReview ?? new Date().toISOString(),
+        progress.lastReview ?? null,
+        progress.reviewCount ?? 0,
+        progress.stability ?? 0,
+        progress.difficulty ?? 0.3,
+        progress.retrievability ?? 1
       ]
     });
   }
 
-  // 插入学习日志数据
+  // 插入学习日志数据（插入必需字段）
   for (const log of sampleData.studyLogs) {
     await db.exec({
       sql: `INSERT INTO study_logs 
-        (userId, itemId, response, responseTime, timestamp)
-        VALUES (?, ?, ?, ?, ?)`,
+        (itemId, timestamp, response, responseTime)
+        VALUES (?, ?, ?, ?)`,
       args: [
-        log.userId,
-        log.itemId,
+        Number(log.itemId),
+        log.timestamp,
         log.response,
-        log.responseTime,
-        log.timestamp
+        log.responseTime
       ]
     });
   }
 
   // 插入示例单词本
   await db.exec({
-    sql: `INSERT OR REPLACE INTO wordbooks (id, name, description, totalWords, createdAt)
-      VALUES (?, ?, ?, ?, ?)`,
-    args: ['cet4-core', 'CET-4 Core Vocabulary', 'Essential vocabulary for CET-4 exam', 100, new Date().toISOString()]
+    sql: `INSERT INTO wordbooks (name, description)
+      VALUES (?, ?)`,
+    args: ['CET-4 Core Vocabulary', 'Essential vocabulary for CET-4 exam']
   });
+  const wbRow = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
+  const wbId = wbRow[0].id as number;
 
   // 插入一些示例单词
   const sampleWords = [
-    { id: 'word-1', word: 'abandon', definition: 'to give up completely', pronunciation: '/əˈbændən/', partOfSpeech: 'verb', example: 'He had to abandon his car in the snow.', wordbookId: 'cet4-core' },
-    { id: 'word-2', word: 'ability', definition: 'the capacity to do something', pronunciation: '/əˈbɪləti/', partOfSpeech: 'noun', example: 'She has the ability to learn quickly.', wordbookId: 'cet4-core' },
-    { id: 'word-3', word: 'absolute', definition: 'complete and total', pronunciation: '/ˈæbsəluːt/', partOfSpeech: 'adjective', example: 'There was absolute silence in the room.', wordbookId: 'cet4-core' }
+    { word: 'abandon', definition: 'to give up completely', phonetic: '/əˈbændən/', example: 'He had to abandon his car in the snow.' },
+    { word: 'ability', definition: 'the capacity to do something', phonetic: '/əˈbɪləti/', example: 'She has the ability to learn quickly.' },
+    { word: 'absolute', definition: 'complete and total', phonetic: '/ˈæbsəluːt/', example: 'There was absolute silence in the room.' }
   ];
 
   for (const word of sampleWords) {
     await db.exec({
-      sql: `INSERT OR REPLACE INTO words (id, word, definition, pronunciation, partOfSpeech, example, wordbookId)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      args: [word.id, word.word, word.definition, word.pronunciation, word.partOfSpeech, word.example, word.wordbookId]
+      sql: `INSERT INTO words (wordbookId, word, type, phonetic, definition, example)
+        VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [wbId, word.word, 'vocabulary', word.phonetic || null, word.definition, word.example || null]
+    });
+    const row = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
+    const newWordId = row[0].id as number;
+    await db.exec({
+      sql: `INSERT INTO learning_progress (wordId, nextReview, state) VALUES (?, ?, ?)`,
+      args: [newWordId, new Date().toISOString(), 'new']
     });
   }
 }
@@ -227,7 +265,8 @@ export async function isDatabaseInitialized(): Promise<boolean> {
     const result = await db.exec({
       sql: 'SELECT COUNT(*) as count FROM learning_statistics'
     });
-    return result[0]?.count > 0;
+    const count = Number((result && result[0] && (result[0] as any).count) ?? 0);
+    return count > 0;
   } catch (error) {
     return false;
   }
