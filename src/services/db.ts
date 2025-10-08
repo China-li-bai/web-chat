@@ -31,10 +31,10 @@ const CREATE_TABLE_STATEMENTS = [
     "stability" REAL NOT NULL DEFAULT 0,
     "retrievability" REAL NOT NULL DEFAULT 1,
     "difficulty" REAL NOT NULL DEFAULT 0.3,
-    "dueDate" TEXT NOT NULL,
-    "lastReviewed" TEXT,
-    "reps" INTEGER NOT NULL DEFAULT 0,
-    "lapses" INTEGER NOT NULL DEFAULT 0,
+    "nextReview" TEXT NOT NULL,
+    "lastReview" TEXT,
+    "reviewCount" INTEGER NOT NULL DEFAULT 0,
+    "lapseCount" INTEGER NOT NULL DEFAULT 0,
     "state" TEXT NOT NULL CHECK("state" IN ('new', 'learning', 'review', 'relearning')) DEFAULT 'new',
     FOREIGN KEY ("wordId") REFERENCES "words" ("id") ON DELETE CASCADE
   );
@@ -42,7 +42,7 @@ const CREATE_TABLE_STATEMENTS = [
   `
   CREATE TABLE IF NOT EXISTS "study_logs" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "wordId" INTEGER NOT NULL,
+    "itemId" INTEGER NOT NULL,
     "timestamp" TEXT NOT NULL,
     "response" TEXT NOT NULL CHECK("response" IN ('again', 'hard', 'good', 'easy')),
     "responseTime" INTEGER NOT NULL,
@@ -51,7 +51,7 @@ const CREATE_TABLE_STATEMENTS = [
     "previousRetrievability" REAL,
     "newStability" REAL,
     "newRetrievability" REAL,
-    FOREIGN KEY ("wordId") REFERENCES "words" ("id") ON DELETE CASCADE
+    FOREIGN KEY ("itemId") REFERENCES "words" ("id") ON DELETE CASCADE
   );
   `
 ];

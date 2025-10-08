@@ -94,6 +94,9 @@ export const WordbookSelectionPage: React.FC = () => {
                   description={book.description}
                   wordCount={book.wordCount}
                   progress={book.progress}
+                  masteredCount={book.masteredCount}
+                  dueCount={book.dueCount}
+                  lastStudied={book.lastStudied}
                   onStart={() => handleStartLearning(book.id)}
                 />
               </Col>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Flashcard } from '@/components/language-learning/Flashcard';
-import { Button, Space, Spin, Result, Typography, message, Progress } from 'antd';
+import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col } from 'antd';
+import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse } from '@/services/learningService';
 import type { LearningSession, ScheduledItem } from '@/lib/memo/types';
 
@@ -15,6 +16,7 @@ const LearningSessionPage: React.FC = () => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0, startTime: Date.now() });
   const responseStartTime = useRef<number>(0);
 
   useEffect(() => {
@@ -49,6 +51,14 @@ const LearningSessionPage: React.FC = () => {
     if (!session || !currentItem) return;
 
     const responseTime = Date.now() - responseStartTime.current;
+    const isCorrect = response === 'good' || response === 'easy';
+
+    // Update session statistics
+    setSessionStats(prev => ({
+      ...prev,
+      correct: prev.correct + (isCorrect ? 1 : 0),
+      total: prev.total + 1
+    }));
 
     try {
       await processStudyResponse(session, currentItem.item.id, response, responseTime);
@@ -61,7 +71,9 @@ const LearningSessionPage: React.FC = () => {
       setCurrentItemIndex(currentItemIndex + 1);
       setIsFlipped(false);
     } else {
-      message.success('Session finished!');
+      const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
+      const accuracy = Math.round((sessionStats.correct / sessionStats.total) * 100);
+      message.success(`Session completed! ${sessionStats.correct}/${sessionStats.total} correct (${accuracy}%) in ${sessionDuration} minutes`);
       navigate('/language-learning');
     }
   };
@@ -102,12 +114,69 @@ const LearningSessionPage: React.FC = () => {
   );
   
   const progressPercent = (currentItemIndex / session.items.length) * 100;
+  const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
+  const accuracy = sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f2f5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-      <div style={{ width: '100%', maxWidth: '500px', position: 'absolute', top: '20px' }}>
-        <Progress percent={progressPercent} showInfo={false} />
-      </div>
+    <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
+      {/* Header with stats */}
+      <Card style={{ margin: '16px', marginBottom: '24px' }}>
+        <Row align="middle" justify="space-between">
+          <Col>
+            <Button 
+              icon={<ArrowLeftOutlined />} 
+              onClick={() => navigate('/language-learning')}
+              type="text"
+            >
+              Back to Wordbooks
+            </Button>
+          </Col>
+          <Col flex={1} style={{ margin: '0 24px' }}>
+            <Progress 
+              percent={progressPercent} 
+              showInfo={false} 
+              strokeColor="#1890ff"
+              size="small"
+            />
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {currentItemIndex + 1} of {session.items.length} words
+            </Text>
+          </Col>
+          <Col>
+            <Row gutter={16}>
+              <Col>
+                <Statistic
+                  title="Accuracy"
+                  value={accuracy}
+                  suffix="%"
+                  prefix={<TrophyOutlined />}
+                  valueStyle={{ fontSize: '16px', color: accuracy >= 80 ? '#52c41a' : accuracy >= 60 ? '#fa8c16' : '#ff4d4f' }}
+                />
+              </Col>
+              <Col>
+                <Statistic
+                  title="Time"
+                  value={sessionDuration}
+                  suffix="min"
+                  prefix={<ClockCircleOutlined />}
+                  valueStyle={{ fontSize: '16px' }}
+                />
+              </Col>
+              <Col>
+                <Statistic
+                  title="Correct"
+                  value={`${sessionStats.correct}/${sessionStats.total}`}
+                  prefix={<BookOutlined />}
+                  valueStyle={{ fontSize: '16px' }}
+                />
+              </Col>
+            </Row>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* Main learning area */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', minHeight: 'calc(100vh - 200px)' }}>
       
       <Flashcard
         frontContent={frontContent}
@@ -116,19 +185,36 @@ const LearningSessionPage: React.FC = () => {
         onFlip={handleFlip}
       />
 
-      <div style={{ marginTop: '24px', width: '100%', maxWidth: '500px' }}>
-        {!isFlipped ? (
-          <Button type="primary" onClick={handleFlip} block size="large">
-            Show Answer
-          </Button>
-        ) : (
-          <Space style={{ width: '100%' }}>
-            <Button danger onClick={() => handleResponse('again')} block size="large">Again</Button>
-            <Button onClick={() => handleResponse('hard')} block size="large">Hard</Button>
-            <Button onClick={() => handleResponse('good')} block size="large">Good</Button>
-            <Button type="primary" ghost onClick={() => handleResponse('easy')} block size="large">Easy</Button>
-          </Space>
-        )}
+        <div style={{ marginTop: '24px', width: '100%', maxWidth: '500px' }}>
+          {!isFlipped ? (
+            <Button type="primary" onClick={handleFlip} block size="large">
+              Show Answer
+            </Button>
+          ) : (
+            <Row gutter={8} style={{ width: '100%' }}>
+              <Col span={6}>
+                <Button danger onClick={() => handleResponse('again')} block size="large">
+                  Again
+                </Button>
+              </Col>
+              <Col span={6}>
+                <Button onClick={() => handleResponse('hard')} block size="large">
+                  Hard
+                </Button>
+              </Col>
+              <Col span={6}>
+                <Button type="primary" onClick={() => handleResponse('good')} block size="large">
+                  Good
+                </Button>
+              </Col>
+              <Col span={6}>
+                <Button type="primary" ghost onClick={() => handleResponse('easy')} block size="large">
+                  Easy
+                </Button>
+              </Col>
+            </Row>
+          )}
+        </div>
       </div>
     </div>
   );

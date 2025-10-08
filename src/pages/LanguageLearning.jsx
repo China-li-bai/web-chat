@@ -38,6 +38,8 @@ import {
 
 // 导入记忆学习算法栈
 import { MemoryLearningManager } from '../lib/memo/MemoryLearningManager';
+// 导入数据初始化服务
+import { initializeDatabase, isDatabaseInitialized } from '../services/dataInitService';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -69,9 +71,31 @@ const LanguageLearning = () => {
 
   // 初始化记忆学习系统
   useEffect(() => {
-    initializeMemorySystem();
-    loadUserData();
+    initializeSystem();
   }, []);
+
+  const initializeSystem = async () => {
+    try {
+      setLoading(true);
+      
+      // 检查并初始化数据库
+      const isInitialized = await isDatabaseInitialized();
+      if (!isInitialized) {
+        console.log('Initializing database with sample data...');
+        await initializeDatabase();
+        message.success('数据库初始化完成');
+      }
+      
+      // 初始化记忆学习系统
+      initializeMemorySystem();
+      loadUserData();
+    } catch (error) {
+      console.error('System initialization failed:', error);
+      message.error('系统初始化失败，请刷新页面重试');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const initializeMemorySystem = () => {
     try {

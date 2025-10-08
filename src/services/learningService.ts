@@ -15,8 +15,8 @@ interface WordWithProgress extends Row {
   stability: number;
   retrievability: number;
   difficulty: number;
-  dueDate: string;
-  lastReviewed: string | null;
+  nextReview: string;
+  lastReview: string | null;
   state: string;
 }
 
@@ -29,10 +29,10 @@ export async function createLearningSessionForWordbook(wordbookId: number) {
     sql: `
       SELECT
         w.id, w.word, w.type, w.phonetic, w.definition, w.example, w.createdAt,
-        lp.stability, lp.retrievability, lp.difficulty, lp.dueDate, lp.lastReviewed, lp.state
+        lp.stability, lp.retrievability, lp.difficulty, lp.nextReview, lp.lastReview, lp.state
       FROM words w
       JOIN learning_progress lp ON w.id = lp.wordId
-      WHERE w.wordbookId = ? AND lp.dueDate <= ?
+      WHERE w.wordbookId = ? AND lp.nextReview <= ?
     `,
     args: [wordbookId, now],
   })) as WordWithProgress[];
@@ -61,12 +61,12 @@ export async function createLearningSessionForWordbook(wordbookId: number) {
   if (wordIds.length > 0) {
     const placeholders = wordIds.map(() => '?').join(',');
     const logs = await db.exec({
-      sql: `SELECT * FROM study_logs WHERE wordId IN (${placeholders}) ORDER BY timestamp DESC LIMIT 100`,
+      sql: `SELECT * FROM study_logs WHERE itemId IN (${placeholders}) ORDER BY timestamp DESC LIMIT 100`,
       args: wordIds,
     });
 
     studyRecords = logs.map((log: Row) => ({
-      itemId: String(log.wordId),
+      itemId: String(log.itemId),
       timestamp: new Date(log.timestamp as string),
       response: log.response as 'again' | 'hard' | 'good' | 'easy',
       responseTime: log.responseTime as number,
@@ -160,10 +160,10 @@ export async function processStudyResponse(
         stability = ?,
         retrievability = ?,
         difficulty = ?,
-        dueDate = ?,
-        lastReviewed = ?,
+        nextReview = ?,
+        lastReview = ?,
         state = ?,
-        reps = reps + 1
+        reviewCount = reviewCount + 1
       WHERE wordId = ?
     `,
     args: [stability, retrievability, difficulty, newDueDate ? newDueDate.toISOString() : new Date().toISOString(), new Date().toISOString(), state, wordId],
@@ -173,7 +173,7 @@ export async function processStudyResponse(
   await db.exec({
     sql: `
       INSERT INTO study_logs
-      (wordId, timestamp, response, responseTime, confidence, previousStability, previousRetrievability, newStability, newRetrievability)
+      (itemId, timestamp, response, responseTime, confidence, previousStability, previousRetrievability, newStability, newRetrievability)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     args: [wordId, new Date().toISOString(), response, responseTime, confidence, previousStability || 0, previousRetrievability || 1, stability, retrievability],

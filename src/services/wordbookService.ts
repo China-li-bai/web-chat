@@ -14,6 +14,9 @@ export interface Wordbook extends Row {
 export interface WordbookWithStats extends Wordbook {
   wordCount: number;
   progress: number; // 0-100
+  masteredCount: number;
+  dueCount: number;
+  lastStudied?: string;
 }
 
 interface ImportWord {
@@ -50,8 +53,8 @@ async function seedFromFile(db: any, fileData: ImportFile) {
     const wordId = wordIdResult[0].id as number;
 
     await db.exec({
-      sql: 'INSERT INTO "learning_progress" ("wordId", "dueDate") VALUES (?, ?)',
-      args: [wordId, new Date().toISOString()],
+      sql: 'INSERT INTO "learning_progress" ("userId", "itemId", "nextReview") VALUES (?, ?, ?)',
+      args: ['default_user', wordId.toString(), new Date().toISOString()],
     });
   }
 }
@@ -88,25 +91,51 @@ export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
     });
     const wordCount = (wordCountResult[0]?.count as number) || 0;
 
-    let progress = 0;
-    if (wordCount > 0) {
-      const masteredCountResult = await db.exec({
-        sql: `
-          SELECT COUNT(*) as count
-          FROM "learning_progress"
-          WHERE "wordId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
-          AND "state" = 'review'
-        `,
-        args: [book.id],
-      });
-      const masteredCount = (masteredCountResult[0]?.count as number) || 0;
-      progress = (masteredCount / wordCount) * 100;
-    }
+    // Get mastered count
+    const masteredCountResult = await db.exec({
+      sql: `
+        SELECT COUNT(*) as count
+        FROM "learning_progress"
+        WHERE "itemId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
+        AND "state" = 'review'
+      `,
+      args: [book.id],
+    });
+    const masteredCount = (masteredCountResult[0]?.count as number) || 0;
+
+    // Get due count (words that need to be studied now)
+    const now = new Date().toISOString();
+    const dueCountResult = await db.exec({
+      sql: `
+        SELECT COUNT(*) as count
+        FROM "learning_progress"
+        WHERE "itemId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
+        AND "nextReview" <= ?
+      `,
+      args: [book.id, now],
+    });
+    const dueCount = (dueCountResult[0]?.count as number) || 0;
+
+    // Get last studied date
+    const lastStudiedResult = await db.exec({
+      sql: `
+        SELECT MAX("timestamp") as lastStudied
+        FROM "study_logs"
+        WHERE "itemId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
+      `,
+      args: [book.id],
+    });
+    const lastStudied = lastStudiedResult[0]?.lastStudied as string | null;
+
+    const progress = wordCount > 0 ? (masteredCount / wordCount) * 100 : 0;
 
     return {
       ...book,
       wordCount,
       progress,
+      masteredCount,
+      dueCount,
+      lastStudied: lastStudied || undefined,
     } as WordbookWithStats;
   });
 
