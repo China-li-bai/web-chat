@@ -1,0 +1,16 @@
+{
+  "name": "CET-4 Core Vocabulary",
+  "description": "College English Test Band 4 core vocabulary.",
+  "words": [
+    { "word": "abandon", "phonetic": "/əˈbændən/", "definition": "v. to leave someone or something behind" },
+    { "word": "ability", "phonetic": "/əˈbɪləti/", "definition": "n. the power or skill to do something" },
+    { "word": "abroad", "phonetic": "/əˈbrɔːd/", "definition": "adv. in or to a foreign country" },
+    { "word": "absence", "phonetic": "/ˈæbsəns/", "definition": "n. the state of being away from a place" },
+    { "word": "absolute", "phonetic": "/ˈæbsəluːt/", "definition": "adj. complete and total" },
+    { "word": "absorb", "phonetic": "/əbˈsɔːrb/", "definition": "v. to take in a liquid, gas or other substance" },
+    { "word": "abstract", "phonetic": "/ˈæbstrækt/", "definition": "adj. existing as an idea, not as a physical thing" },
+    { "word": "academic", "phonetic": "/ˌækəˈdemɪk/", "definition": "adj. relating to education and scholarship" },
+    { "word": "accent", "phonetic": "/ˈæksent/", "definition": "n. a way of pronouncing the words of a language" },
+    { "word": "access", "phonetic": "/ˈækses/", "definition": "n. the right or opportunity to use or benefit from something" }
+  ]
+}

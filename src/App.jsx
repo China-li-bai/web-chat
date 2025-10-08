@@ -5,9 +5,11 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Home from './pages/Home';
 import Practice from './pages/Practice';
-import LanguageLearning from './pages/LanguageLearning';
+import LanguageLearning from './pages/LanguageLearning/index.tsx';
 import Progress from './pages/Progress';
 import Settings from './pages/Settings';
+import LearningSessionPage from './pages/LanguageLearning/LearningSessionPage';
+import StatisticsPage from './pages/LanguageLearning/StatisticsPage';
 import './styles/App.css';
 
 const { Content } = Layout;
@@ -23,6 +25,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/practice" element={<Practice />} />
             <Route path="/language-learning" element={<LanguageLearning />} />
+            <Route path="/learning-session/:wordbookId" element={<LearningSessionPage />} />
+            <Route path="/statistics" element={<StatisticsPage />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
