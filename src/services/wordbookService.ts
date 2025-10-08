@@ -147,6 +147,15 @@ export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
   return Promise.all(statsPromises);
 }
 
+export async function checkWordbookExists(name: string): Promise<boolean> {
+  const db = await getDB();
+  const existing = await db.exec({
+    sql: 'SELECT "id" FROM "wordbooks" WHERE "name" = ?',
+    args: [name],
+  });
+  return existing.length > 0;
+}
+
 interface ImportWord {
   word: string;
   phonetic?: string;

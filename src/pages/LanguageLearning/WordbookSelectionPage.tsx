@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WordbookCard } from '@/components/language-learning/WordbookCard';
-import { seedInitialData, getAllWordbooksWithStats, importWordbook, type WordbookWithStats } from '@/services/wordbookService';
+import { seedInitialData, getAllWordbooksWithStats, importWordbook, checkWordbookExists, type WordbookWithStats } from '@/services/wordbookService';
 import { initializeDatabase } from '@/services/dataInitService';
-import { Button, Row, Col, Typography, Space, Spin, Empty, message, App } from 'antd';
+import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
@@ -44,24 +44,64 @@ export const WordbookSelectionPage: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
       const content = e.target?.result as string;
+      if (!content) {
+        messageApi.error('Could not read file content.');
+        return;
+      }
+
+      let data;
       try {
-        const result = await importWordbook(content);
-        if (result.status === 'created') {
-          messageApi.success('Wordbook imported successfully!');
-        } else {
-          messageApi.success('Wordbook updated successfully!');
+        data = JSON.parse(content);
+      } catch (error) {
+        messageApi.error('Invalid JSON file.');
+        return;
+      }
+
+      const bookName = data.name;
+      if (!bookName) {
+        messageApi.error('Invalid import file: "name" field is missing.');
+        return;
+      }
+
+      const proceedWithImport = async () => {
+        try {
+          const result = await importWordbook(content);
+          if (result.status === 'created') {
+            messageApi.success(`Wordbook "${bookName}" imported successfully!`);
+          } else {
+            messageApi.success(`Wordbook "${bookName}" updated successfully!`);
+          }
+          await loadWordbooks(); // Refresh the list
+        } catch (error: any) {
+          console.error('Failed to import wordbook:', error);
+          messageApi.error(`Import failed: ${error.message}`);
         }
-        await loadWordbooks(); // Refresh the list
+      };
+
+      try {
+        const exists = await checkWordbookExists(bookName);
+        if (exists) {
+          Modal.confirm({
+            title: 'Confirm Overwrite',
+            content: `A wordbook named "${bookName}" already exists. Do you want to overwrite it?`,
+            onOk: proceedWithImport,
+            onCancel() {
+              console.log('Import cancelled by user.');
+            },
+          });
+        } else {
+          await proceedWithImport();
+        }
       } catch (error: any) {
-        console.error('Failed to import wordbook:', error);
-        messageApi.error(`Import failed: ${error.message}`);
+        console.error('Failed to check wordbook existence:', error);
+        messageApi.error(`Error: ${error.message}`);
       }
     };
     reader.readAsText(file);
