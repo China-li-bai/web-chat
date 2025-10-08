@@ -4,7 +4,7 @@ import type { LearningItem, StudyRecord, MemoryStrength } from '@/lib/memo/types
 import type { Row } from '@/packages/wa-sqlite-adapter/types';
 import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
 
-interface WordWithProgress extends Row {
+interface WordWithProgress {
   id: number;
   word: string;
   type: string;
@@ -65,7 +65,7 @@ export async function createLearningSessionForWordbook(wordbookId: number, userI
       args: wordIds,
     });
 
-    studyRecords = logs.map((log: Row) => ({
+    studyRecords = logs.map((log: any) => ({
       itemId: String(log.itemId),
       timestamp: new Date(log.timestamp as string),
       response: log.response as 'again' | 'hard' | 'good' | 'easy',
@@ -236,7 +236,7 @@ async function updateLearningStatistics(
     
     if (existingStats.length > 0) {
       // 更新现有记录
-      const currentStats = existingStats[0] as Row;
+      const currentStats = existingStats[0] as any;
       const newTotalReviews = (currentStats.totalReviews as number) + 1;
       const newCorrectReviews = (currentStats.correctReviews as number) + isCorrect;
       const newTotalResponseTime = (currentStats.totalResponseTime as number) + responseTime;
@@ -364,7 +364,7 @@ async function updateWordTypeStatistics(
     
     if (existingStats.length > 0) {
       // 更新现有记录
-      const currentStats = existingStats[0] as Row;
+      const currentStats = existingStats[0] as any;
       const newTotalReviews = (currentStats.totalReviews as number) + 1;
       const newCorrectReviews = (currentStats.correctReviews as number) + isCorrect;
       
