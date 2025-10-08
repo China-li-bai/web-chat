@@ -1,7 +1,8 @@
 import { getDB } from './db';
 import { MemoryLearningManager } from '@/lib/memo/MemoryLearningManager';
-import type { LearningItem, StudyRecord } from '@/lib/memo/types';
+import type { LearningItem, StudyRecord, MemoryStrength } from '@/lib/memo/types';
 import type { Row } from '@/packages/wa-sqlite-adapter/types';
+import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
 
 interface WordWithProgress extends Row {
   id: number;
@@ -110,6 +111,11 @@ export async function processStudyResponse(
   response: 'again' | 'hard' | 'good' | 'easy',
   responseTime: number
 ) {
+  // Ensure session has a valid startTime
+  if (!session.startTime) {
+    session.startTime = new Date();
+  }
+  
   const manager = (session as any).manager as MemoryLearningManager;
   if (!manager) {
     throw new Error('MemoryLearningManager instance not found in the session.');
@@ -140,6 +146,12 @@ export async function processStudyResponse(
 
   const { newDueDate, newStability, newRetrievability, newDifficulty, newState } = result.updatedMemoryStrength;
 
+  // Ensure we have valid values for required fields
+  const stability = newStability ?? 0; // Default to 0 if null/undefined
+  const retrievability = newRetrievability ?? 1; // Default to 1 if null/undefined
+  const difficulty = newDifficulty ?? 0.5; // Default to 0.5 if null/undefined
+  const state = newState ?? 'new'; // Default to 'new' if null/undefined
+
   // 1. Update the learning_progress table
   await db.exec({
     sql: `
@@ -154,7 +166,7 @@ export async function processStudyResponse(
         reps = reps + 1
       WHERE wordId = ?
     `,
-    args: [newStability, newRetrievability, newDifficulty, newDueDate.toISOString(), new Date().toISOString(), newState, wordId],
+    args: [stability, retrievability, difficulty, newDueDate ? newDueDate.toISOString() : new Date().toISOString(), new Date().toISOString(), state, wordId],
   });
 
   // 2. Insert a new record into study_logs
@@ -164,8 +176,292 @@ export async function processStudyResponse(
       (wordId, timestamp, response, responseTime, confidence, previousStability, previousRetrievability, newStability, newRetrievability)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
-    args: [wordId, new Date().toISOString(), response, responseTime, confidence, previousStability, previousRetrievability, newStability, newRetrievability],
+    args: [wordId, new Date().toISOString(), response, responseTime, confidence, previousStability || 0, previousRetrievability || 1, stability, retrievability],
   });
 
+  // 3. Update long-term learning statistics
+  await updateLearningStatistics(wordId, response, responseTime, stability, retrievability);
+
   return result;
+}
+
+/**
+ * 更新长期学习统计数据
+ * 将单次学习记录累积到用户的长期学习统计中
+ */
+async function updateLearningStatistics(
+  wordId: number,
+  response: 'again' | 'hard' | 'good' | 'easy',
+  responseTime: number,
+  stability: number,
+  retrievability: number
+) {
+  const db = await getDB();
+  const now = new Date().toISOString();
+  const today = now.split('T')[0]; // YYYY-MM-DD 格式
+  const userId = 'user-1'; // TODO: 替换为实际用户ID
+  
+  try {
+    // 1. 确保学习统计表存在
+    await db.exec({
+      sql: `
+        CREATE TABLE IF NOT EXISTS learning_statistics (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId TEXT NOT NULL,
+          date TEXT NOT NULL,
+          totalReviews INTEGER DEFAULT 0,
+          correctReviews INTEGER DEFAULT 0,
+          totalResponseTime INTEGER DEFAULT 0,
+          avgStability REAL DEFAULT 0,
+          avgRetrievability REAL DEFAULT 0,
+          streakDays INTEGER DEFAULT 0,
+          lastUpdated TEXT NOT NULL,
+          UNIQUE(userId, date)
+        )
+      `
+    });
+    
+    // 2. 检查今天的统计记录是否存在
+    const existingStats = await db.exec({
+      sql: 'SELECT * FROM learning_statistics WHERE userId = ? AND date = ?',
+      args: [userId, today]
+    });
+    
+    // 3. 计算正确回答（good 或 easy 视为正确）
+    const isCorrect = response === 'good' || response === 'easy' ? 1 : 0;
+    
+    if (existingStats.length > 0) {
+      // 更新现有记录
+      const currentStats = existingStats[0] as Row;
+      const newTotalReviews = (currentStats.totalReviews as number) + 1;
+      const newCorrectReviews = (currentStats.correctReviews as number) + isCorrect;
+      const newTotalResponseTime = (currentStats.totalResponseTime as number) + responseTime;
+      
+      // 计算平均稳定性和可检索性（加权平均）
+      const currentAvgStability = currentStats.avgStability as number;
+      const currentAvgRetrievability = currentStats.avgRetrievability as number;
+      const newAvgStability = (currentAvgStability * (newTotalReviews - 1) + stability) / newTotalReviews;
+      const newAvgRetrievability = (currentAvgRetrievability * (newTotalReviews - 1) + retrievability) / newTotalReviews;
+      
+      await db.exec({
+        sql: `
+          UPDATE learning_statistics
+          SET 
+            totalReviews = ?,
+            correctReviews = ?,
+            totalResponseTime = ?,
+            avgStability = ?,
+            avgRetrievability = ?,
+            lastUpdated = ?
+          WHERE userId = ? AND date = ?
+        `,
+        args: [
+          newTotalReviews,
+          newCorrectReviews,
+          newTotalResponseTime,
+          newAvgStability,
+          newAvgRetrievability,
+          now,
+          userId,
+          today
+        ]
+      });
+    } else {
+      // 创建新记录
+      
+      // 计算连续学习天数
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterday = yesterdayDate.toISOString().split('T')[0];
+      
+      const yesterdayStats = await db.exec({
+        sql: 'SELECT streakDays FROM learning_statistics WHERE userId = ? AND date = ?',
+        args: [userId, yesterday]
+      });
+      
+      const streakDays = yesterdayStats.length > 0 ? (yesterdayStats[0].streakDays as number) + 1 : 1;
+      
+      await db.exec({
+        sql: `
+          INSERT INTO learning_statistics
+          (userId, date, totalReviews, correctReviews, totalResponseTime, avgStability, avgRetrievability, streakDays, lastUpdated)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [userId, today, 1, isCorrect, responseTime, stability, retrievability, streakDays, now]
+      });
+    }
+    
+    // 4. 更新单词类型的统计数据
+    await updateWordTypeStatistics(wordId, response, stability, retrievability);
+    
+  } catch (error) {
+    console.error('更新学习统计数据失败:', error);
+    // 不抛出错误，避免影响主流程
+  }
+}
+
+/**
+ * 更新单词类型的学习统计
+ * 按照单词类型（如词性、难度等）分类统计学习效果
+ */
+async function updateWordTypeStatistics(
+  wordId: number,
+  response: 'again' | 'hard' | 'good' | 'easy',
+  stability: number,
+  retrievability: number
+) {
+  const db = await getDB();
+  const now = new Date().toISOString();
+  const userId = 'user-1'; // TODO: 替换为实际用户ID
+  
+  try {
+    // 1. 获取单词信息
+    const wordInfo = await db.exec({
+      sql: 'SELECT type FROM words WHERE id = ?',
+      args: [wordId]
+    });
+    
+    if (wordInfo.length === 0) return;
+    
+    const wordType = wordInfo[0].type as string;
+    
+    // 2. 确保单词类型统计表存在
+    await db.exec({
+      sql: `
+        CREATE TABLE IF NOT EXISTS word_type_statistics (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId TEXT NOT NULL,
+          wordType TEXT NOT NULL,
+          totalReviews INTEGER DEFAULT 0,
+          correctReviews INTEGER DEFAULT 0,
+          avgStability REAL DEFAULT 0,
+          avgRetrievability REAL DEFAULT 0,
+          lastUpdated TEXT NOT NULL,
+          UNIQUE(userId, wordType)
+        )
+      `
+    });
+    
+    // 3. 检查该类型的统计记录是否存在
+    const existingStats = await db.exec({
+      sql: 'SELECT * FROM word_type_statistics WHERE userId = ? AND wordType = ?',
+      args: [userId, wordType]
+    });
+    
+    // 4. 计算正确回答（good 或 easy 视为正确）
+    const isCorrect = response === 'good' || response === 'easy' ? 1 : 0;
+    
+    if (existingStats.length > 0) {
+      // 更新现有记录
+      const currentStats = existingStats[0] as Row;
+      const newTotalReviews = (currentStats.totalReviews as number) + 1;
+      const newCorrectReviews = (currentStats.correctReviews as number) + isCorrect;
+      
+      // 计算平均稳定性和可检索性（加权平均）
+      const currentAvgStability = currentStats.avgStability as number;
+      const currentAvgRetrievability = currentStats.avgRetrievability as number;
+      const newAvgStability = (currentAvgStability * (newTotalReviews - 1) + stability) / newTotalReviews;
+      const newAvgRetrievability = (currentAvgRetrievability * (newTotalReviews - 1) + retrievability) / newTotalReviews;
+      
+      await db.exec({
+        sql: `
+          UPDATE word_type_statistics
+          SET 
+            totalReviews = ?,
+            correctReviews = ?,
+            avgStability = ?,
+            avgRetrievability = ?,
+            lastUpdated = ?
+          WHERE userId = ? AND wordType = ?
+        `,
+        args: [
+          newTotalReviews,
+          newCorrectReviews,
+          newAvgStability,
+          newAvgRetrievability,
+          now,
+          userId,
+          wordType
+        ]
+      });
+    } else {
+      // 创建新记录
+      await db.exec({
+        sql: `
+          INSERT INTO word_type_statistics
+          (userId, wordType, totalReviews, correctReviews, avgStability, avgRetrievability, lastUpdated)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [userId, wordType, 1, isCorrect, stability, retrievability, now]
+      });
+    }
+  } catch (error) {
+    console.error('更新单词类型统计数据失败:', error);
+    // 不抛出错误，避免影响主流程
+  }
+}
+
+/**
+ * 测试学习统计功能
+ * 模拟用户学习过程并验证统计数据是否正确更新
+ * 可以通过API端点调用此函数进行测试
+ */
+export async function testLearningStatistics() {
+  try {
+    const db = await getDB();
+    const userId = 'test-user';
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 清理测试数据
+    await db.exec({
+      sql: 'DELETE FROM learning_statistics WHERE userId = ?',
+      args: [userId]
+    });
+    
+    // 模拟学习响应
+    const mockResponses = [
+      { response: 'good', responseTime: 2000, stability: 1.5, retrievability: 0.8 },
+      { response: 'again', responseTime: 3000, stability: 0.5, retrievability: 0.4 },
+      { response: 'easy', responseTime: 1500, stability: 2.5, retrievability: 0.9 }
+    ];
+    
+    // 执行模拟学习
+    for (const mock of mockResponses) {
+      await updateLearningStatistics(
+        1, // 假设的wordId
+        mock.response as 'again' | 'hard' | 'good' | 'easy',
+        mock.responseTime,
+        mock.stability,
+        mock.retrievability
+      );
+    }
+    
+    // 验证结果
+    const stats = await db.exec({
+      sql: 'SELECT * FROM learning_statistics WHERE userId = ? AND date = ?',
+      args: [userId, today]
+    });
+    
+    console.log('Learning statistics test results:', stats);
+    
+    // 验证word_type_statistics
+    const wordTypeStats = await db.exec({
+      sql: 'SELECT * FROM word_type_statistics WHERE userId = ?',
+      args: [userId]
+    });
+    
+    console.log('Word type statistics test results:', wordTypeStats);
+    
+    return {
+      success: stats.length > 0 && stats[0].totalReviews === 3 && stats[0].correctReviews === 2,
+      learningStats: stats,
+      wordTypeStats: wordTypeStats
+    };
+  } catch (error) {
+    console.error('测试学习统计功能失败:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 }
