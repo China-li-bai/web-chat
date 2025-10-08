@@ -52,8 +52,12 @@ export const WordbookSelectionPage: React.FC = () => {
     reader.onload = async (e) => {
       const content = e.target?.result as string;
       try {
-        await importWordbook(content);
-        messageApi.success('Wordbook imported successfully!');
+        const result = await importWordbook(content);
+        if (result.status === 'created') {
+          messageApi.success('Wordbook imported successfully!');
+        } else {
+          messageApi.success('Wordbook updated successfully!');
+        }
         await loadWordbooks(); // Refresh the list
       } catch (error: any) {
         console.error('Failed to import wordbook:', error);

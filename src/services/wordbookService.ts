@@ -35,6 +35,17 @@ interface ImportFile {
 async function seedFromFile(db: any, fileData: ImportFile) {
   const { name, description, words } = fileData;
   
+  // Check if wordbook already exists
+  const existing = await db.exec({
+    sql: 'SELECT "id" FROM "wordbooks" WHERE "name" = ?',
+    args: [name],
+  });
+
+  if (existing.length > 0) {
+    console.log(`Wordbook "${name}" already exists, skipping seed.`);
+    return;
+  }
+
   // 1. Insert wordbook
   await db.exec({
     sql: 'INSERT INTO "wordbooks" ("name", "description") VALUES (?, ?)',
@@ -63,13 +74,7 @@ async function seedFromFile(db: any, fileData: ImportFile) {
 export async function seedInitialData() {
   const db = await getDB();
   
-  const existingWordbooks = await db.exec({ sql: 'SELECT "id" FROM "wordbooks" LIMIT 1' });
-  if (existingWordbooks.length > 0) {
-    console.log('Data already seeded.');
-    return;
-  }
-
-  console.log('Seeding initial data...');
+  console.log('Seeding initial data if necessary...');
   
   await seedFromFile(db, cet4Data as ImportFile);
   await seedFromFile(db, gmatData as ImportFile);
@@ -155,29 +160,43 @@ interface ImportFile {
   words: ImportWord[];
 }
 
-export async function importWordbook(jsonContent: string): Promise<void> {
+export async function importWordbook(jsonContent: string): Promise<{ status: 'created' | 'updated', wordbookId: number }> {
   const db = await getDB();
   const data: ImportFile = JSON.parse(jsonContent);
 
   // 1. Check if wordbook with the same name already exists
-  const existing = await db.exec({
+  const existingResult = await db.exec({
     sql: 'SELECT "id" FROM "wordbooks" WHERE "name" = ?',
     args: [data.name],
   });
 
-  if (existing.length > 0) {
-    throw new Error(`A wordbook with the name "${data.name}" already exists.`);
+  let wordbookId: number;
+  let status: 'created' | 'updated';
+
+  if (existingResult.length > 0) {
+    // Wordbook exists, get its ID and prepare for update
+    status = 'updated';
+    wordbookId = existingResult[0].id as number;
+    console.log(`Updating existing wordbook: ${data.name} (ID: ${wordbookId})`);
+    
+    // Delete old words. ON DELETE CASCADE will handle related progress and logs.
+    await db.exec({
+      sql: 'DELETE FROM "words" WHERE "wordbookId" = ?',
+      args: [wordbookId],
+    });
+  } else {
+    // Wordbook doesn't exist, insert it
+    status = 'created';
+    console.log(`Importing new wordbook: ${data.name}`);
+    await db.exec({
+      sql: 'INSERT INTO "wordbooks" ("name", "description") VALUES (?, ?)',
+      args: [data.name, data.description || ''],
+    });
+    const wordbookIdResult = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
+    wordbookId = wordbookIdResult[0].id as number;
   }
 
-  // 2. Insert the new wordbook
-  await db.exec({
-    sql: 'INSERT INTO "wordbooks" ("name", "description") VALUES (?, ?)',
-    args: [data.name, data.description || ''],
-  });
-  const wordbookIdResult = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
-  const wordbookId = wordbookIdResult[0].id as number;
-
-  // 3. Batch insert words and their learning progress
+  // 3. Batch insert new words and their learning progress
   for (const word of data.words) {
     // Insert word
     await db.exec({
@@ -193,4 +212,6 @@ export async function importWordbook(jsonContent: string): Promise<void> {
       args: [wordId, new Date().toISOString()],
     });
   }
+  
+  return { status, wordbookId };
 }
