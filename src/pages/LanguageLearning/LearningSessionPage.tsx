@@ -4,7 +4,8 @@ import { Flashcard } from '@/components/language-learning/Flashcard';
 import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse } from '@/services/learningService';
-import type { LearningSession, ScheduledItem } from '@/lib/memo/types';
+import type { ScheduledItem } from '@/lib/memo/types';
+import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
 
 const { Title, Text, Paragraph } = Typography;
 
