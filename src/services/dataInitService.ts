@@ -80,12 +80,13 @@ async function createTables(db: any): Promise<void> {
     sql: `CREATE TABLE IF NOT EXISTS word_type_statistics (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       userId TEXT NOT NULL,
+      date TEXT NOT NULL,
       wordType TEXT NOT NULL,
       totalReviews INTEGER NOT NULL DEFAULT 0,
       correctReviews INTEGER NOT NULL DEFAULT 0,
       avgStability REAL NOT NULL DEFAULT 0,
       avgRetrievability REAL NOT NULL DEFAULT 0,
-      UNIQUE(userId, wordType)
+      UNIQUE(userId, date, wordType)
     )`
   });
 
@@ -175,13 +176,15 @@ async function insertSampleData(db: any): Promise<void> {
   }
 
   // 插入单词类型统计数据
+  const today = new Date().toISOString().split('T')[0];
   for (const wordTypeStat of sampleData.wordTypeStatistics) {
     await db.exec({
       sql: `INSERT OR REPLACE INTO word_type_statistics 
-        (userId, wordType, totalReviews, correctReviews, avgStability, avgRetrievability)
-        VALUES (?, ?, ?, ?, ?, ?)`,
+        (userId, date, wordType, totalReviews, correctReviews, avgStability, avgRetrievability)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       args: [
         wordTypeStat.userId,
+        wordTypeStat.date || today,
         wordTypeStat.wordType,
         wordTypeStat.totalReviews,
         wordTypeStat.correctReviews,

@@ -28,7 +28,8 @@ const LearningSessionPage: React.FC = () => {
 
     async function setupSession() {
       try {
-        const newSession = await createLearningSessionForWordbook(Number(wordbookId));
+        const userId = 'user-1';
+        const newSession = await createLearningSessionForWordbook(Number(wordbookId), userId);
         setSession(newSession);
       } catch (e: any) {
         setError(`Failed to create learning session: ${e.message}`);

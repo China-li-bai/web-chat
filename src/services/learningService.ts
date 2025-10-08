@@ -20,7 +20,7 @@ interface WordWithProgress extends Row {
   state: string;
 }
 
-export async function createLearningSessionForWordbook(wordbookId: number) {
+export async function createLearningSessionForWordbook(wordbookId: number, userId: string) {
   const db = await getDB();
 
   // 1. Fetch all words and their progress for the given wordbook that are due
@@ -84,7 +84,7 @@ export async function createLearningSessionForWordbook(wordbookId: number) {
 
   // We don't have a sessions table yet, so we pass an empty array
   const learningSession = await manager.createLearningSession(
-    'user-1', // TODO: Replace with actual user ID
+    userId,
     learningItems,
     studyRecords,
     [] // mockSessions
@@ -100,6 +100,7 @@ export async function createLearningSessionForWordbook(wordbookId: number) {
   });
 
   // Attach the manager instance to the session for later use
+  (learningSession as any).userId = userId;
   (learningSession as any).manager = manager;
 
   return learningSession;
@@ -180,7 +181,8 @@ export async function processStudyResponse(
   });
 
   // 3. Update long-term learning statistics
-  await updateLearningStatistics(wordId, response, responseTime, stability, retrievability);
+  const userIdForStats = (session as any).userId || 'user-1';
+  await updateLearningStatistics(userIdForStats, wordId, response, responseTime, stability, retrievability);
 
   return result;
 }
@@ -190,6 +192,7 @@ export async function processStudyResponse(
  * 将单次学习记录累积到用户的长期学习统计中
  */
 async function updateLearningStatistics(
+  userId: string,
   wordId: number,
   response: 'again' | 'hard' | 'good' | 'easy',
   responseTime: number,
@@ -199,7 +202,7 @@ async function updateLearningStatistics(
   const db = await getDB();
   const now = new Date().toISOString();
   const today = now.split('T')[0]; // YYYY-MM-DD 格式
-  const userId = 'user-1'; // TODO: 替换为实际用户ID
+
   
   try {
     // 1. 确保学习统计表存在
@@ -212,6 +215,7 @@ async function updateLearningStatistics(
           totalReviews INTEGER DEFAULT 0,
           correctReviews INTEGER DEFAULT 0,
           totalResponseTime INTEGER DEFAULT 0,
+          avgResponseTime REAL DEFAULT 0,
           avgStability REAL DEFAULT 0,
           avgRetrievability REAL DEFAULT 0,
           streakDays INTEGER DEFAULT 0,
@@ -243,6 +247,7 @@ async function updateLearningStatistics(
       const newAvgStability = (currentAvgStability * (newTotalReviews - 1) + stability) / newTotalReviews;
       const newAvgRetrievability = (currentAvgRetrievability * (newTotalReviews - 1) + retrievability) / newTotalReviews;
       
+      const newAvgResponseTime = newTotalReviews > 0 ? (newTotalResponseTime * 1.0) / newTotalReviews : 0;
       await db.exec({
         sql: `
           UPDATE learning_statistics
@@ -250,6 +255,7 @@ async function updateLearningStatistics(
             totalReviews = ?,
             correctReviews = ?,
             totalResponseTime = ?,
+            avgResponseTime = ?,
             avgStability = ?,
             avgRetrievability = ?,
             lastUpdated = ?
@@ -259,6 +265,7 @@ async function updateLearningStatistics(
           newTotalReviews,
           newCorrectReviews,
           newTotalResponseTime,
+          newAvgResponseTime,
           newAvgStability,
           newAvgRetrievability,
           now,
@@ -281,18 +288,19 @@ async function updateLearningStatistics(
       
       const streakDays = yesterdayStats.length > 0 ? (yesterdayStats[0].streakDays as number) + 1 : 1;
       
+      const avgResponseTime = responseTime;
       await db.exec({
         sql: `
           INSERT INTO learning_statistics
-          (userId, date, totalReviews, correctReviews, totalResponseTime, avgStability, avgRetrievability, streakDays, lastUpdated)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (userId, date, totalReviews, correctReviews, totalResponseTime, avgResponseTime, avgStability, avgRetrievability, streakDays, lastUpdated)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
-        args: [userId, today, 1, isCorrect, responseTime, stability, retrievability, streakDays, now]
+        args: [userId, today, 1, isCorrect, responseTime, avgResponseTime, stability, retrievability, streakDays, now]
       });
     }
     
     // 4. 更新单词类型的统计数据
-    await updateWordTypeStatistics(wordId, response, stability, retrievability);
+    await updateWordTypeStatistics(userId, wordId, response, stability, retrievability);
     
   } catch (error) {
     console.error('更新学习统计数据失败:', error);
@@ -305,6 +313,7 @@ async function updateLearningStatistics(
  * 按照单词类型（如词性、难度等）分类统计学习效果
  */
 async function updateWordTypeStatistics(
+  userId: string,
   wordId: number,
   response: 'again' | 'hard' | 'good' | 'easy',
   stability: number,
@@ -312,7 +321,7 @@ async function updateWordTypeStatistics(
 ) {
   const db = await getDB();
   const now = new Date().toISOString();
-  const userId = 'user-1'; // TODO: 替换为实际用户ID
+
   
   try {
     // 1. 获取单词信息
@@ -331,21 +340,23 @@ async function updateWordTypeStatistics(
         CREATE TABLE IF NOT EXISTS word_type_statistics (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           userId TEXT NOT NULL,
+          date TEXT NOT NULL,
           wordType TEXT NOT NULL,
           totalReviews INTEGER DEFAULT 0,
           correctReviews INTEGER DEFAULT 0,
           avgStability REAL DEFAULT 0,
           avgRetrievability REAL DEFAULT 0,
           lastUpdated TEXT NOT NULL,
-          UNIQUE(userId, wordType)
+          UNIQUE(userId, date, wordType)
         )
       `
     });
     
     // 3. 检查该类型的统计记录是否存在
+    const today = new Date().toISOString().split('T')[0];
     const existingStats = await db.exec({
-      sql: 'SELECT * FROM word_type_statistics WHERE userId = ? AND wordType = ?',
-      args: [userId, wordType]
+      sql: 'SELECT * FROM word_type_statistics WHERE userId = ? AND date = ? AND wordType = ?',
+      args: [userId, today, wordType]
     });
     
     // 4. 计算正确回答（good 或 easy 视为正确）
@@ -372,7 +383,7 @@ async function updateWordTypeStatistics(
             avgStability = ?,
             avgRetrievability = ?,
             lastUpdated = ?
-          WHERE userId = ? AND wordType = ?
+          WHERE userId = ? AND date = ? AND wordType = ?
         `,
         args: [
           newTotalReviews,
@@ -381,6 +392,7 @@ async function updateWordTypeStatistics(
           newAvgRetrievability,
           now,
           userId,
+          today,
           wordType
         ]
       });
@@ -389,10 +401,10 @@ async function updateWordTypeStatistics(
       await db.exec({
         sql: `
           INSERT INTO word_type_statistics
-          (userId, wordType, totalReviews, correctReviews, avgStability, avgRetrievability, lastUpdated)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          (userId, date, wordType, totalReviews, correctReviews, avgStability, avgRetrievability, lastUpdated)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
-        args: [userId, wordType, 1, isCorrect, stability, retrievability, now]
+        args: [userId, today, wordType, 1, isCorrect, stability, retrievability, now]
       });
     }
   } catch (error) {
@@ -428,6 +440,7 @@ export async function testLearningStatistics() {
     // 执行模拟学习
     for (const mock of mockResponses) {
       await updateLearningStatistics(
+        userId,
         1, // 假设的wordId
         mock.response as 'again' | 'hard' | 'good' | 'easy',
         mock.responseTime,
