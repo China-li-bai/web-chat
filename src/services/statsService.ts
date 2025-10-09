@@ -40,20 +40,27 @@ export interface WordTypeStatistics {
   avgRetrievability: number;
 }
 
-export async function getOverallStats(): Promise<OverallStats> {
+export async function getOverallStats(userId: string = 'user-1'): Promise<OverallStats> {
   const db = await getDB();
-  const userId = 'user-1'; // TODO: 替换为实际用户ID
 
-  const totalWordsResult = await db.exec({ sql: 'SELECT COUNT(*) as count FROM "words"' });
+  // 获取用户相关的单词总数
+  const totalWordsResult = await db.exec({ 
+    sql: 'SELECT COUNT(*) as count FROM "words" WHERE "userId" = ?',
+    args: [userId]
+  });
   const totalWords = (totalWordsResult[0]?.count as number) || 0;
 
+  // 获取用户已掌握的单词数
   const masteredWordsResult = await db.exec({
-    sql: `SELECT COUNT(*) as count FROM "learning_progress" WHERE "state" = 'review'`,
+    sql: `SELECT COUNT(*) as count FROM "learning_progress" WHERE "state" = 'review' AND "userId" = ?`,
+    args: [userId]
   });
   const masteredWords = (masteredWordsResult[0]?.count as number) || 0;
 
+  // 获取用户学习天数
   const learningDaysResult = await db.exec({
-    sql: `SELECT COUNT(DISTINCT date("timestamp")) as count FROM "study_logs"`,
+    sql: `SELECT COUNT(DISTINCT date("timestamp")) as count FROM "study_logs" WHERE "userId" = ?`,
+    args: [userId]
   });
   const learningDays = (learningDaysResult[0]?.count as number) || 0;
   

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Flashcard } from '@/components/language-learning/Flashcard';
 import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
-import { createLearningSessionForWordbook, processStudyResponse } from '@/services/learningService';
+import { createLearningSessionForWordbook, processStudyResponse, updateLearningStatistics } from '@/services/learningService';
 import type { ScheduledItem } from '@/lib/memo/types';
 import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
 
@@ -63,7 +63,16 @@ const LearningSessionPage: React.FC = () => {
     }));
 
     try {
+      const userId = 'user-1';
       await processStudyResponse(session, currentItem.item.id, response, responseTime);
+      
+      // 累积统计到学习统计系统
+      await updateLearningStatistics(userId, session.id, {
+        totalItems: 1,
+        correctItems: isCorrect ? 1 : 0,
+        studyTime: responseTime,
+        responseType: response
+      });
     } catch (e: any) {
       console.error(`Failed to process response: ${e.message}`);
       message.error('Failed to save your progress. Please try again.');
@@ -76,7 +85,7 @@ const LearningSessionPage: React.FC = () => {
       const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
       const accuracy = Math.round((sessionStats.correct / sessionStats.total) * 100);
       message.success(`Session completed! ${sessionStats.correct}/${sessionStats.total} correct (${accuracy}%) in ${sessionDuration} minutes`);
-      navigate('/language-learning');
+      navigate('/statistics');
     }
   };
 

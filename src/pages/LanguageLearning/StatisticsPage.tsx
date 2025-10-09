@@ -27,12 +27,13 @@ const StatisticsPage: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        const userId = 'user-1'; // 硬编码userId，与LearningSessionPage保持一致
         const [overall, heatmap, proficiency, learning, wordType] = await Promise.all([
-          getOverallStats(),
+          getOverallStats(userId),
           getHeatmapData(),
           getProficiencyStats(),
-          getLearningStatistics('user-1', statsDays),
-          getWordTypeStatistics('user-1', statsDays),
+          getLearningStatistics(userId, statsDays),
+          getWordTypeStatistics(userId, statsDays),
         ]);
         setOverallStats(overall);
         setHeatmapData(heatmap);
