@@ -3,7 +3,6 @@ type Row = any;
 import cet4Data from '@/data/cet4-core.json';
 import gmatData from '@/data/gmat-core.json';
 import satData from '@/data/sat-advanced.json';
-
 export interface Wordbook extends Row {
   id: number;
   name: string;
@@ -32,9 +31,8 @@ interface ImportFile {
   words: ImportWord[];
 }
 
-async function seedFromFile(db: any, fileData: ImportFile) {
+async function seedFromFile(db: any, fileData: ImportFile, userId: string) {
   const { name, description, words } = fileData;
-  const userId = 'user-1'; // Default user for seeded data
 
   // Use INSERT OR IGNORE for idempotency, then fetch the ID.
   await db.exec({
@@ -81,14 +79,14 @@ async function seedFromFile(db: any, fileData: ImportFile) {
 }
 
 // Function to seed initial data
-export async function seedInitialData() {
+export async function seedInitialData(userId: string) {
   const db = await getDB();
   
   console.log('Seeding initial data if necessary...');
   
-  await seedFromFile(db, cet4Data as ImportFile);
-  await seedFromFile(db, gmatData as ImportFile);
-  await seedFromFile(db, satData as ImportFile);
+  await seedFromFile(db, cet4Data as ImportFile, userId);
+  await seedFromFile(db, gmatData as ImportFile, userId);
+  await seedFromFile(db, satData as ImportFile, userId);
   
   console.log('Seeding complete.');
 }

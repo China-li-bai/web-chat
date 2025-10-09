@@ -40,7 +40,7 @@ export interface WordTypeStatistics {
   avgRetrievability: number;
 }
 
-export async function getOverallStats(userId: string = 'user-1'): Promise<OverallStats> {
+export async function getOverallStats(userId: string): Promise<OverallStats> {
   const db = await getDB();
 
   // 获取用户相关的单词总数
@@ -140,25 +140,8 @@ export async function getProficiencyStats(userId: string): Promise<ProficiencyDa
  * @param days 获取最近多少天的数据，默认为30天
  * @returns 长期学习统计数据
  */
-export async function getLearningStatistics(userId: string = 'user-1', days: number = 30): Promise<LearningStatistics[]> {
+export async function getLearningStatistics(userId: string, days: number = 30): Promise<LearningStatistics[]> {
   const db = await getDB();
-  
-  // 确保learning_statistics表存在
-  await db.exec({
-    sql: `CREATE TABLE IF NOT EXISTS learning_statistics (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId TEXT NOT NULL,
-      date TEXT NOT NULL,
-      totalReviews INTEGER NOT NULL DEFAULT 0,
-      correctReviews INTEGER NOT NULL DEFAULT 0,
-      totalResponseTime REAL NOT NULL DEFAULT 0,
-      avgResponseTime REAL NOT NULL DEFAULT 0,
-      avgStability REAL NOT NULL DEFAULT 0,
-      avgRetrievability REAL NOT NULL DEFAULT 0,
-      streakDays INTEGER NOT NULL DEFAULT 0,
-      UNIQUE(userId, date)
-    )`
-  });
   
   // 获取最近N天的学习统计数据
   const result = await db.exec({
@@ -177,7 +160,7 @@ export async function getLearningStatistics(userId: string = 'user-1', days: num
     args: [userId, days]
   });
   
-  return result.map((row: Row) => ({
+  return result.map((row: any) => ({
     date: row.date as string,
     totalReviews: row.totalReviews as number,
     correctReviews: row.correctReviews as number,
@@ -195,23 +178,8 @@ export async function getLearningStatistics(userId: string = 'user-1', days: num
  * @param days 获取最近多少天的数据，默认为30天
  * @returns 单词类型统计数据
  */
-export async function getWordTypeStatistics(userId: string = 'user-1', days: number = 30): Promise<WordTypeStatistics[]> {
+export async function getWordTypeStatistics(userId: string, days: number = 30): Promise<WordTypeStatistics[]> {
   const db = await getDB();
-  
-  // 确保word_type_statistics表存在
-  await db.exec({
-    sql: `CREATE TABLE IF NOT EXISTS word_type_statistics (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId TEXT NOT NULL,
-      date TEXT NOT NULL,
-      wordType TEXT NOT NULL,
-      totalReviews INTEGER NOT NULL DEFAULT 0,
-      correctReviews INTEGER NOT NULL DEFAULT 0,
-      avgStability REAL NOT NULL DEFAULT 0,
-      avgRetrievability REAL NOT NULL DEFAULT 0,
-      UNIQUE(userId, date, wordType)
-    )`
-  });
   
   // 获取最近N天的单词类型统计数据
   const result = await db.exec({
@@ -229,7 +197,7 @@ export async function getWordTypeStatistics(userId: string = 'user-1', days: num
     args: [userId, days]
   });
   
-  return result.map((row: Row) => ({
+  return result.map((row: any) => ({
     wordType: row.wordType as string,
     totalReviews: row.totalReviews as number,
     correctReviews: row.correctReviews as number,

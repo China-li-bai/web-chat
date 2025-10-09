@@ -56,6 +56,36 @@ const CREATE_TABLE_STATEMENTS = [
     "newRetrievability" REAL,
     FOREIGN KEY ("itemId") REFERENCES "words" ("id") ON DELETE CASCADE
   );
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS "learning_statistics" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "userId" TEXT NOT NULL,
+    "date" TEXT NOT NULL,
+    "totalReviews" INTEGER DEFAULT 0,
+    "correctReviews" INTEGER DEFAULT 0,
+    "totalResponseTime" INTEGER DEFAULT 0,
+    "avgResponseTime" REAL DEFAULT 0,
+    "avgStability" REAL DEFAULT 0,
+    "avgRetrievability" REAL DEFAULT 0,
+    "streakDays" INTEGER DEFAULT 0,
+    "lastUpdated" TEXT NOT NULL,
+    UNIQUE("userId", "date")
+  );
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS "word_type_statistics" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "userId" TEXT NOT NULL,
+    "date" TEXT NOT NULL,
+    "wordType" TEXT NOT NULL,
+    "totalReviews" INTEGER DEFAULT 0,
+    "correctReviews" INTEGER DEFAULT 0,
+    "avgStability" REAL DEFAULT 0,
+    "avgRetrievability" REAL DEFAULT 0,
+    "lastUpdated" TEXT NOT NULL,
+    UNIQUE("userId", "date", "wordType")
+  );
   `
 ];
 

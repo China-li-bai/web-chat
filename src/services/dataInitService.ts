@@ -1,10 +1,9 @@
 import { getDB } from './db';
 import sampleData from '../data/sample-learning-data.json';
-
 /**
  * Initializes the database with sample data if it's empty.
  */
-export async function initializeDatabase(): Promise<void> {
+export async function initializeDatabase(userId: string): Promise<void> {
   const db = await getDB();
   
   try {
@@ -16,7 +15,7 @@ export async function initializeDatabase(): Promise<void> {
     
     if (existingCount === 0) {
       // Insert sample data
-      await insertSampleData(db);
+      await insertSampleData(db, userId);
       console.log('Sample data initialized successfully');
     } else {
       console.log('Database already contains data, skipping initialization');
@@ -30,9 +29,7 @@ export async function initializeDatabase(): Promise<void> {
 /**
  * Inserts sample data into the database.
  */
-async function insertSampleData(db: any): Promise<void> {
-  const userId = 'user-1'; // Default user for sample data
-
+async function insertSampleData(db: any, userId: string): Promise<void> {
   // Insert wordbooks first
   await db.exec({
     sql: `INSERT INTO wordbooks (name, description) VALUES (?, ?)`,
@@ -42,7 +39,7 @@ async function insertSampleData(db: any): Promise<void> {
   const wbId = wbRow[0].id as number;
 
   // Insert words and their initial progress from the 'words' array in sample data
-  for (const wordData of sampleData.words) {
+  for (const wordData of (sampleData as any).words) {
     if (!wordData.word || !wordData.definition) {
       console.warn('Skipping word with missing content:', wordData);
       continue;
@@ -70,7 +67,7 @@ async function insertSampleData(db: any): Promise<void> {
         progress?.difficulty ?? 0.3,
         progress?.retrievability ?? 1,
         progress?.reviewCount ?? 0,
-        progress?.lapseCount ?? 0
+        (progress as any)?.lapseCount ?? 0
       ]
     });
   }
@@ -92,11 +89,11 @@ async function insertSampleData(db: any): Promise<void> {
         log.timestamp,
         log.response,
         log.responseTime,
-        log.confidence,
-        log.previousStability,
-        log.previousRetrievability,
-        log.newStability,
-        log.newRetrievability
+        (log as any).confidence,
+        (log as any).previousStability,
+        (log as any).previousRetrievability,
+        (log as any).newStability,
+        (log as any).newRetrievability
       ]
     });
   }
@@ -108,7 +105,7 @@ async function insertSampleData(db: any): Promise<void> {
         (userId, date, totalReviews, correctReviews, totalResponseTime, avgResponseTime, avgStability, avgRetrievability, streakDays)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        stat.userId,
+        userId, // Use the passed userId
         stat.date,
         stat.totalReviews,
         stat.correctReviews,
@@ -128,8 +125,8 @@ async function insertSampleData(db: any): Promise<void> {
         (userId, date, wordType, totalReviews, correctReviews, avgStability, avgRetrievability)
         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        wordTypeStat.userId,
-        wordTypeStat.date || new Date().toISOString().split('T')[0],
+        userId,
+        (wordTypeStat as any).date || new Date().toISOString().split('T')[0],
         wordTypeStat.wordType,
         wordTypeStat.totalReviews,
         wordTypeStat.correctReviews,

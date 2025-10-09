@@ -31,12 +31,13 @@ export const WordbookSelectionPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!userId) return;
     (async () => {
-      await initializeDatabase();
-      await seedInitialData(); // This now handles userId internally
+      await initializeDatabase(userId);
+      await seedInitialData(userId);
       await loadWordbooks();
     })();
-  }, []);
+  }, [userId]);
 
   const handleStartLearning = (wordbookId: number) => {
     navigate(`/learning-session/${wordbookId}`);

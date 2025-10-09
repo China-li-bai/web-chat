@@ -1,8 +1,8 @@
 import { getDB } from './db';
 import { MemoryLearningManager } from '@/lib/memo/MemoryLearningManager';
-import type { LearningItem, StudyRecord, MemoryStrength } from '@/lib/memo/types';
-import type { Row } from '@/packages/wa-sqlite-adapter/types';
+import type { LearningItem, LearningItemType, StudyRecord, MemoryStrength } from '@/lib/memo/types';
 import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
+import { useAppStore } from '@/store/useAppStore';
 
 interface WordWithProgress {
   id: number;
@@ -35,13 +35,13 @@ export async function createLearningSessionForWordbook(wordbookId: number, userI
       WHERE w.wordbookId = ? AND lp.nextReview <= ? AND w.userId = ?
     `,
     args: [wordbookId, now, userId],
-  })) as WordWithProgress[];
+  })) as any[];
 
   // 2. Map to the format expected by the MemoryLearningManager
-  const learningItems: LearningItem[] = wordsAndProgress.map((row) => ({
+  const learningItems: LearningItem[] = wordsAndProgress.map((row: any) => ({
     id: String(row.id),
     content: row.word,
-    type: row.type,
+    type: row.type as LearningItemType,
     difficulty: row.difficulty,
     createdAt: new Date(row.createdAt),
     // Attach full data for UI use
@@ -53,7 +53,7 @@ export async function createLearningSessionForWordbook(wordbookId: number, userI
       retrievability: row.retrievability,
       state: row.state,
     }
-  }));
+  } as any));
 
   // 3. Fetch recent study history for these words to provide context to the algorithm
   const wordIds = learningItems.map(item => Number(item.id));
@@ -145,7 +145,7 @@ export async function processStudyResponse(
     confidence
   );
 
-  const { newDueDate, newStability, newRetrievability, newDifficulty, newState } = result.updatedMemoryStrength;
+  const { newDueDate, newStability, newRetrievability, newDifficulty, newState } = result.updatedMemoryStrength as any;
 
   // Ensure we have valid values for required fields
   const stability = newStability ?? 0; // Default to 0 if null/undefined
@@ -179,9 +179,10 @@ export async function processStudyResponse(
     `,
     args: [wordId, (session as any).userId, new Date().toISOString(), response, responseTime, confidence, previousStability || 0, previousRetrievability || 1, stability, retrievability],
   });
+  const userId = useAppStore((state) => state.userId);
 
   // 3. Update long-term learning statistics
-  const userIdForStats = (session as any).userId || 'user-1';
+  const userIdForStats = (session as any).userId || userId;
   await updateLearningStatistics(userIdForStats, wordId, response, responseTime, stability, retrievability);
 
   return result;
@@ -205,27 +206,7 @@ export async function updateLearningStatistics(
 
   
   try {
-    // 1. 确保学习统计表存在
-    await db.exec({
-      sql: `
-        CREATE TABLE IF NOT EXISTS learning_statistics (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          userId TEXT NOT NULL,
-          date TEXT NOT NULL,
-          totalReviews INTEGER DEFAULT 0,
-          correctReviews INTEGER DEFAULT 0,
-          totalResponseTime INTEGER DEFAULT 0,
-          avgResponseTime REAL DEFAULT 0,
-          avgStability REAL DEFAULT 0,
-          avgRetrievability REAL DEFAULT 0,
-          streakDays INTEGER DEFAULT 0,
-          lastUpdated TEXT NOT NULL,
-          UNIQUE(userId, date)
-        )
-      `
-    });
-    
-    // 2. 检查今天的统计记录是否存在
+    // 1. 检查今天的统计记录是否存在
     const existingStats = await db.exec({
       sql: 'SELECT * FROM learning_statistics WHERE userId = ? AND date = ?',
       args: [userId, today]
@@ -302,7 +283,7 @@ export async function updateLearningStatistics(
     // 4. 更新单词类型的统计数据
     await updateWordTypeStatistics(userId, wordId, response, stability, retrievability);
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('更新学习统计数据失败:', error);
     // 不抛出错误，避免影响主流程
   }
@@ -334,25 +315,7 @@ export async function updateWordTypeStatistics(
     
     const wordType = wordInfo[0].type as string;
     
-    // 2. 确保单词类型统计表存在
-    await db.exec({
-      sql: `
-        CREATE TABLE IF NOT EXISTS word_type_statistics (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          userId TEXT NOT NULL,
-          date TEXT NOT NULL,
-          wordType TEXT NOT NULL,
-          totalReviews INTEGER DEFAULT 0,
-          correctReviews INTEGER DEFAULT 0,
-          avgStability REAL DEFAULT 0,
-          avgRetrievability REAL DEFAULT 0,
-          lastUpdated TEXT NOT NULL,
-          UNIQUE(userId, date, wordType)
-        )
-      `
-    });
-    
-    // 3. 检查该类型的统计记录是否存在
+    // 2. 检查该类型的统计记录是否存在
     const today = new Date().toISOString().split('T')[0];
     const existingStats = await db.exec({
       sql: 'SELECT * FROM word_type_statistics WHERE userId = ? AND date = ? AND wordType = ?',
@@ -407,7 +370,7 @@ export async function updateWordTypeStatistics(
         args: [userId, today, wordType, 1, isCorrect, stability, retrievability, now]
       });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('更新单词类型统计数据失败:', error);
     // 不抛出错误，避免影响主流程
   }
@@ -470,7 +433,7 @@ export async function testLearningStatistics() {
       learningStats: stats,
       wordTypeStats: wordTypeStats
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('测试学习统计功能失败:', error);
     return {
       success: false,
