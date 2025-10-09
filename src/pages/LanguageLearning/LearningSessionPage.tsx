@@ -4,7 +4,9 @@ import { Flashcard } from '@/components/language-learning/Flashcard';
 import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col, Modal } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse, updateLearningStatistics } from '@/services/learningService';
+import { importWordbook } from '@/services/wordbookService';
 import { useAppStore } from '@/store/useAppStore';
+type SetLastWordbookId = (id: string) => void;
 import type { ScheduledItem } from '@/lib/memo/types';
 import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
 
@@ -25,6 +27,7 @@ const LearningSessionPage: React.FC = () => {
   const [activeItems, setActiveItems] = useState<ScheduledItem[]>([]);
   const responseStartTime = useRef<number>(0);
   const userId = useAppStore((state) => state.userId);
+  const setLastWordbookId = useAppStore((state) => state.setLastWordbookId as SetLastWordbookId);
 
   useEffect(() => {
     if (!wordbookId) {
@@ -105,6 +108,33 @@ const LearningSessionPage: React.FC = () => {
       const shaky = summaryItems.filter(si => si.response === 'hard' || (si.retrievability >= 0.6 && si.retrievability < 0.85)).length;
       const forgotten = summaryItems.filter(si => si.response === 'again' || si.retrievability < 0.6).length;
       setSummaryCounts({ mastered, shaky, forgotten });
+      // 后台自动生成“下次复习词书”并写入 lastWordbookId（最小增量，弱项为主）
+      try {
+        const weakIds = new Set(
+          summaryItems
+            .filter(si => si.response === 'hard' || si.response === 'again' || si.retrievability < 0.85)
+            .map(si => String(si.id))
+        );
+        const allItems = session?.items || [];
+        const weakItems = allItems.filter(si => weakIds.has(String(si.item.id)));
+        if (weakItems.length > 0) {
+          const name = `Next Review - ${new Date().toLocaleDateString()}`;
+          const description = `Auto-generated review list from session ${wordbookId}`;
+          const words = weakItems.map((si) => ({
+            word: String(si.item.content),
+            type: (si.item as any).type || 'word',
+            phonetic: (si.item as any).details?.phonetic || null,
+            definition: (si.item as any).details?.definition || '',
+            example: (si.item as any).details?.example || null
+          }));
+          const payload = JSON.stringify({ name, description, words });
+          const result = await importWordbook(payload, userId);
+          const newWordbookId = result.wordbookId;
+          setLastWordbookId(String(newWordbookId));
+        }
+      } catch (e: any) {
+        console.error('Auto-create next review wordbook failed:', e?.message || e);
+      }
       // Show summary modal instead of immediate navigation
       setShowSummary(true);
     }
@@ -275,6 +305,31 @@ const LearningSessionPage: React.FC = () => {
             }
           }}>
             立即复习弱项
+          </Button>,
+          <Button key="plan" onClick={async () => {
+            const classify = (si: { response: 'again'|'hard'|'good'|'easy'; retrievability: number }) => {
+              if (si.response === 'again' || si.retrievability < 0.6) return 'forgotten';
+              if (si.response === 'hard' || (si.retrievability >= 0.6 && si.retrievability < 0.85)) return 'shaky';
+              return 'mastered';
+            };
+            const planned = summaryItems.map(si => ({
+              itemId: String(si.id),
+              category: classify(si as any),
+              nextReview: si.nextReview ? si.nextReview : new Date(Date.now() + 24 * 60 * 60 * 1000)
+            }));
+            try {
+              await updateLearningStatistics({
+                userId,
+                wordbookId: Number(wordbookId),
+                planned
+              } as any);
+              message.success('已安排下次复习并写入统计');
+            } catch (e: any) {
+              console.error(e);
+              message.error('安排复习失败，请稍后重试');
+            }
+          }}>
+            安排下次复习
           </Button>,
           <Button key="continue" type="primary" onClick={() => { setShowSummary(false); navigate('/language-learning'); }}>
             继续学习

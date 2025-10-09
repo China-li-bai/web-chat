@@ -107,6 +107,7 @@ interface AppState {
   userStats: UserStats;
   settings: Settings;
   practiceTopics: PracticeTopic[];
+  lastWordbookId?: string; // 最近学习词书ID
 }
 
 interface AppActions {
@@ -137,6 +138,7 @@ interface AppActions {
   getFilteredRecords: (filter: any) => PracticeRecord[];
   getProgressStats: (days?: number) => any[];
   resetAll: () => void;
+  setLastWordbookId: (id: string) => void; // 设置最近词书ID
 }
 
 type AppStore = AppState & AppActions;
@@ -262,7 +264,8 @@ export const useAppStore = create<AppStore>()(
           totalSessions: 0, totalMinutes: 0, averageScore: 0, streak: 0,
           improvementRate: 0, favoriteTopics: [], weeklyProgress: []
         }
-      })
+      }),
+      setLastWordbookId: (id) => set(() => ({ lastWordbookId: id }))
     }),
     {
       name: 'ai-speech-practice-store',
@@ -275,7 +278,8 @@ export const useAppStore = create<AppStore>()(
           ...state.settings,
           apiKeys: { gemini: '', baidu: '', xunfei: '', tencent: '' }
         },
-        practiceTopics: state.practiceTopics
+        practiceTopics: state.practiceTopics,
+        lastWordbookId: state.lastWordbookId
       })
     }
   )
