@@ -44,22 +44,22 @@ export async function getOverallStats(userId: string = 'user-1'): Promise<Overal
   const db = await getDB();
 
   // 获取用户相关的单词总数
-  const totalWordsResult = await db.exec({ 
-    sql: 'SELECT COUNT(*) as count FROM "words" WHERE "userId" = ?',
+  const totalWordsResult = await db.exec({
+    sql: 'SELECT COUNT(id) as count FROM words WHERE userId = ?',
     args: [userId]
   });
   const totalWords = (totalWordsResult[0]?.count as number) || 0;
 
   // 获取用户已掌握的单词数
   const masteredWordsResult = await db.exec({
-    sql: `SELECT COUNT(*) as count FROM "learning_progress" WHERE "state" = 'review' AND "userId" = ?`,
+    sql: `SELECT COUNT(id) as count FROM learning_progress WHERE "state" = 'review' AND userId = ?`,
     args: [userId]
   });
   const masteredWords = (masteredWordsResult[0]?.count as number) || 0;
 
   // 获取用户学习天数
   const learningDaysResult = await db.exec({
-    sql: `SELECT COUNT(DISTINCT date("timestamp")) as count FROM "study_logs" WHERE "userId" = ?`,
+    sql: `SELECT COUNT(DISTINCT date) as count FROM learning_statistics WHERE userId = ?`,
     args: [userId]
   });
   const learningDays = (learningDaysResult[0]?.count as number) || 0;
@@ -91,18 +91,19 @@ export async function getOverallStats(userId: string = 'user-1'): Promise<Overal
   };
 }
 
-export async function getHeatmapData(): Promise<HeatmapData[]> {
+export async function getHeatmapData(userId: string): Promise<HeatmapData[]> {
   const db = await getDB();
   const rows = await db.exec({
     sql: `
       SELECT
-        date("timestamp") as date,
-        COUNT(*) as count
-      FROM "study_logs"
-      WHERE "timestamp" >= date('now', '-1 year')
+        date,
+        SUM(totalReviews) as count
+      FROM "learning_statistics"
+      WHERE date >= date('now', '-1 year') AND userId = ?
       GROUP BY date
       ORDER BY date ASC
     `,
+    args: [userId],
   });
   
   // 正确映射Row到HeatmapData
@@ -112,7 +113,7 @@ export async function getHeatmapData(): Promise<HeatmapData[]> {
   })) as HeatmapData[];
 }
 
-export async function getProficiencyStats(): Promise<ProficiencyData[]> {
+export async function getProficiencyStats(userId: string): Promise<ProficiencyData[]> {
   const db = await getDB();
   const rows = await db.exec({
     sql: `
@@ -120,8 +121,10 @@ export async function getProficiencyStats(): Promise<ProficiencyData[]> {
         "state",
         COUNT(*) as count
       FROM "learning_progress"
+      WHERE userId = ?
       GROUP BY "state"
     `,
+    args: [userId],
   });
   
   // 正确映射Row到ProficiencyData

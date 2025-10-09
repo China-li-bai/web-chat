@@ -32,9 +32,9 @@ export async function createLearningSessionForWordbook(wordbookId: number, userI
         lp.stability, lp.retrievability, lp.difficulty, lp.nextReview, lp.lastReview, lp.state
       FROM words w
       JOIN learning_progress lp ON w.id = lp.wordId
-      WHERE w.wordbookId = ? AND lp.nextReview <= ?
+      WHERE w.wordbookId = ? AND lp.nextReview <= ? AND w.userId = ?
     `,
-    args: [wordbookId, now],
+    args: [wordbookId, now, userId],
   })) as WordWithProgress[];
 
   // 2. Map to the format expected by the MemoryLearningManager
@@ -131,8 +131,8 @@ export async function processStudyResponse(
 
   // Get current progress for logging
   const currentProgress = await db.exec({
-    sql: 'SELECT stability, retrievability FROM learning_progress WHERE wordId = ?',
-    args: [wordId],
+    sql: 'SELECT stability, retrievability FROM learning_progress WHERE wordId = ? AND userId = ?',
+    args: [wordId, (session as any).userId],
   });
   const previousStability = (currentProgress[0]?.stability as number) || 0;
   const previousRetrievability = (currentProgress[0]?.retrievability as number) || 1;
@@ -165,19 +165,19 @@ export async function processStudyResponse(
         lastReview = ?,
         state = ?,
         reviewCount = reviewCount + 1
-      WHERE wordId = ?
+      WHERE wordId = ? AND userId = ?
     `,
-    args: [stability, retrievability, difficulty, newDueDate ? newDueDate.toISOString() : new Date().toISOString(), new Date().toISOString(), state, wordId],
+    args: [stability, retrievability, difficulty, newDueDate ? newDueDate.toISOString() : new Date().toISOString(), new Date().toISOString(), state, wordId, (session as any).userId],
   });
 
   // 2. Insert a new record into study_logs
   await db.exec({
     sql: `
       INSERT INTO study_logs
-      (itemId, timestamp, response, responseTime, confidence, previousStability, previousRetrievability, newStability, newRetrievability)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (itemId, userId, timestamp, response, responseTime, confidence, previousStability, previousRetrievability, newStability, newRetrievability)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
-    args: [wordId, new Date().toISOString(), response, responseTime, confidence, previousStability || 0, previousRetrievability || 1, stability, retrievability],
+    args: [wordId, (session as any).userId, new Date().toISOString(), response, responseTime, confidence, previousStability || 0, previousRetrievability || 1, stability, retrievability],
   });
 
   // 3. Update long-term learning statistics

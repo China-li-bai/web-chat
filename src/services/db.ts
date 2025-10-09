@@ -14,6 +14,7 @@ const CREATE_TABLE_STATEMENTS = [
   CREATE TABLE IF NOT EXISTS "words" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "wordbookId" INTEGER NOT NULL,
+    "userId" TEXT NOT NULL,
     "word" TEXT NOT NULL,
     "type" TEXT NOT NULL DEFAULT 'vocabulary',
     "phonetic" TEXT,
@@ -28,6 +29,7 @@ const CREATE_TABLE_STATEMENTS = [
   CREATE TABLE IF NOT EXISTS "learning_progress" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "wordId" INTEGER NOT NULL UNIQUE,
+    "userId" TEXT NOT NULL,
     "stability" REAL NOT NULL DEFAULT 0,
     "retrievability" REAL NOT NULL DEFAULT 1,
     "difficulty" REAL NOT NULL DEFAULT 0.3,
@@ -43,6 +45,7 @@ const CREATE_TABLE_STATEMENTS = [
   CREATE TABLE IF NOT EXISTS "study_logs" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "itemId" INTEGER NOT NULL,
+    "userId" TEXT NOT NULL,
     "timestamp" TEXT NOT NULL,
     "response" TEXT NOT NULL CHECK("response" IN ('again', 'hard', 'good', 'easy')),
     "responseTime" INTEGER NOT NULL,
@@ -57,6 +60,30 @@ const CREATE_TABLE_STATEMENTS = [
 ];
 
 let dbInstance: Database | null = null;
+
+/**
+ * Runs database migrations to update the schema.
+ * This is a simple implementation that adds columns if they don't exist.
+ */
+async function migrateDB(db: Database) {
+  const migrationStatements = [
+    'ALTER TABLE "words" ADD COLUMN "userId" TEXT;',
+    'ALTER TABLE "learning_progress" ADD COLUMN "userId" TEXT;',
+    'ALTER TABLE "study_logs" ADD COLUMN "userId" TEXT;',
+  ];
+
+  for (const sql of migrationStatements) {
+    try {
+      await db.exec({ sql });
+    } catch (e: any) {
+      // Ignore "duplicate column name" error, which is expected if the migration has already run.
+      if (!e.message.includes('duplicate column name')) {
+        console.error(`Migration failed for: ${sql}`, e);
+        throw e;
+      }
+    }
+  }
+}
 
 /**
  * Initializes the database, creates tables if they don't exist,
@@ -79,6 +106,9 @@ export async function getDB(): Promise<Database> {
       throw e;
     }
   }
+
+  // After ensuring tables exist, run migrations to add columns.
+  await migrateDB(db);
 
   dbInstance = db;
   return dbInstance;

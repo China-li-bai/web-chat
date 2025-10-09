@@ -63,16 +63,7 @@ const LearningSessionPage: React.FC = () => {
     }));
 
     try {
-      const userId = 'user-1';
       await processStudyResponse(session, currentItem.item.id, response, responseTime);
-      
-      // 累积统计到学习统计系统
-      await updateLearningStatistics(userId, session.id, {
-        totalWords: 1,
-        masteredWords: isCorrect ? 1 : 0,
-        familiarWords: response === 'good' ? 1 : 0,
-        unfamiliarWords: response === 'again' || response === 'hard' ? 1 : 0
-      });
     } catch (e: any) {
       console.error(`Failed to process response: ${e.message}`);
       message.error('Failed to save your progress. Please try again.');

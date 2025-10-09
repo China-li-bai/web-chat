@@ -34,38 +34,48 @@ interface ImportFile {
 
 async function seedFromFile(db: any, fileData: ImportFile) {
   const { name, description, words } = fileData;
+  const userId = 'user-1'; // Default user for seeded data
+
+  // Use INSERT OR IGNORE for idempotency, then fetch the ID.
+  await db.exec({
+    sql: 'INSERT OR IGNORE INTO "wordbooks" ("name", "description") VALUES (?, ?)',
+    args: [name, description || ''],
+  });
   
-  // Check if wordbook already exists
-  const existing = await db.exec({
+  const wordbookIdResult = await db.exec({
     sql: 'SELECT "id" FROM "wordbooks" WHERE "name" = ?',
     args: [name],
   });
 
-  if (existing.length > 0) {
-    console.log(`Wordbook "${name}" already exists, skipping seed.`);
+  if (wordbookIdResult.length === 0) {
+    console.error(`Failed to insert or find wordbook: ${name}`);
+    return;
+  }
+  const wordbookId = wordbookIdResult[0].id as number;
+
+  // Check if words for this user and wordbook already exist to prevent re-seeding
+  const wordCountResult = await db.exec({
+    sql: 'SELECT COUNT(*) as count FROM "words" WHERE "wordbookId" = ? AND "userId" = ?',
+    args: [wordbookId, userId],
+  });
+
+  if ((wordCountResult[0]?.count as number) > 0) {
+    console.log(`Words for "${name}" and user "${userId}" already exist, skipping word seed.`);
     return;
   }
 
-  // 1. Insert wordbook
-  await db.exec({
-    sql: 'INSERT INTO "wordbooks" ("name", "description") VALUES (?, ?)',
-    args: [name, description || ''],
-  });
-  const wordbookIdResult = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
-  const wordbookId = wordbookIdResult[0].id as number;
-
-  // 2. Batch insert words and their learning progress
+  // Batch insert words and their learning progress
   for (const word of words) {
     await db.exec({
-      sql: 'INSERT INTO "words" ("wordbookId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?)',
-      args: [wordbookId, word.word, word.phonetic || null, word.definition, word.example || null],
+      sql: 'INSERT INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?, ?)',
+      args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.example || null],
     });
     const wordIdResult = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
     const wordId = wordIdResult[0].id as number;
 
     await db.exec({
-      sql: 'INSERT INTO "learning_progress" ("wordId", "nextReview") VALUES (?, ?)',
-      args: [wordId, new Date().toISOString()],
+      sql: 'INSERT INTO "learning_progress" ("wordId", "userId", "nextReview") VALUES (?, ?, ?)',
+      args: [wordId, userId, new Date().toISOString()],
     });
   }
 }
@@ -83,7 +93,7 @@ export async function seedInitialData() {
   console.log('Seeding complete.');
 }
 
-export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
+export async function getAllWordbooksWithStats(userId: string): Promise<WordbookWithStats[]> {
   const db = await getDB();
   const books = (await db.exec({
     sql: 'SELECT * FROM "wordbooks" ORDER BY "createdAt" DESC',
@@ -91,8 +101,8 @@ export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
 
   const statsPromises = (books as Wordbook[]).map(async (book) => {
     const wordCountResult = await db.exec({
-      sql: 'SELECT COUNT(*) as count FROM "words" WHERE "wordbookId" = ?',
-      args: [book.id],
+      sql: 'SELECT COUNT(*) as count FROM "words" WHERE "wordbookId" = ? AND "userId" = ?',
+      args: [book.id, userId],
     });
     const wordCount = (wordCountResult[0]?.count as number) || 0;
 
@@ -101,10 +111,10 @@ export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
       sql: `
         SELECT COUNT(*) as count
         FROM "learning_progress"
-        WHERE "wordId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
+        WHERE "userId" = ? AND "wordId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "userId" = ?)
         AND "state" = 'review'
       `,
-      args: [book.id],
+      args: [userId, book.id, userId],
     });
     const masteredCount = (masteredCountResult[0]?.count as number) || 0;
 
@@ -114,10 +124,10 @@ export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
       sql: `
         SELECT COUNT(*) as count
         FROM "learning_progress"
-        WHERE "wordId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
+        WHERE "userId" = ? AND "wordId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "userId" = ?)
         AND "nextReview" <= ?
       `,
-      args: [book.id, now],
+      args: [userId, book.id, userId, now],
     });
     const dueCount = (dueCountResult[0]?.count as number) || 0;
 
@@ -126,9 +136,9 @@ export async function getAllWordbooksWithStats(): Promise<WordbookWithStats[]> {
       sql: `
         SELECT MAX("timestamp") as lastStudied
         FROM "study_logs"
-        WHERE "itemId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ?)
+        WHERE "userId" = ? AND "itemId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "userId" = ?)
       `,
-      args: [book.id],
+      args: [userId, book.id, userId],
     });
     const lastStudied = lastStudiedResult[0]?.lastStudied as string | null;
 
@@ -169,7 +179,7 @@ interface ImportFile {
   words: ImportWord[];
 }
 
-export async function importWordbook(jsonContent: string): Promise<{ status: 'created' | 'updated', wordbookId: number }> {
+export async function importWordbook(jsonContent: string, userId: string): Promise<{ status: 'created' | 'updated', wordbookId: number }> {
   const db = await getDB();
   const data: ImportFile = JSON.parse(jsonContent);
 
@@ -186,12 +196,12 @@ export async function importWordbook(jsonContent: string): Promise<{ status: 'cr
     // Wordbook exists, get its ID and prepare for update
     status = 'updated';
     wordbookId = existingResult[0].id as number;
-    console.log(`Updating existing wordbook: ${data.name} (ID: ${wordbookId})`);
+    console.log(`Updating existing wordbook for user ${userId}: ${data.name} (ID: ${wordbookId})`);
     
-    // Delete old words. ON DELETE CASCADE will handle related progress and logs.
+    // Delete old words for this user in this wordbook.
     await db.exec({
-      sql: 'DELETE FROM "words" WHERE "wordbookId" = ?',
-      args: [wordbookId],
+      sql: 'DELETE FROM "words" WHERE "wordbookId" = ? AND "userId" = ?',
+      args: [wordbookId, userId],
     });
   } else {
     // Wordbook doesn't exist, insert it
@@ -205,20 +215,20 @@ export async function importWordbook(jsonContent: string): Promise<{ status: 'cr
     wordbookId = wordbookIdResult[0].id as number;
   }
 
-  // 3. Batch insert new words and their learning progress
+  // 3. Batch insert new words and their learning progress for the given user
   for (const word of data.words) {
     // Insert word
     await db.exec({
-      sql: 'INSERT INTO "words" ("wordbookId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?)',
-      args: [wordbookId, word.word, word.phonetic || null, word.definition, word.example || null],
+      sql: 'INSERT INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?, ?)',
+      args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.example || null],
     });
     const wordIdResult = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
     const wordId = wordIdResult[0].id as number;
 
     // Create initial learning progress for the new word
     await db.exec({
-      sql: 'INSERT INTO "learning_progress" ("wordId", "nextReview") VALUES (?, ?)',
-      args: [wordId, new Date().toISOString()],
+      sql: 'INSERT INTO "learning_progress" ("wordId", "userId", "nextReview") VALUES (?, ?, ?)',
+      args: [wordId, userId, new Date().toISOString()],
     });
   }
   

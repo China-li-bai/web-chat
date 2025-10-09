@@ -30,8 +30,8 @@ const StatisticsPage: React.FC = () => {
         const userId = 'user-1'; // 硬编码userId，与LearningSessionPage保持一致
         const [overall, heatmap, proficiency, learning, wordType] = await Promise.all([
           getOverallStats(userId),
-          getHeatmapData(),
-          getProficiencyStats(),
+          getHeatmapData(userId),
+          getProficiencyStats(userId),
           getLearningStatistics(userId, statsDays),
           getWordTypeStatistics(userId, statsDays),
         ]);
@@ -127,7 +127,7 @@ const StatisticsPage: React.FC = () => {
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     {formattedProficiencyData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
