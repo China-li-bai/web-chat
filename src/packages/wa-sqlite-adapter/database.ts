@@ -71,7 +71,7 @@ export class BasicDatabase {
       }
       return resultToRows(res) // exit loop after one statement
     }
-    return []  // will get here only if there is no statement
+    return [] // will get here only if there is no statement
   }
 
   getRowsModified() {
@@ -85,7 +85,7 @@ export class BasicDatabase {
     dbName: string,
     locateSqliteDist?: string | ((path: string) => string)
   ) {
-    const vfs: SQLiteVFS =  new IDBBatchAtomicVFS(dbName,{durability:"relaxed"})
+    const vfs: SQLiteVFS = await new IDBBatchAtomicVFS(dbName,{durability:"relaxed"})
 
     return BasicDatabase._init(
       dbName,
@@ -103,7 +103,7 @@ export class BasicDatabase {
     locateSqliteDist?: string | ((path: string) => string)
   ) {
 
-    return BasicDatabase._init(dbName, vfs, locateSqliteDist)
+    return this._init(dbName, vfs, locateSqliteDist)
   }
 
   private static async _init(
@@ -119,7 +119,9 @@ export class BasicDatabase {
         }
         : locateSqliteDist
 
-    const SQLiteAsyncModule = await SQLiteAsyncESMFactory()
+    const SQLiteAsyncModule = await SQLiteAsyncESMFactory({
+      locateFile: locateFile,
+    })
     // Build API objects for the module
     const sqlite3 = SQLite.Factory(SQLiteAsyncModule)
 
@@ -131,7 +133,8 @@ export class BasicDatabase {
     const db = await sqlite3.open_v2(
       dbName,
       SQLite.SQLITE_OPEN_CREATE | SQLite.SQLITE_OPEN_READWRITE,
-      // dbName
+      undefined,
+      dbName
     )
 
     return new BasicDatabase(dbName, sqlite3, db)

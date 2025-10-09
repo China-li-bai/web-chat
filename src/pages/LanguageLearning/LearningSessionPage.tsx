@@ -22,6 +22,7 @@ const LearningSessionPage: React.FC = () => {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryCounts, setSummaryCounts] = useState({ mastered: 0, shaky: 0, forgotten: 0 });
   const [summaryItems, setSummaryItems] = useState<Array<{ id: string; content: string; response: 'again'|'hard'|'good'|'easy'; retrievability: number; nextReview?: Date }>>([]);
+  const [activeItems, setActiveItems] = useState<ScheduledItem[]>([]);
   const responseStartTime = useRef<number>(0);
   const userId = useAppStore((state) => state.userId);
 
@@ -45,6 +46,12 @@ const LearningSessionPage: React.FC = () => {
 
     setupSession();
   }, [wordbookId]);
+
+  useEffect(() => {
+    if (session && Array.isArray(session.items)) {
+      setActiveItems(session.items);
+    }
+  }, [session]);
 
   const handleFlip = () => {
     if (!isFlipped) {
@@ -86,7 +93,7 @@ const LearningSessionPage: React.FC = () => {
       message.error('Failed to save your progress. Please try again.');
     }
 
-    if (currentItemIndex < session.items.length - 1) {
+    if (currentItemIndex < activeItems.length - 1) {
       setCurrentItemIndex(currentItemIndex + 1);
       setIsFlipped(false);
     } else {
@@ -124,7 +131,8 @@ const LearningSessionPage: React.FC = () => {
     />;
   }
 
-  const currentItem = session.items[currentItemIndex] as ScheduledItem & { item: { details?: any }};
+  const itemsSource: ScheduledItem[] = (activeItems && activeItems.length > 0) ? activeItems : (session?.items || []);
+  const currentItem = itemsSource[currentItemIndex] as ScheduledItem & { item: { details?: any }};
   const details = (currentItem.item as any).details || {};
 
   const frontContent = <Title level={2}>{currentItem.item.content}</Title>;
@@ -138,7 +146,7 @@ const LearningSessionPage: React.FC = () => {
     </div>
   );
   
-  const progressPercent = (currentItemIndex / session.items.length) * 100;
+  const progressPercent = itemsSource.length > 0 ? (currentItemIndex / itemsSource.length) * 100 : 0;
   const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
   const accuracy = sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0;
 
@@ -164,7 +172,7 @@ const LearningSessionPage: React.FC = () => {
               size="small"
             />
             <Text type="secondary" style={{ fontSize: '12px' }}>
-              {currentItemIndex + 1} of {session.items.length} words
+              {currentItemIndex + 1} of {itemsSource.length} words
             </Text>
           </Col>
           <Col>
@@ -247,6 +255,27 @@ const LearningSessionPage: React.FC = () => {
         title="学习总结"
         onCancel={() => setShowSummary(false)}
         footer={[
+          <Button key="micro" onClick={() => {
+            const weakIds = new Set(
+              summaryItems
+                .filter(si => si.response === 'hard' || si.response === 'again' || si.retrievability < 0.85)
+                .map(si => String(si.id))
+            );
+            const allItems = session?.items || [];
+            const weakItems = allItems.filter(si => weakIds.has(String(si.item.id)));
+            if (weakItems.length === 0) {
+              message.info('本次没有可复习的弱项，建议查看统计或返回词书。');
+            } else {
+              setActiveItems(weakItems);
+              setCurrentItemIndex(0);
+              setIsFlipped(false);
+              setSessionStats({ correct: 0, total: 0, startTime: Date.now() });
+              setShowSummary(false);
+              message.success(`已进入弱项微复习，共 ${weakItems.length} 个词`);
+            }
+          }}>
+            立即复习弱项
+          </Button>,
           <Button key="continue" type="primary" onClick={() => { setShowSummary(false); navigate('/language-learning'); }}>
             继续学习
           </Button>,
