@@ -191,7 +191,7 @@ export async function processStudyResponse(
  * 更新长期学习统计数据
  * 将单次学习记录累积到用户的长期学习统计中
  */
-async function updateLearningStatistics(
+export async function updateLearningStatistics(
   userId: string,
   wordId: number,
   response: 'again' | 'hard' | 'good' | 'easy',
@@ -312,7 +312,7 @@ async function updateLearningStatistics(
  * 更新单词类型的学习统计
  * 按照单词类型（如词性、难度等）分类统计学习效果
  */
-async function updateWordTypeStatistics(
+export async function updateWordTypeStatistics(
   userId: string,
   wordId: number,
   response: 'again' | 'hard' | 'good' | 'easy',

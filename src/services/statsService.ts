@@ -104,7 +104,12 @@ export async function getHeatmapData(): Promise<HeatmapData[]> {
       ORDER BY date ASC
     `,
   });
-  return rows as HeatmapData[];
+  
+  // 正确映射Row到HeatmapData
+  return rows.map((row: any) => ({
+    date: row.date as string,
+    count: row.count as number
+  })) as HeatmapData[];
 }
 
 export async function getProficiencyStats(): Promise<ProficiencyData[]> {
@@ -118,7 +123,12 @@ export async function getProficiencyStats(): Promise<ProficiencyData[]> {
       GROUP BY "state"
     `,
   });
-  return rows as ProficiencyData[];
+  
+  // 正确映射Row到ProficiencyData
+  return rows.map((row: any) => ({
+    state: row.state as 'new' | 'learning' | 'review' | 'relearning',
+    count: row.count as number
+  })) as ProficiencyData[];
 }
 
 /**

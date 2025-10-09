@@ -68,10 +68,10 @@ const LearningSessionPage: React.FC = () => {
       
       // 累积统计到学习统计系统
       await updateLearningStatistics(userId, session.id, {
-        totalItems: 1,
-        correctItems: isCorrect ? 1 : 0,
-        studyTime: responseTime,
-        responseType: response
+        totalWords: 1,
+        masteredWords: isCorrect ? 1 : 0,
+        familiarWords: response === 'good' ? 1 : 0,
+        unfamiliarWords: response === 'again' || response === 'hard' ? 1 : 0
       });
     } catch (e: any) {
       console.error(`Failed to process response: ${e.message}`);
