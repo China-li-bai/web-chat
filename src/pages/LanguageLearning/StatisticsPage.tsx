@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Row, Col, Card, Spin, Typography, Empty, Statistic, DatePicker } from 'antd';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
 import { getOverallStats, getHeatmapData, getProficiencyStats, getLearningStatistics, getWordTypeStatistics } from '@/services/statsService';
+import { useAppStore } from '@/store/useAppStore';
 import type { OverallStats, HeatmapData, ProficiencyData, LearningStatistics, WordTypeStatistics } from '@/services/statsService';
 import { CalendarOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
 
@@ -22,12 +23,12 @@ const StatisticsPage: React.FC = () => {
   const [learningStats, setLearningStats] = useState<LearningStatistics[]>([]);
   const [wordTypeStats, setWordTypeStats] = useState<WordTypeStatistics[]>([]);
   const [statsDays, setStatsDays] = useState(30);
+  const userId = useAppStore((state) => state.userId);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const userId = 'user-1'; // 硬编码userId，与LearningSessionPage保持一致
         const [overall, heatmap, proficiency, learning, wordType] = await Promise.all([
           getOverallStats(userId),
           getHeatmapData(userId),

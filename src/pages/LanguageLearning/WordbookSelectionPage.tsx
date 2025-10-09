@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { WordbookCard } from '@/components/language-learning/WordbookCard';
 import { seedInitialData, getAllWordbooksWithStats, importWordbook, checkWordbookExists, type WordbookWithStats } from '@/services/wordbookService';
 import { initializeDatabase } from '@/services/dataInitService';
-import useAppStore from '@/store/useAppStore';
+import { useAppStore } from '@/store/useAppStore';
 import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 

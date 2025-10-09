@@ -4,6 +4,7 @@ import { Flashcard } from '@/components/language-learning/Flashcard';
 import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse, updateLearningStatistics } from '@/services/learningService';
+import { useAppStore } from '@/store/useAppStore';
 import type { ScheduledItem } from '@/lib/memo/types';
 import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
 
@@ -19,6 +20,7 @@ const LearningSessionPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0, startTime: Date.now() });
   const responseStartTime = useRef<number>(0);
+  const userId = useAppStore((state) => state.userId);
 
   useEffect(() => {
     if (!wordbookId) {
@@ -29,7 +31,6 @@ const LearningSessionPage: React.FC = () => {
 
     async function setupSession() {
       try {
-        const userId = 'user-1';
         const newSession = await createLearningSessionForWordbook(Number(wordbookId), userId);
         setSession(newSession);
       } catch (e: any) {
