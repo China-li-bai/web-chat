@@ -64,7 +64,7 @@ const LearningSessionPage: React.FC = () => {
     }));
 
     try {
-      await processStudyResponse(session, currentItem.item.id, response, responseTime);
+      await processStudyResponse(session, currentItem.item.id, response, responseTime, userId);
     } catch (e: any) {
       console.error(`Failed to process response: ${e.message}`);
       message.error('Failed to save your progress. Please try again.');
