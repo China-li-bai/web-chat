@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Flashcard } from '@/components/language-learning/Flashcard';
-import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col } from 'antd';
+import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col, Modal } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse, updateLearningStatistics } from '@/services/learningService';
 import { useAppStore } from '@/store/useAppStore';
@@ -19,6 +19,9 @@ const LearningSessionPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0, startTime: Date.now() });
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryCounts, setSummaryCounts] = useState({ mastered: 0, shaky: 0, forgotten: 0 });
+  const [summaryItems, setSummaryItems] = useState<Array<{ id: string; content: string; response: 'again'|'hard'|'good'|'easy'; retrievability: number; nextReview?: Date }>>([]);
   const responseStartTime = useRef<number>(0);
   const userId = useAppStore((state) => state.userId);
 
@@ -62,9 +65,22 @@ const LearningSessionPage: React.FC = () => {
       correct: prev.correct + (isCorrect ? 1 : 0),
       total: prev.total + 1
     }));
+    // Update local summary counts by response category
+    setSummaryCounts(prev => ({
+      mastered: prev.mastered + (response === 'good' || response === 'easy' ? 1 : 0),
+      shaky: prev.shaky + (response === 'hard' ? 1 : 0),
+      forgotten: prev.forgotten + (response === 'again' ? 1 : 0),
+    }));
 
     try {
-      await processStudyResponse(session, currentItem.item.id, response, responseTime, userId);
+      const result = await processStudyResponse(session, currentItem.item.id, response, responseTime, userId);
+      const ms: any = result?.updatedMemoryStrength || {};
+      const retrievability = typeof ms.newRetrievability === 'number' ? ms.newRetrievability : (typeof ms.retrievability === 'number' ? ms.retrievability : 0);
+      const nextReview: Date | undefined = ms.newDueDate || ms.nextReview;
+      setSummaryItems(prev => [
+        ...prev,
+        { id: String(currentItem.item.id), content: String(currentItem.item.content), response, retrievability, nextReview }
+      ]);
     } catch (e: any) {
       console.error(`Failed to process response: ${e.message}`);
       message.error('Failed to save your progress. Please try again.');
@@ -77,7 +93,13 @@ const LearningSessionPage: React.FC = () => {
       const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
       const accuracy = Math.round((sessionStats.correct / sessionStats.total) * 100);
       message.success(`Session completed! ${sessionStats.correct}/${sessionStats.total} correct (${accuracy}%) in ${sessionDuration} minutes`);
-      navigate('/statistics');
+      // FSRS + 评分分类（阈值：mastered ≥0.85；shaky [0.6,0.85)；forgotten <0.6）
+      const mastered = summaryItems.filter(si => (si.response === 'good' || si.response === 'easy') && si.retrievability >= 0.85).length;
+      const shaky = summaryItems.filter(si => si.response === 'hard' || (si.retrievability >= 0.6 && si.retrievability < 0.85)).length;
+      const forgotten = summaryItems.filter(si => si.response === 'again' || si.retrievability < 0.6).length;
+      setSummaryCounts({ mastered, shaky, forgotten });
+      // Show summary modal instead of immediate navigation
+      setShowSummary(true);
     }
   };
 
@@ -219,6 +241,51 @@ const LearningSessionPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      <Modal
+        open={showSummary}
+        title="学习总结"
+        onCancel={() => setShowSummary(false)}
+        footer={[
+          <Button key="continue" type="primary" onClick={() => { setShowSummary(false); navigate('/language-learning'); }}>
+            继续学习
+          </Button>,
+          <Button key="stats" onClick={() => { setShowSummary(false); navigate('/statistics'); }}>
+            查看统计
+          </Button>,
+        ]}
+        bodyStyle={{ backdropFilter: 'blur(8px)' }}
+        style={{ background: 'rgba(255,255,255,0.6)' }}
+      >
+        <Row gutter={16}>
+          <Col span={8}>
+            <Statistic title="准确率" value={accuracy} suffix="%" />
+          </Col>
+          <Col span={8}>
+            <Statistic title="用时" value={sessionDuration} suffix="min" />
+          </Col>
+          <Col span={8}>
+            <Statistic title="总题数" value={sessionStats.total} />
+          </Col>
+        </Row>
+        <Row gutter={16} style={{ marginTop: 16 }}>
+          <Col span={8}>
+            <Card size="small" title="已掌握">
+              <Text>{summaryCounts.mastered} 个</Text>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" title="生疏">
+              <Text>{summaryCounts.shaky} 个</Text>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" title="遗忘">
+              <Text>{summaryCounts.forgotten} 个</Text>
+            </Card>
+          </Col>
+        </Row>
+      </Modal>
     </div>
   );
 };
