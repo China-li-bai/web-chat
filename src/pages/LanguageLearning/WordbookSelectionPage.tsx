@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { WordbookCard } from '@/components/language-learning/WordbookCard';
 import { seedInitialData, getAllWordbooksWithStats, importWordbook, checkWordbookExists, type WordbookWithStats } from '@/services/wordbookService';
 import { initializeDatabase } from '@/services/dataInitService';
+import useAppStore from '@/store/useAppStore';
 import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 
@@ -14,11 +15,12 @@ export const WordbookSelectionPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const userId = useAppStore((state) => state.userId);
 
   const loadWordbooks = async () => {
     try {
       setIsLoading(true);
-      const books = await getAllWordbooksWithStats();
+      const books = await getAllWordbooksWithStats(userId);
       setWordbooks(books);
     } catch (error) {
       console.error("Failed to load wordbooks:", error);
@@ -31,7 +33,7 @@ export const WordbookSelectionPage: React.FC = () => {
   useEffect(() => {
     (async () => {
       await initializeDatabase();
-      await seedInitialData();
+      await seedInitialData(); // This now handles userId internally
       await loadWordbooks();
     })();
   }, []);
@@ -72,7 +74,7 @@ export const WordbookSelectionPage: React.FC = () => {
 
       const proceedWithImport = async () => {
         try {
-          const result = await importWordbook(content);
+          const result = await importWordbook(content, userId);
           if (result.status === 'created') {
             messageApi.success(`Wordbook "${bookName}" imported successfully!`);
           } else {
