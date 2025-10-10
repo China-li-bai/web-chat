@@ -145,13 +145,14 @@ export async function processStudyResponse(
     confidence
   );
 
-  const { newDueDate, newStability, newRetrievability, newDifficulty, newState } = result.updatedMemoryStrength as any;
+  const ms = result.updatedMemoryStrength as any;
 
-  // Ensure we have valid values for required fields
-  const stability = newStability ?? 0; // Default to 0 if null/undefined
-  const retrievability = newRetrievability ?? 1; // Default to 1 if null/undefined
-  const difficulty = newDifficulty ?? 0.5; // Default to 0.5 if null/undefined
-  const state = newState ?? 'new'; // Default to 'new' if null/undefined
+  // 使用 FSRS 返回的标准字段
+  const nextReview: Date | undefined = ms?.nextReview;
+  const stability = ms?.stability ?? 0; // Default to 0 if null/undefined
+  const retrievability = ms?.retrievability ?? 1; // Default to 1 if null/undefined
+  const difficulty = ms?.difficulty ?? 0.5; // Default to 0.5 if null/undefined
+  const state = ms?.state ?? 'new'; // 如果没有状态，保持原有默认
 
   // 1. Update the learning_progress table
   await db.exec({
@@ -167,7 +168,7 @@ export async function processStudyResponse(
         reviewCount = reviewCount + 1
       WHERE wordId = ? AND userId = ?
     `,
-    args: [stability, retrievability, difficulty, newDueDate ? newDueDate.toISOString() : new Date().toISOString(), new Date().toISOString(), state, wordId, userId],
+    args: [stability, retrievability, difficulty, nextReview ? nextReview.toISOString() : new Date().toISOString(), new Date().toISOString(), state, wordId, userId],
   });
 
   // 2. Insert a new record into study_logs
