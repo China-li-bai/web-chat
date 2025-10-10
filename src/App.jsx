@@ -10,6 +10,7 @@ import Progress from './pages/Progress';
 import Settings from './pages/Settings';
 import LearningSessionPage from './pages/LanguageLearning/LearningSessionPage';
 import StatisticsPage from './pages/LanguageLearning/StatisticsPage';
+import ReviewPlannerPage from './pages/ReviewPlanner/review-planner-page';
 import './styles/App.css';
 
 const { Content } = Layout;
@@ -27,6 +28,7 @@ function App() {
             <Route path="/language-learning" element={<LanguageLearning />} />
             <Route path="/learning-session/:wordbookId" element={<LearningSessionPage />} />
             <Route path="/statistics" element={<StatisticsPage />} />
+            <Route path="/review-planner" element={<ReviewPlannerPage />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

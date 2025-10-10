@@ -356,3 +356,285 @@ export async function schedulePlannedReviews(params: {
 
   return { updated };
 }
+
+// 按词书分组统计到期/即将到期（基于 FSRS 的 nextReview）
+export async function getReviewQueueGroupedByWordbook(params: {
+  userId: string;
+  timeWindowHours?: number; // 0=仅到期；24=含24小时内
+  page?: number;
+  pageSize?: number;
+}) {
+  const db = await getDB();
+  const userId = params.userId;
+  const page = Math.max(1, params.page || 1);
+  const pageSize = Math.max(1, Math.min(100, params.pageSize || 10));
+  const offset = (page - 1) * pageSize;
+
+  const now = new Date();
+  const timeWindowHours = typeof params.timeWindowHours === 'number' ? params.timeWindowHours : 0;
+  const upper = new Date(now.getTime() + timeWindowHours * 3600 * 1000);
+
+  // 1) 基础分组统计（严格按 nextReview 窗口）
+  const rows = await db.exec({
+    sql: `
+      SELECT 
+        w.wordbookId AS wordbookId,
+        COUNT(*) AS totalPlanned,
+        SUM(CASE WHEN lp.nextReview <= ? THEN 1 ELSE 0 END) AS dueCount,
+        SUM(CASE WHEN lp.nextReview > ? AND lp.nextReview <= ? THEN 1 ELSE 0 END) AS upcomingCount
+      FROM words w
+      JOIN learning_progress lp ON w.id = lp.wordId
+      WHERE w.userId = ?
+      GROUP BY w.wordbookId
+      ORDER BY dueCount DESC, upcomingCount DESC
+      LIMIT ? OFFSET ?
+    `,
+    args: [now.toISOString(), now.toISOString(), upper.toISOString(), userId, pageSize, offset],
+  });
+
+  // 2) 统计总组数（用于分页）
+  const totalGroupsRows = await db.exec({
+    sql: `
+      SELECT COUNT(*) AS cnt
+      FROM (
+        SELECT w.wordbookId
+        FROM words w
+        JOIN learning_progress lp ON w.id = lp.wordId
+        WHERE w.userId = ?
+        GROUP BY w.wordbookId
+      ) t
+    `,
+    args: [userId],
+  });
+  const total = (totalGroupsRows[0]?.cnt as number) || 0;
+
+  // 3) 词书名映射（若有 wordbooks 表，则补充名称；失败则忽略）
+  const idList = rows.map((r: any) => Number(r.wordbookId)).filter((n: number) => Number.isFinite(n));
+  const nameMap = new Map<number, string>();
+  if (idList.length > 0) {
+    try {
+      const placeholders = idList.map(() => '?').join(',');
+      const nameRows = await db.exec({
+        sql: `
+          SELECT id, name 
+          FROM wordbooks 
+          WHERE userId = ? AND id IN (${placeholders})
+        `,
+        args: [userId, ...idList],
+      });
+      (nameRows || []).forEach((nr: any) => {
+        if (nr && typeof nr.id !== 'undefined') {
+          nameMap.set(Number(nr.id), String(nr.name || ''));
+        }
+      });
+    } catch (e: any) {
+      console.error('Optional wordbookName mapping failed (ok to ignore):', e?.message || e);
+    }
+  }
+
+  return {
+    items: rows.map((r: any) => {
+      const wid = Number(r.wordbookId);
+      return {
+        wordbookId: wid,
+        wordbookName: nameMap.get(wid) || '',
+        dueCount: Number(r.dueCount || 0),
+        upcomingCount: Number(r.upcomingCount || 0),
+        totalPlanned: Number(r.totalPlanned || 0),
+        topSamples: [] as Array<{ id: string; word: string; retrievability?: number }>,
+      };
+    }),
+    page,
+    pageSize,
+    total,
+  };
+}
+
+// 获取某词书到期（或含24h内）候选集合，支持首字母筛选与分页
+export async function getDueItems(params: {
+  userId: string;
+  wordbookId: number;
+  includeUpcoming?: boolean; // false=仅到期；true=含24h内
+  startsWith?: string; // 'A'-'Z' 或 '#'
+  page?: number;
+  pageSize?: number;
+}) {
+  const db = await getDB();
+  const userId = params.userId;
+  const wordbookId = params.wordbookId;
+  const includeUpcoming = !!params.includeUpcoming;
+  const page = Math.max(1, params.page || 1);
+  const pageSize = Math.max(1, Math.min(200, params.pageSize || 50));
+  const offset = (page - 1) * pageSize;
+
+  const now = new Date();
+  const upper = new Date(now.getTime() + 24 * 3600 * 1000);
+  const letter = (params.startsWith || '').trim().toLowerCase();
+
+  // 先按到期窗口过滤；首字母过滤尽量在 SQL 中做（A-Z），'#' 在内存中过滤
+  const timePredicate = includeUpcoming
+    ? 'lp.nextReview <= ?'
+    : 'lp.nextReview <= ?';
+
+  const timeArgs = includeUpcoming
+    ? [upper.toISOString()]
+    : [now.toISOString()];
+
+  // 如果是 A-Z 之一，使用 LIKE；否则先不加首字母谓词
+  const isAZ = letter.length === 1 && letter >= 'a' && letter <= 'z';
+  const letterPredicate = isAZ ? 'AND (w.word LIKE ? OR w.word LIKE ?)' : '';
+  const letterArgs = isAZ ? [`${letter}%`, `${letter.toUpperCase()}%`] : [];
+
+  const baseSql = `
+    FROM words w
+    JOIN learning_progress lp ON w.id = lp.wordId
+    WHERE w.userId = ? AND w.wordbookId = ? AND ${timePredicate}
+    ${letterPredicate}
+  `;
+
+  const listRows = await db.exec({
+    sql: `
+      SELECT 
+        w.id, w.word, lp.nextReview, lp.retrievability
+      ${baseSql}
+      ORDER BY lp.nextReview ASC
+      LIMIT ? OFFSET ?
+    `,
+    args: [userId, wordbookId, ...timeArgs, ...letterArgs, pageSize, offset],
+  });
+
+  // 统计总数
+  const countRows = await db.exec({
+    sql: `
+      SELECT COUNT(*) AS cnt
+      ${baseSql}
+    `,
+    args: [userId, wordbookId, ...timeArgs, ...letterArgs],
+  });
+  let items = listRows.map((r: any) => ({
+    id: String(r.id),
+    word: r.word as string,
+    nextReview: r.nextReview as string,
+    retrievability: typeof r.retrievability === 'number' ? r.retrievability : undefined,
+  }));
+
+  // 若选择了 '#'，在内存中过滤“非字母开头”
+  if (letter === '#') {
+    items = items.filter(it => !/^[A-Za-z]/.test(it.word || ''));
+  }
+
+  return {
+    items,
+    page,
+    pageSize,
+    total: (countRows[0]?.cnt as number) || 0,
+  };
+}
+
+// 扩展版：支持 includeUpcoming 与 startsWith，仅筛选候选集合，算法与写回保持一致
+export async function createLearningSessionForWordbookExtended(params: {
+  userId: string;
+  wordbookId: number;
+  includeUpcoming?: boolean; // false=仅到期；true=含24h内
+  startsWith?: string; // 'A'-'Z' 或 '#'
+}) {
+  const db = await getDB();
+  const { userId, wordbookId } = params;
+  const includeUpcoming = !!params.includeUpcoming;
+  const letter = (params.startsWith || '').trim().toLowerCase();
+
+  const now = new Date();
+  const upper = new Date(now.getTime() + 24 * 3600 * 1000);
+
+  // 时间窗口：仅到期或含24h内
+  const timePredicate = includeUpcoming ? 'lp.nextReview <= ?' : 'lp.nextReview <= ?';
+  const timeArgs = includeUpcoming ? [upper.toISOString()] : [now.toISOString()];
+
+  // 首字母过滤（A-Z 走 SQL LIKE；'#' 与其他情况后续在内存中过滤）
+  const isAZ = letter.length === 1 && letter >= 'a' && letter <= 'z';
+  const letterPredicate = isAZ ? 'AND (w.word LIKE ? OR w.word LIKE ?)' : '';
+  const letterArgs = isAZ ? [`${letter}%`, `${letter.toUpperCase()}%`] : [];
+
+  const rows = await db.exec({
+    sql: `
+      SELECT
+        w.id, w.word, w.type, w.phonetic, w.definition, w.example, w.createdAt,
+        lp.stability, lp.retrievability, lp.difficulty, lp.nextReview, lp.lastReview, lp.state
+      FROM words w
+      JOIN learning_progress lp ON w.id = lp.wordId
+      WHERE w.userId = ? AND w.wordbookId = ? AND ${timePredicate}
+      ${letterPredicate}
+      ORDER BY lp.nextReview ASC
+    `,
+    args: [userId, wordbookId, ...timeArgs, ...letterArgs],
+  });
+
+  // 内存中过滤“非字母开头”
+  const filteredRows = letter === '#'
+    ? rows.filter((r: any) => !/^[A-Za-z]/.test((r.word || '') as string))
+    : rows;
+
+  // 构建 LearningItem
+  const learningItems: LearningItem[] = filteredRows.map((row: any) => ({
+    id: String(row.id),
+    content: row.word,
+    type: row.type as LearningItemType,
+    difficulty: row.difficulty,
+    createdAt: new Date(row.createdAt),
+    details: {
+      phonetic: row.phonetic,
+      definition: row.definition,
+      example: row.example,
+      stability: row.stability,
+      retrievability: row.retrievability,
+      state: row.state,
+    }
+  } as any));
+
+  // 拉取最近学习日志
+  const wordIds = learningItems.map(item => Number(item.id));
+  let studyRecords: StudyRecord[] = [];
+  if (wordIds.length > 0) {
+    const placeholders = wordIds.map(() => '?').join(',');
+    const logs = await db.exec({
+      sql: `SELECT * FROM study_logs WHERE itemId IN (${placeholders}) ORDER BY timestamp DESC LIMIT 100`,
+      args: wordIds,
+    });
+
+    studyRecords = logs.map((log: any) => ({
+      itemId: String(log.itemId),
+      timestamp: new Date(log.timestamp as string),
+      response: log.response as 'again' | 'hard' | 'good' | 'easy',
+      responseTime: log.responseTime as number,
+      confidence: log.confidence as number,
+    }));
+  }
+
+  // 初始化并创建会话（与原函数一致）
+  const manager = new MemoryLearningManager({
+    fsrsParams: { requestRetention: 0.9, maximumInterval: 36500 },
+    adaptiveConfig: { minDifficulty: 0.1, maxDifficulty: 0.9, adaptationRate: 0.1 },
+    retrievalConfig: { maxSessionDuration: 1800, targetCognitiveLoad: 0.7, interleaveTypes: true },
+  });
+
+  const learningSession = await manager.createLearningSession(
+    userId,
+    learningItems,
+    studyRecords,
+    [] // mockSessions
+  );
+
+  // 回填 details
+  const detailsById = new Map(learningItems.map(li => [li.id, (li as any).details]));
+  (learningSession.items as any[]).forEach(si => {
+    const itemId = si.item?.id;
+    if (itemId && detailsById.has(itemId)) {
+      si.item.details = detailsById.get(itemId);
+    }
+  });
+
+  (learningSession as any).userId = userId;
+  (learningSession as any).manager = manager;
+
+  return learningSession;
+}
