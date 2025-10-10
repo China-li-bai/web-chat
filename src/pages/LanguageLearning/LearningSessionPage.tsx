@@ -24,6 +24,7 @@ const LearningSessionPage: React.FC = () => {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryCounts, setSummaryCounts] = useState({ mastered: 0, shaky: 0, forgotten: 0 });
   const [summaryItems, setSummaryItems] = useState<Array<{ id: string; content: string; response: 'again'|'hard'|'good'|'easy'; retrievability: number; nextReview?: Date }>>([]);
+  const [summaryStats, setSummaryStats] = useState<{ estimatedRetention: number; cognitiveLoad: number } | null>(null);
   const [activeItems, setActiveItems] = useState<ScheduledItem[]>([]);
   const responseStartTime = useRef<number>(0);
   const userId = useAppStore((state) => state.userId);
@@ -108,6 +109,22 @@ const LearningSessionPage: React.FC = () => {
       const shaky = summaryItems.filter(si => si.response === 'hard' || (si.retrievability >= 0.6 && si.retrievability < 0.85)).length;
       const forgotten = summaryItems.filter(si => si.response === 'again' || si.retrievability < 0.6).length;
       setSummaryCounts({ mastered, shaky, forgotten });
+      // 收集会话统计（预计保持率/实际认知负荷）
+      try {
+        const manager = (session as any)?.manager;
+        if (manager && typeof (manager as any).getSessionStatistics === 'function') {
+          (manager as any).completeSession(session as any);
+          const stats = (manager as any).getSessionStatistics(session as any);
+          if (stats && typeof (stats as any).estimatedRetention === 'number') {
+            setSummaryStats({
+              estimatedRetention: (stats as any).estimatedRetention,
+              cognitiveLoad: (stats as any).cognitiveLoadActual ?? (stats as any).cognitiveLoad ?? 0
+            });
+          }
+        }
+      } catch (err) {
+        console.error('collect session stats failed', err);
+      }
       // 后台自动生成“下次复习词书”并写入 lastWordbookId（最小增量，弱项为主）
       try {
         const weakIds = new Set(
@@ -176,6 +193,7 @@ const LearningSessionPage: React.FC = () => {
     </div>
   );
   
+  const currentStrategy = (currentItem as any)?.strategy?.name || (currentItem as any)?.strategy?.type || 'active-retrieval';
   const progressPercent = itemsSource.length > 0 ? (currentItemIndex / itemsSource.length) * 100 : 0;
   const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
   const accuracy = sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0;
@@ -202,7 +220,7 @@ const LearningSessionPage: React.FC = () => {
               size="small"
             />
             <Text type="secondary" style={{ fontSize: '12px' }}>
-              {currentItemIndex + 1} of {itemsSource.length} words
+              {currentItemIndex + 1} of {itemsSource.length} words · Strategy: {currentStrategy}
             </Text>
           </Col>
           <Col>
@@ -352,6 +370,23 @@ const LearningSessionPage: React.FC = () => {
             <Statistic title="总题数" value={sessionStats.total} />
           </Col>
         </Row>
+        <Row gutter={16} style={{ marginTop: 12 }}>
+          <Col span={12}>
+            <Card size="small" title="预计保持率">
+              <Text>{summaryStats ? `${Math.round(summaryStats.estimatedRetention * 100)}%` : '-'}</Text>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card size="small" title="实际认知负荷">
+              <Text>{summaryStats ? Number(summaryStats.cognitiveLoad).toFixed(2) : '-'}</Text>
+            </Card>
+          </Col>
+        </Row>
+        <div style={{ marginTop: 8 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            提示：预计保持率基于本次正确率与实际认知负荷估算；若本次全错或未作答则显示 0%。实际认知负荷由题目难度、用时与错误率综合计算，范围 0–1（建议控制在 0.8 以下）。
+          </Text>
+        </div>
         <Row gutter={16} style={{ marginTop: 16 }}>
           <Col span={8}>
             <Card size="small" title="已掌握">

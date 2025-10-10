@@ -306,7 +306,10 @@ export class MemoryLearningManager {
     const successRate = session.completedItems > 0 ? session.totalCorrect / session.completedItems : 0;
     
     // 预测保持率（基于成功率和认知负荷）
-    const estimatedRetention = this.estimateRetention(successRate, session.cognitiveLoadActual);
+    // 显式规则：若全错或未作答，则预计保持率为 0
+    const estimatedRetention = (session.completedItems === 0 || successRate === 0)
+      ? 0
+      : this.estimateRetention(successRate, session.cognitiveLoadActual);
 
     return {
       completionRate,
