@@ -354,9 +354,6 @@ try {
 - [测试效应研究](https://en.wikipedia.org/wiki/Testing_effect)
 - [脑科学记忆调研文档](../../docs/腦科學有關於記憶的調研.md)
 
-## 📄 许可证
-
-MIT License
 
 ## 🤝 贡献
 
