@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Flashcard } from '@/components/language-learning/Flashcard';
 import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col, Modal } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
-import { createLearningSessionForWordbook, processStudyResponse, updateLearningStatistics } from '@/services/learningService';
+import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews } from '@/services/learningService';
 import { importWordbook } from '@/services/wordbookService';
 import { useAppStore } from '@/store/useAppStore';
 type SetLastWordbookId = (id: string) => void;
@@ -67,6 +67,9 @@ const LearningSessionPage: React.FC = () => {
   const handleResponse = async (response: 'again' | 'hard' | 'good' | 'easy') => {
     if (!session || !currentItem) return;
 
+    // 本次答题的条目占位，放在函数顶部以确保各分支均可访问
+    let lastEntry: { id: string; content: string; response: 'again'|'hard'|'good'|'easy'; retrievability: number; nextReview?: Date } | null = null;
+
     const responseTime = Date.now() - responseStartTime.current;
     const isCorrect = response === 'good' || response === 'easy';
 
@@ -88,26 +91,30 @@ const LearningSessionPage: React.FC = () => {
       const ms: any = result?.updatedMemoryStrength || {};
       const retrievability = typeof ms.newRetrievability === 'number' ? ms.newRetrievability : (typeof ms.retrievability === 'number' ? ms.retrievability : 0);
       const nextReview: Date | undefined = ms.newDueDate || ms.nextReview;
-      setSummaryItems(prev => [
-        ...prev,
-        { id: String(currentItem.item.id), content: String(currentItem.item.content), response, retrievability, nextReview }
-      ]);
+      lastEntry = { id: String(currentItem.item.id), content: String(currentItem.item.content), response, retrievability, nextReview };
+      setSummaryItems(prev => [...prev, lastEntry]);
     } catch (e: any) {
       console.error(`Failed to process response: ${e.message}`);
       message.error('Failed to save your progress. Please try again.');
     }
 
     if (currentItemIndex < activeItems.length - 1) {
-      setCurrentItemIndex(currentItemIndex + 1);
+      setCurrentItemIndex((prev)=>prev + 1);
       setIsFlipped(false);
     } else {
-      const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
-      const accuracy = Math.round((sessionStats.correct / sessionStats.total) * 100);
-      message.success(`Session completed! ${sessionStats.correct}/${sessionStats.total} correct (${accuracy}%) in ${sessionDuration} minutes`);
+      // 使用本地最终值，避免因状态异步导致提示显示上一拍的数据
+      const localTotal = sessionStats.total + 1;
+      const localCorrect = sessionStats.correct + (isCorrect ? 1 : 0);
+      const elapsedMs = Date.now() - sessionStats.startTime;
+      const minutes = Math.floor(elapsedMs / 60000);
+      const sessionDurationText = minutes >= 1 ? `${minutes} minutes` : `${Math.ceil(elapsedMs / 1000)} seconds`;
+      const localAccuracy = localTotal > 0 ? Math.round((localCorrect / localTotal) * 100) : 0;
+      message.success(`Session completed! ${localCorrect}/${localTotal} correct (${localAccuracy}%) in ${sessionDurationText}`);
       // FSRS + 评分分类（阈值：mastered ≥0.85；shaky [0.6,0.85)；forgotten <0.6）
-      const mastered = summaryItems.filter(si => (si.response === 'good' || si.response === 'easy') && si.retrievability >= 0.85).length;
-      const shaky = summaryItems.filter(si => si.response === 'hard' || (si.retrievability >= 0.6 && si.retrievability < 0.85)).length;
-      const forgotten = summaryItems.filter(si => si.response === 'again' || si.retrievability < 0.6).length;
+      const localSummary = lastEntry ? [...summaryItems, lastEntry] : summaryItems;
+      const mastered = localSummary.filter(si => (si.response === 'good' || si.response === 'easy') && si.retrievability >= 0.85).length;
+      const shaky = localSummary.filter(si => si.response === 'hard' || (si.retrievability >= 0.6 && si.retrievability < 0.85)).length;
+      const forgotten = localSummary.filter(si => si.response === 'again' || si.retrievability < 0.6).length;
       setSummaryCounts({ mastered, shaky, forgotten });
       // 收集会话统计（预计保持率/实际认知负荷）
       try {
@@ -128,7 +135,7 @@ const LearningSessionPage: React.FC = () => {
       // 后台自动生成“下次复习词书”并写入 lastWordbookId（最小增量，弱项为主）
       try {
         const weakIds = new Set(
-          summaryItems
+          (lastEntry ? [...summaryItems, lastEntry] : summaryItems)
             .filter(si => si.response === 'hard' || si.response === 'again' || si.retrievability < 0.85)
             .map(si => String(si.id))
         );
@@ -193,11 +200,18 @@ const LearningSessionPage: React.FC = () => {
     </div>
   );
   
-  const currentStrategy = (currentItem as any)?.strategy?.name || (currentItem as any)?.strategy?.type || 'active-retrieval';
-  const progressPercent = itemsSource.length > 0 ? (currentItemIndex / itemsSource.length) * 100 : 0;
+  const rawType = (currentItem as any)?.strategy?.type as string | undefined;
+  const rawDiff = (currentItem as any)?.strategy?.difficulty as string | undefined;
+  const currentStrategyLabel = rawType === 'recognition' ? '识别'
+    : rawType === 'cued_recall' ? '提示回忆'
+    : rawType === 'free_recall' ? '自由回忆'
+    : rawType === 'elaborative_retrieval' ? '精细回忆'
+    : '检索';
+  const currentStrategyDisplay = rawDiff ? `${currentStrategyLabel} · ${rawDiff}` : currentStrategyLabel;
+  const progressPercent = ()=>itemsSource.length > 0 ? (currentItemIndex / itemsSource.length) * 100 : 0;
   const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
   const accuracy = sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0;
-
+  
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
       {/* Header with stats */}
@@ -214,13 +228,13 @@ const LearningSessionPage: React.FC = () => {
           </Col>
           <Col flex={1} style={{ margin: '0 24px' }}>
             <Progress 
-              percent={progressPercent} 
+              percent={progressPercent()} 
               showInfo={false} 
               strokeColor="#1890ff"
               size="small"
             />
             <Text type="secondary" style={{ fontSize: '12px' }}>
-              {currentItemIndex + 1} of {itemsSource.length} words · Strategy: {currentStrategy}
+              {currentItemIndex + 1} of {itemsSource.length} words · Strategy: {currentStrategyDisplay}
             </Text>
           </Col>
           <Col>
@@ -245,8 +259,8 @@ const LearningSessionPage: React.FC = () => {
               </Col>
               <Col>
                 <Statistic
-                  title="Correct"
-                  value={`${sessionStats.correct}/${sessionStats.total}`}
+                  title="Progress"
+                  value={`${sessionStats.total}/${itemsSource.length}`}
                   prefix={<BookOutlined />}
                   valueStyle={{ fontSize: '16px' }}
                 />
@@ -336,12 +350,12 @@ const LearningSessionPage: React.FC = () => {
               nextReview: si.nextReview ? si.nextReview : new Date(Date.now() + 24 * 60 * 60 * 1000)
             }));
             try {
-              await updateLearningStatistics({
+              const res = await schedulePlannedReviews({
                 userId,
                 wordbookId: Number(wordbookId),
                 planned
-              } as any);
-              message.success('已安排下次复习并写入统计');
+              });
+              message.success(`已安排下次复习（${res.updated} 项）`);
             } catch (e: any) {
               console.error(e);
               message.error('安排复习失败，请稍后重试');

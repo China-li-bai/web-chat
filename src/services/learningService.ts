@@ -319,3 +319,39 @@ export async function updateWordTypeStatistics(
     console.error('Failed to update word type statistics:', error);
   }
 }
+
+/**
+ * 安排下次复习：根据 planned 列表更新各词条的 nextReview
+ * planned.itemId 为字符串形式的词ID；nextReview 为 Date
+ */
+export async function schedulePlannedReviews(params: {
+  userId: string;
+  wordbookId: number;
+  planned: Array<{ itemId: string; category: 'mastered' | 'shaky' | 'forgotten'; nextReview: Date }>;
+}): Promise<{ updated: number }> {
+  const db = await getDB();
+  const { userId, planned } = params;
+  let updated = 0;
+
+  for (const p of planned) {
+    const wordId = Number(p.itemId);
+    if (!wordId || !isFinite(wordId)) {
+      continue;
+    }
+    try {
+      await db.exec({
+        sql: `
+          UPDATE learning_progress
+          SET nextReview = ?
+          WHERE wordId = ? AND userId = ?
+        `,
+        args: [p.nextReview.toISOString(), wordId, userId],
+      });
+      updated++;
+    } catch (e: any) {
+      console.error('schedulePlannedReviews failed for wordId:', wordId, e?.message || e);
+    }
+  }
+
+  return { updated };
+}

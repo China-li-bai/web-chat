@@ -89,7 +89,14 @@ export class MemoryLearningManager {
       }
     };
 
-    this.fsrsAlgorithm = new FSRSAlgorithm({ fsrsParams: this.config.fsrsParams });
+    // 传入符合 StrategyConfig 的对象，内部将使用默认参数或 parameters.fsrsParams
+    this.fsrsAlgorithm = new FSRSAlgorithm({
+      algorithm: 'fsrs',
+      parameters: {},
+      adaptiveMode: true,
+      maxReviewsPerDay: 50,
+      targetRetention: this.config.fsrsParams?.requestRetention ?? 0.9
+    });
     this.adaptiveAlgorithm = new DifficultyAdaptiveAlgorithm();
     this.retrievalAlgorithm = new ActiveRetrievalAlgorithm();
   }
