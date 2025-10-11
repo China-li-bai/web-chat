@@ -27,7 +27,21 @@ const LearningSessionPage: React.FC = () => {
   const [summaryItems, setSummaryItems] = useState<Array<{ id: string; content: string; response: 'again'|'hard'|'good'|'easy'; retrievability: number; nextReview?: Date }>>([]);
   const [summaryStats, setSummaryStats] = useState<{ estimatedRetention: number; cognitiveLoad: number } | null>(null);
   const [activeItems, setActiveItems] = useState<ScheduledItem[]>([]);
+  // 统一统计口径（每日/按书）
+  const [counters, setCounters] = useState<{
+    daily: { new: number; review: number; done: number };
+    byBook: Record<string, { new: number; review: number; done: number }>;
+  }>({
+    daily: { new: 0, review: 0, done: 0 },
+    byBook: {},
+  });
   const responseStartTime = useRef<number>(0);
+  // 微会话分段（默认 8）
+  const [segmentSize, setSegmentSize] = useState(8);
+  const [segmentIndex, setSegmentIndex] = useState(0);
+  const [segmentQueue, setSegmentQueue] = useState<ScheduledItem[]>([]);
+  // 触摸手势
+  const touchStartX = useRef<number>(0);
   const userId = useAppStore((state) => state.userId);
   const setLastWordbookId = useAppStore((state) => state.setLastWordbookId as SetLastWordbookId);
 
@@ -73,6 +87,27 @@ const LearningSessionPage: React.FC = () => {
     }
   }, [session]);
 
+  // 计算并切换当前分段
+  const computeSegment = (seg: number, source: ScheduledItem[]) => {
+    const start = seg * segmentSize;
+    const end = start + segmentSize;
+    const slice = source.slice(start, end);
+    setSegmentQueue(slice);
+    setCurrentItemIndex(0);
+    setIsFlipped(false);
+  };
+
+  useEffect(() => {
+    const source = (activeItems && activeItems.length > 0) ? activeItems : (session?.items || []);
+    if (source.length > 0) {
+      computeSegment(segmentIndex, source);
+    } else {
+      setSegmentQueue([]);
+      setCurrentItemIndex(0);
+      setIsFlipped(false);
+    }
+  }, [activeItems, session, segmentIndex, segmentSize]);
+
   const handleFlip = () => {
     if (!isFlipped) {
       responseStartTime.current = Date.now(); // Start timer when answer is shown
@@ -109,6 +144,28 @@ const LearningSessionPage: React.FC = () => {
       const nextReview: Date | undefined = ms.newDueDate || ms.nextReview;
       lastEntry = { id: String(currentItem.item.id), content: String(currentItem.item.content), response, retrievability, nextReview };
       setSummaryItems(prev => [...prev, lastEntry]);
+      // 统一统计口径（每日/按书）
+      const bookIdKey = String((currentItem?.item as any)?.wordbookId || wordbookId || 'unknown');
+      const isNew = Boolean((currentItem as any)?.isNew === true);
+      setCounters(prev => {
+        const inc = { new: isNew ? 1 : 0, review: isNew ? 0 : 1, done: 1 };
+        const prevBook = prev.byBook[bookIdKey] || { new: 0, review: 0, done: 0 };
+        return {
+          daily: {
+            new: prev.daily.new + inc.new,
+            review: prev.daily.review + inc.review,
+            done: prev.daily.done + 1,
+          },
+          byBook: {
+            ...prev.byBook,
+            [bookIdKey]: {
+              new: prevBook.new + inc.new,
+              review: prevBook.review + inc.review,
+              done: prevBook.done + 1,
+            },
+          },
+        };
+      });
     } catch (e: any) {
       console.error(`Failed to process response: ${e.message}`);
       message.error('Failed to save your progress. Please try again.');
@@ -215,7 +272,9 @@ const LearningSessionPage: React.FC = () => {
     />;
   }
 
-  const itemsSource: ScheduledItem[] = (activeItems && activeItems.length > 0) ? activeItems : (session?.items || []);
+  const itemsSource: ScheduledItem[] = (segmentQueue && segmentQueue.length > 0)
+    ? segmentQueue
+    : ((activeItems && activeItems.length > 0) ? activeItems : (session?.items || []));
   const currentItem = itemsSource[currentItemIndex] as ScheduledItem & { item: { details?: any }};
   const details = (currentItem.item as any).details || {};
 
@@ -241,6 +300,27 @@ const LearningSessionPage: React.FC = () => {
   const progressPercent = ()=>itemsSource.length > 0 ? (currentItemIndex / itemsSource.length) * 100 : 0;
   const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
   const accuracy = sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0;
+
+  // 键盘快捷键：Enter 翻面/默认 Good，1/2/3/4=Again/Hard/Good/Easy
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      if (e.key === 'Enter') {
+        if (!isFlipped) {
+          handleFlip();
+        } else {
+          handleResponse('good');
+        }
+      }
+      if (!isFlipped) return;
+      if (e.key === '1') handleResponse('again');
+      if (e.key === '2') handleResponse('hard');
+      if (e.key === '3') handleResponse('good');
+      if (e.key === '4') handleResponse('easy');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isFlipped, currentItemIndex]); 
   
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
@@ -252,8 +332,10 @@ const LearningSessionPage: React.FC = () => {
               icon={<ArrowLeftOutlined />} 
               onClick={() => navigate('/language-learning')}
               type="text"
+              aria-label="返回词书列表"
+              title="返回词书列表"
             >
-              Back to Wordbooks
+              {wordbookId === 'global' ? 'Global Session' : 'Back to Wordbook'}
             </Button>
           </Col>
           <Col flex={1} style={{ margin: '0 24px' }}>
@@ -295,13 +377,36 @@ const LearningSessionPage: React.FC = () => {
                   valueStyle={{ fontSize: '16px' }}
                 />
               </Col>
+              <Col>
+                <Statistic
+                  title="Today"
+                  value={counters.daily.done}
+                  valueStyle={{ fontSize: '16px' }}
+                />
+              </Col>
             </Row>
           </Col>
         </Row>
       </Card>
 
       {/* Main learning area */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', minHeight: 'calc(100vh - 200px)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', minHeight: 'calc(100vh - 200px)' }}
+        onTouchStart={(e) => { try { const t = e.changedTouches[0]; if (t) touchStartX.current = t.clientX; } catch (_) {} }}
+        onTouchEnd={(e) => {
+          try {
+            const t = e.changedTouches[0];
+            if (!t) return;
+            const dx = t.clientX - touchStartX.current;
+            if (Math.abs(dx) > 40) {
+              if (!isFlipped) {
+                handleFlip();
+              } else {
+                if (dx > 0) handleResponse('good'); else handleResponse('again');
+              }
+            }
+          } catch (_) {}
+        }}
+      >
       
       <Flashcard
         frontContent={frontContent}
@@ -310,7 +415,20 @@ const LearningSessionPage: React.FC = () => {
         onFlip={handleFlip}
       />
 
-        <div style={{ marginTop: '24px', width: '100%', maxWidth: '500px' }}>
+        {/* 底部固定拇指操作条（移动与桌面均固定） */}
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: '12px 16px',
+            background: '#fff',
+            borderTop: '1px solid #f0f0f0',
+            boxShadow: '0 -2px 8px rgba(0,0,0,0.06)',
+            zIndex: 10
+          }}
+        >
           {!isFlipped ? (
             <Button type="primary" onClick={handleFlip} block size="large">
               Show Answer
