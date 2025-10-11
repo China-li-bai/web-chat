@@ -11,7 +11,7 @@
 {
   "Web": {
     "arch": "react",
-    "component": "shadcn"
+   
   }
 }
 
