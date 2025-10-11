@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Card, Row, Col, Switch, Button, Segmented, Table, Pagination, Empty, Typography, Space, message } from "antd";
+import { Card, Row, Col, Switch, Button, Segmented, Table, Pagination, Empty, Typography, Space, message, Grid } from "antd";
 import { ReloadOutlined, PlayCircleOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { getReviewQueueGroupedByWordbook, getDueItems, createLearningSessionForWordbookExtended } from "@/services/learningService";
@@ -54,6 +54,10 @@ export default function ReviewPlannerPage() {
     const [duePage, setDuePage] = useState<number>(1);
     const [duePageSize, setDuePageSize] = useState<number>(50);
     const [dueTotal, setDueTotal] = useState<number>(0);
+
+    // 响应式：判断是否为移动端（小于 md）
+    const screens = Grid.useBreakpoint();
+    const isMobile = !screens.md;
 
     const timeWindowHours = includeUpcoming ? 24 : 0;
 
@@ -186,16 +190,53 @@ export default function ReviewPlannerPage() {
                             </Space>
                         </Space>
                         <div style={{ marginTop: 12 }}>
-                            <Table
-                                rowKey="wordbookId"
-                                size="middle"
-                                loading={groupsLoading}
-                                columns={groupsColumns as any}
-                                dataSource={groups}
-                                pagination={false}
-                            />
+                            {isMobile ? (
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+                                    {groups.map((g) => (
+                                        <Card key={g.wordbookId} size="small">
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                                                <div style={{ display: "flex", flexDirection: "column" }}>
+                                                    <Text strong>{g.wordbookName || `词书 #${g.wordbookId}`}</Text>
+                                                    <Text type="secondary">到期 {g.dueCount} · 24h内 {g.upcomingCount} · 已安排 {g.totalPlanned}</Text>
+                                                </div>
+                                                <Space>
+                                                    <Button
+                                                        size="small"
+                                                        type={activeWordbookId === g.wordbookId ? "primary" : "default"}
+                                                        onClick={() => { setActiveWordbookId(g.wordbookId); setDuePage(1); }}
+                                                    >
+                                                        查看
+                                                    </Button>
+                                                    <Button
+                                                        size="small"
+                                                        icon={<PlayCircleOutlined />}
+                                                        onClick={() => {
+                                                            setActiveWordbookId(g.wordbookId);
+                                                            setDuePage(1);
+                                                            setTimeout(onStartReview, 0);
+                                                        }}
+                                                    >
+                                                        开始
+                                                    </Button>
+                                                </Space>
+                                            </div>
+                                        </Card>
+                                    ))}
+                                    {groups.length === 0 && !groupsLoading && <Empty description="暂无分组数据" />}
+                                </div>
+                            ) : (
+                                <Table
+                                    rowKey="wordbookId"
+                                    size="middle"
+                                    loading={groupsLoading}
+                                    columns={groupsColumns as any}
+                                    dataSource={groups}
+                                    pagination={false}
+                                />
+                            )}
                             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
                                 <Pagination
+                                    size={isMobile ? "small" : "default"}
                                     current={groupsPage}
                                     pageSize={groupsPageSize}
                                     total={groupsTotal}
@@ -221,9 +262,9 @@ export default function ReviewPlannerPage() {
                             </Space>
                         </Space>
 
-                        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", overflowX: "auto", whiteSpace: "nowrap", paddingBottom: 4 }}>
                             <Segmented
-                                size="small"
+                                size={isMobile ? "small" : "middle"}
                                 value={startsWith}
                                 onChange={(val) => { setStartsWith(String(val)); setDuePage(1); }}
                                 options={letters.map(l => ({ label: l, value: l }))}
@@ -233,17 +274,35 @@ export default function ReviewPlannerPage() {
                         <div style={{ marginTop: 12 }}>
                             {activeWordbookId ? (
                                 <>
-                                    <Table
-                                        rowKey="id"
-                                        size="middle"
-                                        loading={dueLoading}
-                                        columns={dueColumns as any}
-                                        dataSource={dueItems}
-                                        pagination={false}
-                                        locale={{ emptyText: <Empty description="无到期词条" /> }}
-                                    />
+                                    {isMobile ? (
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+                                            {dueItems.map((d) => (
+                                                <Card key={d.id} size="small">
+                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                                                        <div style={{ display: "flex", flexDirection: "column" }}>
+                                                            <Text strong>{d.word}</Text>
+                                                            <Text type="secondary">下一次复习：{new Date(d.nextReview).toLocaleString()}</Text>
+                                                            <Text type="secondary">可提取性：{d.retrievability === undefined ? "-" : `${Math.round(d.retrievability * 100)}%`}</Text>
+                                                        </div>
+                                                    </div>
+                                                </Card>
+                                            ))}
+                                            {dueItems.length === 0 && !dueLoading && <Empty description="无到期词条" />}
+                                        </div>
+                                    ) : (
+                                        <Table
+                                            rowKey="id"
+                                            size="middle"
+                                            loading={dueLoading}
+                                            columns={dueColumns as any}
+                                            dataSource={dueItems}
+                                            pagination={false}
+                                            locale={{ emptyText: <Empty description="无到期词条" /> }}
+                                        />
+                                    )}
                                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
                                         <Pagination
+                                            size={isMobile ? "small" : "default"}
                                             current={duePage}
                                             pageSize={duePageSize}
                                             total={dueTotal}
