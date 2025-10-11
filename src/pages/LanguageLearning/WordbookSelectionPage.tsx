@@ -163,3 +163,5 @@ export const WordbookSelectionPage: React.FC = () => {
     </>
   );
 };
+
+export default WordbookSelectionPage

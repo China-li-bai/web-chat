@@ -4,6 +4,7 @@ import { Flashcard } from '@/components/language-learning/Flashcard';
 import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col, Modal } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews, startSessionFromTodayPlan } from '@/services/learningService';
+import { evaluateRewardsOnEvent, addDailyFocusProgress } from '@/services/rewardService';
 import { importWordbook } from '@/services/wordbookService';
 import { useAppStore } from '@/store/useAppStore';
 type SetLastWordbookId = (id: string) => void;
@@ -125,6 +126,20 @@ const LearningSessionPage: React.FC = () => {
       const sessionDurationText = minutes >= 1 ? `${minutes} minutes` : `${Math.ceil(elapsedMs / 1000)} seconds`;
       const localAccuracy = localTotal > 0 ? Math.round((localCorrect / localTotal) * 100) : 0;
       message.success(`Session completed! ${localCorrect}/${localTotal} correct (${localAccuracy}%) in ${sessionDurationText}`);
+      // 记录当日完成计数并评估奖励
+      try {
+        addDailyFocusProgress(userId, new Date().toISOString(), localTotal);
+      } catch (err) {
+        console.error('record daily focus count failed', err);
+      }
+      try {
+        const evalRes = evaluateRewardsOnEvent({ userId, eventType: 'sessionCompleted', dailyQuota: 60 });
+        if (Array.isArray(evalRes.granted) && evalRes.granted.length > 0) {
+          message.success(`🎖 获得新的奖励 ${evalRes.granted.length} 项`);
+        }
+      } catch (err) {
+        console.error('evaluate rewards failed', err);
+      }
       // FSRS + 评分分类（阈值：mastered ≥0.85；shaky [0.6,0.85)；forgotten <0.6）
       const localSummary = lastEntry ? [...summaryItems, lastEntry] : summaryItems;
       const mastered = localSummary.filter(si => (si.response === 'good' || si.response === 'easy') && si.retrievability >= 0.85).length;

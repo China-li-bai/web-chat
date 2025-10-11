@@ -10,6 +10,7 @@ import Progress from './pages/Progress';
 import Settings from './pages/Settings';
 import LearningSessionPage from './pages/LanguageLearning/LearningSessionPage';
 import StatisticsPage from './pages/LanguageLearning/StatisticsPage';
+import TodayPlanPage from './pages/TodayPlan/today-plan-page.tsx';
 import ReviewPlannerPage from './pages/ReviewPlanner/review-planner-page';
 import './styles/App.css';
 
@@ -25,6 +26,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/practice" element={<Practice />} />
+            <Route path="/today-plan" element={<TodayPlanPage />} />
             <Route path="/language-learning" element={<LanguageLearning />} />
             <Route path="/learning-session/:wordbookId" element={<LearningSessionPage />} />
             <Route path="/statistics" element={<StatisticsPage />} />
