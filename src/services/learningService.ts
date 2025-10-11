@@ -105,6 +105,368 @@ export async function createLearningSessionForWordbook(wordbookId: number, userI
   return learningSession;
 }
 
+/**
+ * 从 TodayPlan 启动跨词书全局学习会话
+ * 将 plan.items 映射为 LearningItem，并交由 MemoryLearningManager 生成会话
+ */
+export async function startSessionFromTodayPlan(params: {
+  userId: string;
+  plan: {
+    items: Array<{ id: string; wordId: number; wordbookId: number; word: string }>;
+  };
+  targetDurationSeconds?: number; // 可选，会话目标时长
+}): Promise<LearningSession> {
+  const { userId, plan } = params;
+  const db = await getDB();
+
+  // 获取详细字段（type/phonetic/definition/example 及 progress）
+  const ids = (plan.items || []).map(i => i.wordId).filter(n => Number.isFinite(n));
+  let rows: any[] = [];
+  if (ids.length > 0) {
+    const placeholders = ids.map(() => '?').join(',');
+    rows = await db.exec({
+      sql: `
+        SELECT
+          w.id, w.word, w.type, w.phonetic, w.definition, w.example, w.createdAt,
+          lp.stability, lp.retrievability, lp.difficulty, lp.nextReview, lp.lastReview, lp.state
+        FROM words w
+        JOIN learning_progress lp ON w.id = lp.wordId
+        WHERE w.userId = ? AND w.id IN (${placeholders})
+        ORDER BY lp.retrievability ASC, lp.nextReview ASC
+      `,
+      args: [userId, ...ids],
+    });
+  }
+
+  const learningItems: LearningItem[] = rows.map((row: any) => ({
+    id: String(row.id),
+    content: row.word,
+    type: row.type as LearningItemType,
+    difficulty: row.difficulty,
+    createdAt: new Date(row.createdAt),
+    details: {
+      phonetic: row.phonetic,
+      definition: row.definition,
+      example: row.example,
+      stability: row.stability,
+      retrievability: row.retrievability,
+      state: row.state,
+    }
+  } as any));
+
+  // 拉取最近学习日志
+  const wordIds = learningItems.map(item => Number(item.id));
+  let studyRecords: StudyRecord[] = [];
+  if (wordIds.length > 0) {
+    const placeholders = wordIds.map(() => '?').join(',');
+    const logs = await db.exec({
+      sql: `SELECT * FROM study_logs WHERE itemId IN (${placeholders}) ORDER BY timestamp DESC LIMIT 200`,
+      args: wordIds,
+    });
+
+    studyRecords = logs.map((log: any) => ({
+      itemId: String(log.itemId),
+      timestamp: new Date(log.timestamp as string),
+      response: log.response as 'again' | 'hard' | 'good' | 'easy',
+      responseTime: log.responseTime as number,
+      confidence: log.confidence as number,
+    }));
+  }
+
+  // 初始化管理器
+  const manager = new MemoryLearningManager({
+    fsrsParams: { requestRetention: 0.9, maximumInterval: 36500 },
+    adaptiveConfig: { minDifficulty: 0.1, maxDifficulty: 0.9, adaptationRate: 0.1 },
+    retrievalConfig: {
+      maxSessionDuration: params.targetDurationSeconds || 1800,
+      targetCognitiveLoad: 0.7,
+      interleaveTypes: true
+    },
+  });
+
+  const learningSession = await manager.createLearningSession(
+    userId,
+    learningItems,
+    studyRecords,
+    [] // mockSessions
+  );
+
+  // 回填 details
+  const detailsById = new Map(learningItems.map(li => [li.id, (li as any).details]));
+  (learningSession.items as any[]).forEach(si => {
+    const itemId = si.item?.id;
+    if (itemId && detailsById.has(itemId)) {
+      si.item.details = detailsById.get(itemId);
+    }
+  });
+
+  (learningSession as any).userId = userId;
+  (learningSession as any).manager = manager;
+
+  return learningSession;
+}
+
+/** 今日计划类型（仅服务内部使用） */
+interface TodayPlan {
+  generatedAt: string;
+  dailyQuota: number;
+  perWordbookQuota: Array<{
+    wordbookId: number;
+    wordbookName?: string;
+    quota: number;
+    dueCount: number;
+    upcomingCount: number;
+  }>;
+  items: Array<{
+    id: string;
+    wordId: number;
+    wordbookId: number;
+    word: string;
+    nextReview: string;
+    retrievability?: number;
+    state?: 'new'|'learning'|'review'|'relearning';
+  }>;
+}
+
+/**
+ * 生成全局“今日计划”：按到期量比例 + 最小保障分配每日配额，并按 retrievability 选取
+ */
+export async function getTodayPlan(params: {
+  userId: string;
+  dailyQuota: number;
+  includeUpcoming?: boolean; // false=仅到期；true=含24h内
+}): Promise<TodayPlan> {
+  const { userId } = params;
+  const dailyQuota = Math.max(1, Math.min(500, params.dailyQuota || 60));
+  const includeUpcoming = !!params.includeUpcoming;
+  const timeWindowHours = includeUpcoming ? 24 : 0;
+
+  // 拉取分组统计（到期/24h内）
+  const grouped = await getReviewQueueGroupedByWordbook({
+    userId,
+    timeWindowHours,
+    page: 1,
+    pageSize: 1000
+  });
+
+  const groups = grouped.items || [];
+  const diList = groups.map(g => Number(g.dueCount || 0));
+  const dTotal = diList.reduce((acc, n) => acc + n, 0);
+
+  // 若无到期项，直接返回空计划
+  if (dTotal === 0) {
+    return {
+      generatedAt: new Date().toISOString(),
+      dailyQuota,
+      perWordbookQuota: groups.map(g => ({
+        wordbookId: g.wordbookId,
+        wordbookName: g.wordbookName || '',
+        quota: 0,
+        dueCount: Number(g.dueCount || 0),
+        upcomingCount: Number(g.upcomingCount || 0),
+      })),
+      items: []
+    };
+  }
+
+  // 初始比例分配
+  let quotas = groups.map(g => ({
+    wordbookId: g.wordbookId,
+    wordbookName: g.wordbookName || '',
+    dueCount: Number(g.dueCount || 0),
+    upcomingCount: Number(g.upcomingCount || 0),
+    quota: 0
+  }));
+
+  let allocated = 0;
+  quotas.forEach(q => {
+    const share = Math.round((dailyQuota * q.dueCount) / dTotal);
+    q.quota = Math.min(share, q.dueCount);
+    allocated += q.quota;
+  });
+
+  // 处理取整误差：超分则减，未满则补
+  const adjust = (delta: number) => {
+    if (delta > 0) {
+      // 需要减少
+      for (let i = 0; i < quotas.length && delta > 0; i++) {
+        const q = quotas[i];
+        if (q.quota > 0) {
+          q.quota -= 1;
+          delta -= 1;
+        }
+      }
+    } else if (delta < 0) {
+      // 需要增加
+      delta = -delta;
+      for (let i = 0; i < quotas.length && delta > 0; i++) {
+        const q = quotas[i];
+        if (q.quota < q.dueCount) {
+          q.quota += 1;
+          delta -= 1;
+        }
+      }
+    }
+  };
+  adjust(allocated - dailyQuota);
+
+  // 最小保障：有到期但 q=0 的词书，至少分配1（若还有剩余空间）
+  for (let i = 0; i < quotas.length; i++) {
+    const q = quotas[i];
+    if (q.dueCount > 0 && q.quota === 0 && allocated < dailyQuota) {
+      q.quota = 1;
+      allocated += 1;
+    }
+  }
+  // 若超过总配额，再次回退
+  adjust(allocated - dailyQuota);
+
+  // 选取具体词条：按 retrievability 从低到高（undefined 置后）
+  const items: TodayPlan['items'] = [];
+  for (const q of quotas) {
+    if (q.quota <= 0) continue;
+    const res = await getDueItems({
+      userId,
+      wordbookId: q.wordbookId,
+      includeUpcoming,
+      page: 1,
+      pageSize: Math.max(50, q.quota) // 拉取足够多以排序
+    });
+    const sorted = [...(res.items || [])].sort((a, b) => {
+      const ra = typeof a.retrievability === 'number' ? a.retrievability! : Number.POSITIVE_INFINITY;
+      const rb = typeof b.retrievability === 'number' ? b.retrievability! : Number.POSITIVE_INFINITY;
+      return ra - rb;
+    });
+    const picked = sorted.slice(0, q.quota);
+    picked.forEach(p => {
+      items.push({
+        id: p.id,
+        wordId: Number(p.id),
+        wordbookId: q.wordbookId,
+        word: p.word,
+        nextReview: p.nextReview,
+        retrievability: p.retrievability
+      });
+    });
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    dailyQuota,
+    perWordbookQuota: quotas,
+    items
+  };
+}
+
+/**
+ * 聚合当日学习日志，并计算各词书的 masteredCount 与 progress（百分比）
+ * 注：掌握判定：state='review' 且 retrievability ≥ 0.85（可后续调整）
+ */
+export async function aggregateDailyStudyAndUpdateProgress(params: {
+  userId: string;
+  date?: string; // YYYY-MM-DD（可选，默认当天）
+}): Promise<{ updatedWordbooks: Array<{ wordbookId: number; masteredCount: number; progress: number }> }> {
+  const db = await getDB();
+  const { userId } = params;
+  const nowIso = new Date().toISOString();
+  const todayStr = (params.date || nowIso.split('T')[0]);
+
+  // 收集当天学习的唯一词ID
+  const logs = await db.exec({
+    sql: `
+      SELECT DISTINCT itemId 
+      FROM study_logs 
+      WHERE userId = ? AND timestamp LIKE ?
+    `,
+    args: [userId, `${todayStr}%`],
+  });
+  const studiedWordIds: number[] = (logs || []).map((r: any) => Number(r.itemId)).filter(n => Number.isFinite(n));
+  if (studiedWordIds.length === 0) {
+    // 无当日学习，返回当前进度快照
+    const wbRows = await db.exec({
+      sql: `
+        SELECT w.wordbookId AS wordbookId
+        FROM words w
+        WHERE w.userId = ?
+        GROUP BY w.wordbookId
+      `,
+      args: [userId],
+    });
+    const updatedWordbooks: Array<{ wordbookId: number; masteredCount: number; progress: number }> = [];
+    for (const r of wbRows) {
+      const wid = Number(r.wordbookId);
+      const wcRows = await db.exec({
+        sql: `
+          SELECT COUNT(*) AS cnt
+          FROM learning_progress lp
+          JOIN words w ON w.id = lp.wordId
+          WHERE lp.userId = ? AND w.wordbookId = ?
+        `,
+        args: [userId, wid],
+      });
+      const mcRows = await db.exec({
+        sql: `
+          SELECT COUNT(*) AS cnt
+          FROM learning_progress lp
+          JOIN words w ON w.id = lp.wordId
+          WHERE lp.userId = ? AND w.wordbookId = ? AND lp.state = 'review' AND lp.retrievability >= 0.85
+        `,
+        args: [userId, wid],
+      });
+      const wordCount = Number(wcRows[0]?.cnt || 0);
+      const masteredCount = Number(mcRows[0]?.cnt || 0);
+      const progress = wordCount > 0 ? (masteredCount / wordCount) * 100 : 0;
+      updatedWordbooks.push({ wordbookId: wid, masteredCount, progress });
+    }
+    return { updatedWordbooks };
+  }
+
+  // 映射：词ID -> 词书ID
+  const placeholders = studiedWordIds.map(() => '?').join(',');
+  const wbMapRows = await db.exec({
+    sql: `
+      SELECT id, wordbookId
+      FROM words
+      WHERE id IN (${placeholders}) AND userId = ?
+    `,
+    args: [...studiedWordIds, userId],
+  });
+  const wordToBook = new Map<number, number>();
+  (wbMapRows || []).forEach((r: any) => {
+    wordToBook.set(Number(r.id), Number(r.wordbookId));
+  });
+
+  // 计算每个词书的总词数与掌握数
+  const updatedWordbooks: Array<{ wordbookId: number; masteredCount: number; progress: number }> = [];
+  const uniqueBooks = new Set<number>(Array.from(wordToBook.values()));
+  for (const wid of uniqueBooks) {
+    const wcRows = await db.exec({
+      sql: `
+        SELECT COUNT(*) AS cnt
+        FROM learning_progress lp
+        JOIN words w ON w.id = lp.wordId
+        WHERE lp.userId = ? AND w.wordbookId = ?
+      `,
+      args: [userId, wid],
+    });
+    const mcRows = await db.exec({
+      sql: `
+        SELECT COUNT(*) AS cnt
+        FROM learning_progress lp
+        JOIN words w ON w.id = lp.wordId
+        WHERE lp.userId = ? AND w.wordbookId = ? AND lp.state = 'review' AND lp.retrievability >= 0.85
+      `,
+      args: [userId, wid],
+    });
+    const wordCount = Number(wcRows[0]?.cnt || 0);
+    const masteredCount = Number(mcRows[0]?.cnt || 0);
+    const progress = wordCount > 0 ? (masteredCount / wordCount) * 100 : 0;
+    updatedWordbooks.push({ wordbookId: wid, masteredCount, progress });
+  }
+
+  return { updatedWordbooks };
+}
+
 export async function processStudyResponse(
   session: LearningSession,
   itemId: string,

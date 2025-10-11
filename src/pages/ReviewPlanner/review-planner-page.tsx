@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Card, Row, Col, Switch, Button, Segmented, Table, Pagination, Empty, Typography, Space, message, Grid } from "antd";
 import { ReloadOutlined, PlayCircleOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { getReviewQueueGroupedByWordbook, getDueItems, createLearningSessionForWordbookExtended } from "@/services/learningService";
+import { getReviewQueueGroupedByWordbook, getDueItems, createLearningSessionForWordbookExtended, getTodayPlan, aggregateDailyStudyAndUpdateProgress } from "@/services/learningService";
 import { useAppStore } from "@/store/useAppStore";
 
 const { Title, Text } = Typography;
@@ -60,6 +60,8 @@ export default function ReviewPlannerPage() {
     const isMobile = !screens.md;
 
     const timeWindowHours = includeUpcoming ? 24 : 0;
+
+    const [todayPlanPreview, setTodayPlanPreview] = useState<{ quota: number; totalItems: number; perBook: Array<{ id: number; name: string; q: number }> } | null>(null);
 
     const fetchGroups = async () => {
         setGroupsLoading(true);
@@ -183,6 +185,42 @@ export default function ReviewPlannerPage() {
                             <Space>
                                 <Title level={4} style={{ margin: 0 }}>复习计划（FSRS 间隔驱动）</Title>
                                 <Button icon={<ReloadOutlined />} onClick={fetchGroups}>刷新</Button>
+                                <Button onClick={async () => {
+                                    try {
+                                        const dailyQuota = 60; // 默认每日配额
+                                        const plan = await getTodayPlan({ userId, dailyQuota, includeUpcoming });
+                                        const perBook = (plan.perWordbookQuota || []).map(p => ({ id: p.wordbookId, name: (p as any).wordbookName || `词书 #${p.wordbookId}`, q: p.quota }));
+                                        setTodayPlanPreview({ quota: plan.dailyQuota, totalItems: plan.items.length, perBook });
+                                        message.success(`今日计划已生成：${plan.items.length}/${plan.dailyQuota}`);
+                                    } catch (e) {
+                                        console.error(e);
+                                        message.error("生成今日计划失败");
+                                    }
+                                }}>生成今日计划</Button>
+                                <Button onClick={async () => {
+                                    try {
+                                        const res = await aggregateDailyStudyAndUpdateProgress({ userId });
+                                        const count = res.updatedWordbooks.length;
+                                        message.success(`已更新 ${count} 个词书的进度`);
+                                        fetchGroups();
+                                    } catch (e) {
+                                        console.error(e);
+                                        message.error("更新进度失败");
+                                    }
+                                }}>更新进度</Button>
+                                <Button type="primary" onClick={async () => {
+                                    try {
+                                        const dailyQuota = 60;
+                                        const plan = await getTodayPlan({ userId, dailyQuota, includeUpcoming });
+                                        // 存入 sessionStorage 供全局会话页读取
+                                        sessionStorage.setItem('todayPlan', JSON.stringify(plan));
+                                        message.success(`已为今日生成 ${plan.items.length}/${plan.dailyQuota} 项，即将进入全局会话`);
+                                        navigate('/learning-session/global');
+                                    } catch (e) {
+                                        console.error(e);
+                                        message.error("启动全局会话失败");
+                                    }
+                                }}>开始今日计划（全局）</Button>
                             </Space>
                             <Space>
                                 <Text>包含24小时内即将到期</Text>
@@ -190,6 +228,20 @@ export default function ReviewPlannerPage() {
                             </Space>
                         </Space>
                         <div style={{ marginTop: 12 }}>
+                            {todayPlanPreview && (
+                                <Card size="small" style={{ marginTop: 12 }}>
+                                    <Space direction="vertical" style={{ width: "100%" }}>
+                                        <Text>今日配额：{todayPlanPreview.quota} 项 · 已选取：{todayPlanPreview.totalItems}</Text>
+                                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                            {todayPlanPreview.perBook.map(pb => (
+                                                <span key={pb.id} style={{ background: "#f5f5f5", padding: "4px 8px", borderRadius: 8 }}>
+                                                    {pb.name}: {pb.q}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </Space>
+                                </Card>
+                            )}
                             {isMobile ? (
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
                                     {groups.map((g) => (

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Flashcard } from '@/components/language-learning/Flashcard';
 import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col, Modal } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
-import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews } from '@/services/learningService';
+import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews, startSessionFromTodayPlan } from '@/services/learningService';
 import { importWordbook } from '@/services/wordbookService';
 import { useAppStore } from '@/store/useAppStore';
 type SetLastWordbookId = (id: string) => void;
@@ -39,8 +39,23 @@ const LearningSessionPage: React.FC = () => {
 
     async function setupSession() {
       try {
-        const newSession = await createLearningSessionForWordbook(Number(wordbookId), userId);
-        setSession(newSession);
+        if (wordbookId === 'global') {
+          const raw = sessionStorage.getItem('todayPlan');
+          if (!raw) {
+            setError('未找到今日计划，请先在复习计划页生成。');
+          } else {
+            const plan = JSON.parse(raw);
+            const s = await startSessionFromTodayPlan({
+              userId,
+              plan,
+              targetDurationSeconds: 1800
+            });
+            setSession(s);
+          }
+        } else {
+          const newSession = await createLearningSessionForWordbook(Number(wordbookId), userId);
+          setSession(newSession);
+        }
       } catch (e: any) {
         setError(`Failed to create learning session: ${e.message}`);
       } finally {
