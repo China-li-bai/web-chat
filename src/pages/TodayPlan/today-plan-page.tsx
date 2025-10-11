@@ -72,11 +72,16 @@ export default function TodayPlanPage() {
     loadPlanFromStorage();
   }, []);
 
-  // 加载“我的奖励”列表
+  // 加载“我的奖励”列表（兼容同步/异步返回）
   useEffect(() => {
-    getUserRewards({ userId })
-      .then((list: any) => setRewards(Array.isArray(list) ? list : []))
-      .catch(console.error);
+    const res: any = getUserRewards({ userId } as any);
+    if (res && typeof res.then === "function") {
+      (res as Promise<any[]>)
+        .then((list) => setRewards(Array.isArray(list) ? list : []))
+        .catch(console.error);
+    } else {
+      setRewards(Array.isArray(res) ? res : []);
+    }
   }, [userId]);
 
   // 读取 streak（优先 store，其次 localStorage）
@@ -115,7 +120,10 @@ export default function TodayPlanPage() {
     { title: "单词", dataIndex: "word", key: "word" },
     { title: "词书ID", dataIndex: "wordbookId", key: "wordbookId", width: 100 },
     { title: "下一次复习", dataIndex: "nextReview", key: "nextReview", width: 200, render: (v: string) => new Date(v).toLocaleString() },
-    { title: "可提取性", dataIndex: "retrievability", key: "retrievability", width: 140, render: (v: number | undefined) => v === undefined ? "-" : `${Math.round(v * 100)}%` },
+    { title: "可提取性", dataIndex: "retrievability", key: "retrievability", width: 140, render: (v: number | undefined) => {
+      const color = v === undefined ? "default" : (v >= 0.8 ? "green" : (v >= 0.6 ? "blue" : (v >= 0.4 ? "orange" : "red")));
+      return <Tag color={color}>{v === undefined ? "-" : `${Math.round(v * 100)}%`}</Tag>;
+    } },
   ];
 
   return (
@@ -246,7 +254,9 @@ export default function TodayPlanPage() {
                             <Space wrap>
                               <Tag>{`词书 #${it.wordbookId}`}</Tag>
                               <Tag color="default">{new Date(it.nextReview).toLocaleString()}</Tag>
-                              <Tag color="success">{it.retrievability === undefined ? "-" : `${Math.round(it.retrievability * 100)}%`}</Tag>
+                              <Tag color={it.retrievability === undefined ? "default" : (it.retrievability >= 0.8 ? "green" : (it.retrievability >= 0.6 ? "blue" : (it.retrievability >= 0.4 ? "orange" : "red")))}>
+                                {it.retrievability === undefined ? "-" : `${Math.round(it.retrievability * 100)}%`}
+                              </Tag>
                             </Space>
                           </Space>
                         </Card>
