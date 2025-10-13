@@ -1,30 +1,46 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Button, Typography } from 'antd';
 
 const { Title, Paragraph, Text } = Typography;
 
-export interface SpellingQuestionProps {
-  targetWord: string;
-  definition: string;
+export interface ClozeSpellingQuestionProps {
+  word: string;
+  sentence?: string; // 例句优先
+  definition?: string; // 无例句时作为提示
   onResult: (ok: boolean) => void;
 }
 
 /**
- * 拼写题（占位加强版）
- * - 即时反馈：输入框边框与提示文案
- * - 提交方式：Enter 或按钮
- * - 容错：大小写/首尾空格无关
+ * 拼写填空题
+ * - 将例句中的目标单词隐藏为下划线，用户输入单词作答
+ * - 即时反馈：输入过程前缀匹配提示与边框颜色
+ * - 提交：Enter 或按钮；大小写/首尾空格无关
  */
-export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, definition, onResult }) => {
+export const ClozeSpellingQuestion: React.FC<ClozeSpellingQuestionProps> = ({ word, sentence, definition, onResult }) => {
   const [value, setValue] = useState('');
   const [submitted, setSubmitted] = useState<null | boolean>(null);
 
-  const normalizedTarget = useMemo(
-    () => (targetWord || '').trim().toLowerCase(),
-    [targetWord]
-  );
+  const normalizedTarget = useMemo(() => (word || '').trim().toLowerCase(), [word]);
 
-  // 计算相似度（简易 Levenshtein 距离转相似度）
+  // 例句中隐藏目标词为下划线（大小写不敏感），若例句未包含该词则在末尾附加空格
+  const clozeText = useMemo(() => {
+    const target = normalizedTarget;
+    const src = (sentence || '').trim();
+    if (!src || !target) return '';
+    try {
+      const esc = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`\\b${esc}\\b`, 'gi');
+      const blanks = '_'.repeat(target.length);
+      const replaced = src.replace(re, blanks);
+      if (replaced === src) return `${src}  ——  ${blanks}`;
+      return replaced;
+    } catch {
+      const blanks = '_'.repeat(target.length);
+      return `${src}  ——  ${blanks}`;
+    }
+  }, [sentence, normalizedTarget]);
+
+  // 简易相似度与逐字高亮（与 SpellingQuestion 保持一致风格）
   const similarityInfo = useMemo(() => {
     const a = value.trim().toLowerCase();
     const b = normalizedTarget;
@@ -45,7 +61,6 @@ export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, 
     const dist = dp[a.length][b.length];
     const maxLen = Math.max(a.length, b.length) || 1;
     const score = Math.max(0, Math.round((1 - dist / maxLen) * 100));
-    // 简易逐字高亮：正确字符绿色，错误字符红色
     const highlighted = (
       <span>
         {Array.from(b).map((ch, idx) => {
@@ -57,40 +72,46 @@ export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, 
     return { score, highlighted };
   }, [value, normalizedTarget]);
 
+  const trimmed = value.trim().toLowerCase();
+  const liveOk = trimmed.length > 0 && normalizedTarget.startsWith(trimmed);
+  const borderColor = submitted === null ? (liveOk ? '#91d5ff' : '#d9d9d9') : submitted ? '#52c41a' : '#ff4d4f';
+
   const check = useCallback(() => {
-    const ok = value.trim().toLowerCase() === normalizedTarget;
+    const ok = trimmed === normalizedTarget;
     setSubmitted(ok);
     onResult(ok);
     try {
       if (navigator.vibrate) navigator.vibrate(ok ? 10 : 30);
     } catch {}
-  }, [value, normalizedTarget, onResult]);
-
-  const trimmed = value.trim().toLowerCase();
-  const liveOk = trimmed.length > 0 && normalizedTarget.startsWith(trimmed);
-  const borderColor = submitted === null ? (liveOk ? '#91d5ff' : '#d9d9d9') : submitted ? '#52c41a' : '#ff4d4f';
+  }, [trimmed, normalizedTarget, onResult]);
 
   return (
-    <div className="spelling-card">
-      <Title level={3} style={{ textAlign: 'center' }}>拼写该单词</Title>
-      <Paragraph type="secondary" style={{ textAlign: 'center' }}>
-        {definition || 'Definition hidden'}
-      </Paragraph>
+    <div className="cloze-spelling-card">
+      <Title level={3} style={{ textAlign: 'center' }}>拼写填空</Title>
+      {clozeText ? (
+        <Paragraph style={{ textAlign: 'center', fontSize: 16 }}>{clozeText}</Paragraph>
+      ) : (
+        <Paragraph type="secondary" style={{ textAlign: 'center' }}>
+          {definition ? `提示：${definition}` : '请根据提示输入单词'}
+        </Paragraph>
+      )}
+
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
         <input
           value={value}
           onChange={(e) => { setValue(e.target.value); setSubmitted(null); }}
-          placeholder="输入拼写并回车"
+          placeholder="输入缺失的单词并回车"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="none"
           spellCheck={false}
           style={{ flex: 1, padding: '10px 12px', fontSize: 16, border: `1px solid ${borderColor}`, borderRadius: 6 }}
           onKeyDown={(e) => { if ((e as any).key === 'Enter') check(); }}
-          aria-label="spelling-input"
+          aria-label="cloze-spelling-input"
         />
         <Button type="primary" onClick={check}>提交</Button>
       </div>
+
       <div style={{ marginTop: 8, textAlign: 'center' }}>
         {submitted === null ? (
           <>
@@ -109,7 +130,7 @@ export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, 
           <Text type="success">正确！</Text>
         ) : (
           <>
-            <Text type="danger">不正确，答案：{targetWord}</Text>
+            <Text type="danger">不正确，答案：{word}</Text>
             <div style={{ marginTop: 6, fontSize: 12, color: '#888' }}>
               相似度：{similarityInfo.score}%&nbsp;|&nbsp;目标：{similarityInfo.highlighted}
             </div>
@@ -120,4 +141,4 @@ export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, 
   );
 };
 
-export default SpellingQuestion;
+export default ClozeSpellingQuestion;

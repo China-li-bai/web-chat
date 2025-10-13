@@ -6,6 +6,7 @@ import ErrorBoundary from '@/components/LanguageLearning/ErrorBoundary';
 import { ChoiceQuestion } from '@/components/language-learning/ChoiceQuestion';
 import { SpellingQuestion } from '@/components/language-learning/SpellingQuestion';
 import { ListeningQuestion } from '@/components/language-learning/ListeningQuestion';
+import { ClozeSpellingQuestion } from '@/components/language-learning/ClozeSpellingQuestion';
 
 // 懒加载组件
 const SessionEndFeedback = lazy(() => import('../../components/LanguageLearning/SessionEndFeedback'));
@@ -17,6 +18,7 @@ import { importWordbook } from '@/services/wordbookService';
 import { useAppStore } from '@/store/useAppStore';
 import './LearningSessionPage.css';
 import { selectNextQuestionType, type QuestionType } from '@/modules/qts';
+import { selectNextFromFsrs } from '@/modules/fsrs/select-next';
 
 type SetLastWordbookId = (id: string) => void;
 import type { ScheduledItem } from '@/lib/memo/types';
@@ -261,7 +263,46 @@ const LearningSessionPage: React.FC = () => {
 
     try {
       if (currentItemIndex < activeItems.length - 1) {
-        setCurrentItemIndex((prev)=>prev + 1);
+        // 优先使用 FSRS 队列选择器决定下一题，失败回退顺序 +1
+        try {
+          const candidates = itemsSource.map((it, idx) => {
+            const ms: any = (it as any)?.memoryStrength || {};
+            // 简单分类：无记忆强度视为新词，否则视为复习（学习中暂视为复习）
+            const kind: 'review' | 'learning' | 'new' = ms && Object.keys(ms).length > 0 ? 'review' : 'new';
+            // 兼容多来源 due 字段
+            const dueAt = (ms?.nextReview || ms?.dueDate || ms?.newDueDate || (it as any)?.dueAt) as Date | string | undefined;
+            const stability = typeof ms?.stability === 'number' ? ms.stability : undefined;
+            const difficulty = typeof ms?.difficulty === 'number' ? ms.difficulty : undefined;
+            const lapses = typeof ms?.lapses === 'number' ? ms.lapses : undefined;
+            const lastRating = (ms?.lastRating || undefined) as any;
+            return {
+              id: String((it as any)?.item?.id ?? idx),
+              kind,
+              fsrs: { dueAt, stability, difficulty, lapses, lastRating }
+            };
+          });
+          const res = selectNextFromFsrs({
+            items: candidates,
+            currentIndex: currentItemIndex,
+            session: {
+              now: new Date(),
+              newCount: summaryCounts.mastered + summaryCounts.shaky + summaryCounts.forgotten - (sessionStats.total || 0) > 0 ? 0 : 0, // 最小实现：先置 0，后续与设置页联动
+              reviewCount: sessionStats.total,
+              learningCount: 0,
+              seenToday: sessionStats.total
+            }
+          });
+          if (res && typeof res.index === 'number' && res.index >= 0 && res.index < itemsSource.length) {
+            // eslint-disable-next-line no-console
+            console.debug('[FSRS] next index', { from: currentItemIndex, to: res.index, reason: res.reason, parts: res.debug });
+            setCurrentItemIndex(res.index);
+          } else {
+            setCurrentItemIndex((prev)=>prev + 1);
+          }
+        } catch (e) {
+          console.error('FSRS selection error, fallback +1', e);
+          setCurrentItemIndex((prev)=>prev + 1);
+        }
         setIsFlipped(false);
       } else {
         // 使用本地最终值，避免因状态异步导致提示显示上一拍的数据
@@ -713,11 +754,20 @@ const LearningSessionPage: React.FC = () => {
               )}
 
               {questionType === 'spelling' && (
-                <SpellingQuestion
-                  targetWord={String(((currentItem as any)?.item?.content) || '')}
-                  definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
-                  onResult={(ok) => handleResponse(ok ? 'good' : 'again')}
-                />
+                ((currentItem as any)?.item?.details?.example) ? (
+                  <ClozeSpellingQuestion
+                    word={String(((currentItem as any)?.item?.content) || '')}
+                    sentence={String((((currentItem as any)?.item?.details)?.example) || '')}
+                    definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                    onResult={(ok) => handleResponse(ok ? 'good' : 'again')}
+                  />
+                ) : (
+                  <SpellingQuestion
+                    targetWord={String(((currentItem as any)?.item?.content) || '')}
+                    definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                    onResult={(ok) => handleResponse(ok ? 'good' : 'again')}
+                  />
+                )
               )}
 
               {questionType === 'listening' && (
