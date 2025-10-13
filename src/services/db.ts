@@ -90,6 +90,28 @@ const CREATE_TABLE_STATEMENTS = [
 ];
 
 let dbInstance: Database | null = null;
+let hasTriedReset = false;
+
+function isMalformedError(e: any): boolean {
+  const msg = String(e?.message || e || '').toLowerCase();
+  return msg.includes('malformed') || msg.includes('disk image is malformed');
+}
+
+async function deleteIndexedDB(dbName: string): Promise<void> {
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase(dbName);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error || new Error('indexedDB delete error'));
+      req.onblocked = () => {
+        // 依然 resolve，避免卡住；通常刷新页面可解除 blocked
+        resolve();
+      };
+    });
+  } catch (err) {
+    console.warn('IndexedDB delete failed (ignored):', err);
+  }
+}
 
 /**
  * Runs database migrations to update the schema.
@@ -190,24 +212,45 @@ export async function getDB(): Promise<Database> {
   }
 
   const dbName = 'language-learning.db';
-  const db = await BasicDatabase.init(dbName);
 
-  for (const sql of CREATE_TABLE_STATEMENTS) {
-    try {
+  async function initOnce(): Promise<Database> {
+    const db = await BasicDatabase.init(dbName);
+
+    for (const sql of CREATE_TABLE_STATEMENTS) {
       await db.exec({ sql });
-    } catch (e) {
-      console.error(`Failed to execute schema statement for db ${dbName}`, e);
-      console.error('Statement: ', sql);
-      throw e;
     }
+
+    await migrateDB(db);
+    await migrateWordsUniqueConstraint(db);
+    return db;
   }
 
-  // After ensuring tables exist, run migrations to add columns.
-  await migrateDB(db);
-
-  // Ensure unique constraint on words includes userId
-  await migrateWordsUniqueConstraint(db);
-
-  dbInstance = db;
-  return dbInstance;
+  try {
+    const db = await initOnce();
+    dbInstance = db;
+    return dbInstance!;
+  } catch (e: any) {
+    // 捕获“disk image is malformed”并自愈一次
+    if (!hasTriedReset && isMalformedError(e)) {
+      console.warn('Database is malformed. Attempting self-heal reset for IndexedDB:', dbName, e?.message);
+      hasTriedReset = true;
+      try {
+        // 关闭旧连接（若有）
+        try { if (dbInstance && typeof (dbInstance as any).close === 'function') await (dbInstance as any).close(); } catch {}
+        dbInstance = null;
+        // 删除 IndexedDB 库
+        await deleteIndexedDB(dbName);
+        // 重建
+        const db = await initOnce();
+        dbInstance = db;
+        // 轻量提示（不依赖 UI 组件，避免循环依赖）
+        try { console.warn('Database has been reset and rebuilt due to corruption.'); } catch {}
+        return dbInstance!;
+      } catch (e2) {
+        console.error('Database self-heal reset failed:', e2);
+        throw e2;
+      }
+    }
+    throw e;
+  }
 }

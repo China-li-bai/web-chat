@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { Button, Typography, Space } from 'antd';
-import { generateDistractors, stableSeedFromWord } from '@/utils/distractor';
+import { generateDistractors, stableSeedFromWord, buildMCQ } from '@/utils/distractor';
 
 const { Title, Paragraph } = Typography;
 
@@ -8,6 +8,9 @@ export interface ChoiceQuestionProps {
   word: string;
   definition: string;
   onAnswer: (ok: boolean) => void;
+  retrievability?: number;          // 当前条目检索性（0~1）
+  rollingAccuracy?: number;         // 最近窗口滚动准确率（0~1）
+  allowHint?: boolean;              // 是否允许使用提示（默认：高难度 L3 禁用）
 }
 
 /**
@@ -15,30 +18,21 @@ export interface ChoiceQuestionProps {
  * - 稳定随机：基于 word 的哈希作为种子，避免重渲染导致选项顺序抖动
  * - 按钮点击后禁用，提供轻微振动反馈
  */
-export const ChoiceQuestion: React.FC<ChoiceQuestionProps> = ({ word, definition, onAnswer }) => {
+export const ChoiceQuestion: React.FC<ChoiceQuestionProps> = ({ word, definition, onAnswer, retrievability, rollingAccuracy, allowHint }) => {
   const [answered, setAnswered] = useState(false);
 
-  const { opts, correctIndex } = useMemo(() => {
-    const correct = definition || 'No definition provided.';
+  const { opts, correctIndex, level } = useMemo(() => {
     const seed = stableSeedFromWord(word);
-    const distractors = generateDistractors(definition, seed, 3);
-    const combined = [correct, ...distractors].slice(0, 4);
-
-    // 稳定随机：再基于 seed 做一次洗牌
-    const shuffled = combined
-      .map((v, i) => ({ v, i }))
-      .sort((a, b) => ((seed >> (a.i % 16)) & 0xffff) - ((seed >> (b.i % 16)) & 0xffff))
-      .map(x => x.v);
-
-    const correctIdx = shuffled.findIndex((v) => v === correct);
-    return { opts: shuffled, correctIndex: correctIdx };
-  }, [word, definition]);
+    const mcq = buildMCQ(definition, seed, retrievability, rollingAccuracy);
+    return { opts: mcq.options, correctIndex: mcq.correctIndex, level: mcq.level };
+  }, [word, definition, retrievability, rollingAccuracy]);
 
   const [eliminated, setEliminated] = useState<number | null>(null);
   const [hintUsed, setHintUsed] = useState(false);
+  const canUseHint = (allowHint ?? level !== 'L3');
 
   const useHint = useCallback(() => {
-    if (hintUsed) return;
+    if (hintUsed || !canUseHint) return;
     const candidates = opts
       .map((_, i) => i)
       .filter(i => i !== correctIndex && i !== eliminated);
@@ -49,7 +43,7 @@ export const ChoiceQuestion: React.FC<ChoiceQuestionProps> = ({ word, definition
       setHintUsed(true);
       try { if (navigator.vibrate) navigator.vibrate(15); } catch {}
     }
-  }, [opts, correctIndex, eliminated, hintUsed, word]);
+  }, [opts, correctIndex, eliminated, hintUsed, word, canUseHint]);
 
   const handleClick = useCallback(
     (idx: number) => {
@@ -69,7 +63,7 @@ export const ChoiceQuestion: React.FC<ChoiceQuestionProps> = ({ word, definition
       <Title level={3} style={{ textAlign: 'center' }}>选择正确释义</Title>
       <Paragraph style={{ textAlign: 'center', marginBottom: 16 }}>{word}</Paragraph>
       <Space style={{ marginBottom: 8 }}>
-        <Button size="small" onClick={useHint} disabled={hintUsed || opts.length - (eliminated !== null ? 1 : 0) <= 2}>
+        <Button size="small" onClick={useHint} disabled={!canUseHint || hintUsed || opts.length - (eliminated !== null ? 1 : 0) <= 2}>
           提示（消除一个错误项）
         </Button>
       </Space>

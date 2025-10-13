@@ -75,3 +75,78 @@ export function generateDistractors(definition: string, seed: number, count = 3)
 export function stableSeedFromWord(word: string): number {
   return hashString(word || 'seed');
 }
+
+// 内部小工具：按 seed 取前 n 个
+function pick<T>(arr: T[], n: number, seed: number): T[] {
+  if (!arr || arr.length === 0) return [];
+  const shuffled = seededShuffle(arr, seed);
+  return shuffled.slice(0, Math.min(n, arr.length));
+}
+
+// 模板族：相近/相反/模糊（轻量，无外部词典）
+function genNearSynLike(definition: string): string[] {
+  const keys = extractKeywords(definition);
+  if (keys.length === 0) return [];
+  const k = keys[0];
+  return [
+    `A meaning closely related to ${k}, but not exact.`,
+    `A similar definition to ${k} with a different focus.`,
+    `An approximate sense around ${k}.`,
+  ];
+}
+
+function genOppositeLike(definition: string): string[] {
+  const keys = extractKeywords(definition);
+  if (keys.length === 0) return [];
+  const k = keys[0];
+  return [
+    `A meaning opposite to ${k}.`,
+    `A contrasting concept against ${k}.`,
+  ];
+}
+
+function genVague(definition: string): string[] {
+  const keys = extractKeywords(definition);
+  if (keys.length === 0) {
+    return ['A broad, ambiguous definition.', 'An unclear, generic meaning.'];
+  }
+  const k = keys[0];
+  return [
+    `A broad and vague idea about ${k}.`,
+    `An imprecise description vaguely involving ${k}.`,
+  ];
+}
+
+// 依据检索性与滚动准确率挑选难度等级
+export function pickLevel(R?: number, rollingAcc?: number): 'L1'|'L2'|'L3' {
+  let level: 'L1'|'L2'|'L3' = 'L2';
+  if (typeof R === 'number') {
+    if (R < 0.6) level = 'L1';
+    else if (R >= 0.85) level = 'L3';
+    else level = 'L2';
+  }
+  if (typeof rollingAcc === 'number') {
+    if (rollingAcc < 0.7 && level !== 'L1') level = 'L1';
+    if (rollingAcc > 0.9 && level !== 'L3') level = 'L3';
+  }
+  return level;
+}
+
+// 构建选择题（4选1）：返回 options、correctIndex、level
+export function buildMCQ(definition: string, seed: number, R?: number, rollingAcc?: number) {
+  const level = pickLevel(R, rollingAcc);
+  const correct = definition || 'No definition provided.';
+  const near = genNearSynLike(definition);
+  const opp = genOppositeLike(definition);
+  const vague = genVague(definition);
+
+  let distractors: string[] = [];
+  if (level === 'L1') distractors = pick(vague, 3, seed);
+  if (level === 'L2') distractors = [...pick(near, 1, seed), ...pick(vague, 2, seed + 1)];
+  if (level === 'L3') distractors = [...pick(near, 2, seed), ...pick(opp, 1, seed + 2)];
+
+  const combined = [correct, ...distractors].slice(0, 4);
+  const options = seededShuffle(combined, seed);
+  const correctIndex = options.findIndex(v => v === correct);
+  return { options, correctIndex, level };
+}

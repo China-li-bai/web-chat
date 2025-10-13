@@ -35,6 +35,14 @@ const LearningSessionPage: React.FC = () => {
   const [showSummary, setShowSummary] = useState(false);
   const [showEndFeedback, setShowEndFeedback] = useState(false);
   const [summaryCounts, setSummaryCounts] = useState({ mastered: 0, shaky: 0, forgotten: 0 });
+  // 最近回答滚动窗口（最多50条），用于自适应难度
+  const [rolling, setRolling] = useState<boolean[]>([]);
+  const rollingAccuracy = useMemo(() => {
+    if (!rolling.length) return undefined as number | undefined;
+    const n = Math.min(20, rolling.length);
+    const slice = rolling.slice(-n);
+    return slice.reduce((a, b) => a + (b ? 1 : 0), 0) / n;
+  }, [rolling]);
   const [summaryItems, setSummaryItems] = useState<Array<{ id: string; content: string; response: 'again'|'hard'|'good'|'easy'; retrievability: number; nextReview?: Date }>>([]);
   const [summaryStats, setSummaryStats] = useState<{ estimatedRetention: number; cognitiveLoad: number } | null>(null);
   const [activeItems, setActiveItems] = useState<ScheduledItem[]>([]);
@@ -167,6 +175,11 @@ const LearningSessionPage: React.FC = () => {
         correct: prev.correct + (isCorrect ? 1 : 0),
         total: prev.total + 1
       }));
+      // 更新滚动准确率窗口（最多保留50条）
+      setRolling(prev => {
+        const next = [...prev, isCorrect];
+        return next.length > 50 ? next.slice(-50) : next;
+      });
       
       // Update local summary counts by response category
       setSummaryCounts(prev => ({
@@ -570,6 +583,8 @@ const LearningSessionPage: React.FC = () => {
                 <ChoiceQuestion
                   word={String(((currentItem as any)?.item?.content) || '')}
                   definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                  retrievability={(currentItem as any)?.memoryStrength?.retrievability}
+                  rollingAccuracy={rollingAccuracy}
                   onAnswer={(ok) => handleResponse(ok ? 'good' : 'again')}
                 />
               )}
