@@ -9,8 +9,8 @@ import { ListeningQuestion } from '@/components/language-learning/ListeningQuest
 
 // 懒加载组件
 const SessionEndFeedback = lazy(() => import('../../components/LanguageLearning/SessionEndFeedback'));
-import { Button, Space, Spin, Result, Typography, message, Progress, Select } from 'antd';
-import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
+import { Button, Space, Spin, Result, Typography, message, Progress, Select, Tag, Tooltip } from 'antd';
+import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews, startSessionFromTodayPlan } from '@/services/learningService';
 import { evaluateRewardsOnEvent, addDailyFocusProgress } from '@/services/rewardService';
 import { importWordbook } from '@/services/wordbookService';
@@ -486,17 +486,17 @@ const LearningSessionPage: React.FC = () => {
 
 
 
-  const questionType: QuestionType = useMemo(() => {
+  const qtsDecision = useMemo(() => {
     try {
-      if (questionMode === 'flashcard-only') return 'flashcard';
-
-      // 混合模式保持原有固定轮换，确保可预期
+      if (questionMode === 'flashcard-only') {
+        return { type: 'flashcard' as QuestionType, difficultyTarget: 'medium' as const, reason: 'fixed: flashcard-only', debug: null };
+      }
       const baseCycle: QuestionType[] = ['flashcard', 'choice', 'spelling', 'listening'];
       if (questionMode === 'mixed') {
-        return baseCycle[currentItemIndex % baseCycle.length];
+        const t = baseCycle[currentItemIndex % baseCycle.length];
+        return { type: t, difficultyTarget: 'medium' as const, reason: 'fixed: mixed cycle', debug: null };
       }
-
-      // 自适应：调用本地 QTS
+      // 自适应：调用模块 QTS
       const decision = selectNextQuestionType({
         currentItem,
         currentItemIndex,
@@ -504,8 +504,6 @@ const LearningSessionPage: React.FC = () => {
         rollingAcc: rollingAccuracy,
         recentRTs: responseTimesRef.current
       });
-
-      // 输出决策理由与调参信息
       console.debug('[QTS] decision', {
         index: currentItemIndex,
         word: String(((currentItem as any)?.item?.content) || ''),
@@ -514,24 +512,28 @@ const LearningSessionPage: React.FC = () => {
         reason: decision.reason,
         debug: decision.debug
       });
-
-      return decision.type;
+      return decision;
     } catch (err) {
       console.error('QTS select failed, fallback to baseline:', err);
-      // 回退到稳定基线选择（原逻辑的近似）
+      // 回退：近似原基线
       const ms: any = (currentItem as any)?.memoryStrength || {};
       const r = typeof ms.retrievability === 'number' ? ms.retrievability : undefined;
       const stType = (currentItem as any)?.strategy?.type as string | undefined;
+      let t: QuestionType;
       if (typeof r === 'number') {
-        if (r < 0.6) return 'spelling';
-        if (r < 0.85) return 'choice';
-        return (currentItemIndex % 4 === 3) ? 'listening' : 'flashcard';
-      }
-      if (stType === 'free_recall') return 'spelling';
-      if (stType === 'recognition') return 'choice';
-      return (currentItemIndex % 5 === 4) ? 'listening' : 'flashcard';
+        if (r < 0.6) t = 'spelling';
+        else if (r < 0.85) t = 'choice';
+        else t = (currentItemIndex % 4 === 3) ? 'listening' : 'flashcard';
+      } else if (stType === 'free_recall') t = 'spelling';
+      else if (stType === 'recognition') t = 'choice';
+      else t = (currentItemIndex % 5 === 4) ? 'listening' : 'flashcard';
+      return { type: t, difficultyTarget: 'medium' as const, reason: 'fallback baseline', debug: null };
     }
   }, [questionMode, currentItem, currentItemIndex, segmentPolicy.weights, rollingAccuracy]);
+
+  const questionType: QuestionType = qtsDecision.type;
+  const qtsDifficultyTarget = qtsDecision.difficultyTarget;
+  const qtsReason = qtsDecision.reason;
 
 
 
@@ -627,8 +629,17 @@ const LearningSessionPage: React.FC = () => {
                   size="small"
                 />
               </div>
-              <div className="session-progress-text">
-                {currentItemIndex + 1} / {itemsSource.length} · {currentStrategyDisplay}
+              <div className="session-progress-text" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>{currentItemIndex + 1} / {itemsSource.length} · {currentStrategyDisplay}</span>
+                {questionMode === 'adaptive' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Tag color="geekblue">{qtsDifficultyTarget}</Tag>
+                    <Tag>{questionType}</Tag>
+                    <Tooltip title={qtsReason}>
+                      <QuestionCircleOutlined style={{ color: '#8c8c8c' }} />
+                    </Tooltip>
+                  </span>
+                )}
               </div>
             </div>
             
