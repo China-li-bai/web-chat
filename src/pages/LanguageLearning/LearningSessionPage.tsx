@@ -16,6 +16,7 @@ import { evaluateRewardsOnEvent, addDailyFocusProgress } from '@/services/reward
 import { importWordbook } from '@/services/wordbookService';
 import { useAppStore } from '@/store/useAppStore';
 import './LearningSessionPage.css';
+import { selectNextQuestionType, type QuestionType } from '@/modules/qts';
 
 type SetLastWordbookId = (id: string) => void;
 import type { ScheduledItem } from '@/lib/memo/types';
@@ -465,62 +466,72 @@ const LearningSessionPage: React.FC = () => {
   const [questionMode, setQuestionMode] = useState<QuestionMode>('mixed');
 
   // 题型决定：按模式/难度自适应
-  type QuestionType = 'flashcard' | 'choice' | 'spelling' | 'listening';
+  // QTS 最小配置与选择器（本地版）；异常时回退原顺序逻辑
+  const qtsConfig = {
+    weights: { due: 0.4, newBudget: 0.2, diff: 0.2, fatigue: 0.1, streak: 0.1 },
+    dailyNewTarget: 30,
+  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   const questionType: QuestionType = useMemo(() => {
-    if (questionMode === 'flashcard-only') return 'flashcard';
+    try {
+      if (questionMode === 'flashcard-only') return 'flashcard';
 
-    // 基础映射（混合模式固定轮换）
-    const baseCycle: QuestionType[] = ['flashcard', 'choice', 'spelling', 'listening'];
-    if (questionMode === 'mixed') {
-      return baseCycle[currentItemIndex % baseCycle.length];
-    }
-
-    // adaptive：先根据检索性/策略做基线决策，再叠加段级配比权重进行“稳定加权”选择
-    const ms: any = (currentItem as any)?.memoryStrength || {};
-    const r = typeof ms.retrievability === 'number' ? ms.retrievability : undefined;
-    const stType = (currentItem as any)?.strategy?.type as string | undefined;
-
-    let baseline: QuestionType;
-    if (typeof r === 'number') {
-      if (r < 0.6) baseline = 'spelling';
-      else if (r < 0.85) baseline = 'choice';
-      else baseline = (currentItemIndex % 4 === 3) ? 'listening' : 'flashcard';
-    } else if (stType === 'free_recall') {
-      baseline = 'spelling';
-    } else if (stType === 'recognition') {
-      baseline = 'choice';
-    } else {
-      baseline = (currentItemIndex % 5 === 4) ? 'listening' : 'flashcard';
-    }
-
-    // 段级权重稳定选择：按当前 index 做简易可复现随机，按权重落桶
-    const w = segmentPolicy.weights;
-    const buckets: Array<{ t: QuestionType; w: number }> = [
-      { t: 'flashcard', w: w.flashcard },
-      { t: 'choice', w: w.choice },
-      { t: 'spelling', w: w.spelling },
-      { t: 'listening', w: w.listening },
-    ];
-    const total = buckets.reduce((s, b) => s + b.w, 0) || 1;
-    const normalized = buckets.map(b => ({ t: b.t, w: b.w / total }));
-
-    // 生成 0..1 稳定值：使用当前索引与词内容作为种子扰动
-    const seedStr = String(((currentItem as any)?.item?.content) || '') + ':' + currentItemIndex;
-    let hash = 2166136261 >>> 0;
-    for (let i = 0; i < seedStr.length; i++) { hash ^= seedStr.charCodeAt(i); hash = Math.imul(hash, 16777619) >>> 0; }
-    const rnd = (hash % 1000) / 1000;
-
-    let acc = 0;
-    for (const b of normalized) {
-      acc += b.w;
-      if (rnd <= acc) {
-        // 在选择的桶与基线之间做轻微偏置：如果差异很大，20% 概率回退到基线，保持语义合理性
-        if (b.t !== baseline && (hash & 0xf) < 3) return baseline;
-        return b.t;
+      // 混合模式保持原有固定轮换，确保可预期
+      const baseCycle: QuestionType[] = ['flashcard', 'choice', 'spelling', 'listening'];
+      if (questionMode === 'mixed') {
+        return baseCycle[currentItemIndex % baseCycle.length];
       }
+
+      // 自适应：调用本地 QTS
+      const decision = selectNextQuestionType({
+        currentItem,
+        currentItemIndex,
+        segmentWeights: segmentPolicy.weights,
+        rollingAcc: rollingAccuracy,
+        recentRTs: responseTimesRef.current
+      });
+
+      // 输出决策理由与调参信息
+      console.debug('[QTS] decision', {
+        index: currentItemIndex,
+        word: String(((currentItem as any)?.item?.content) || ''),
+        type: decision.type,
+        target: decision.difficultyTarget,
+        reason: decision.reason,
+        debug: decision.debug
+      });
+
+      return decision.type;
+    } catch (err) {
+      console.error('QTS select failed, fallback to baseline:', err);
+      // 回退到稳定基线选择（原逻辑的近似）
+      const ms: any = (currentItem as any)?.memoryStrength || {};
+      const r = typeof ms.retrievability === 'number' ? ms.retrievability : undefined;
+      const stType = (currentItem as any)?.strategy?.type as string | undefined;
+      if (typeof r === 'number') {
+        if (r < 0.6) return 'spelling';
+        if (r < 0.85) return 'choice';
+        return (currentItemIndex % 4 === 3) ? 'listening' : 'flashcard';
+      }
+      if (stType === 'free_recall') return 'spelling';
+      if (stType === 'recognition') return 'choice';
+      return (currentItemIndex % 5 === 4) ? 'listening' : 'flashcard';
     }
-    return baseline;
-  }, [questionMode, currentItem, currentItemIndex, segmentPolicy.weights]);
+  }, [questionMode, currentItem, currentItemIndex, segmentPolicy.weights, rollingAccuracy]);
 
 
 
