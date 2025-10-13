@@ -319,26 +319,29 @@ const LearningSessionPage: React.FC = () => {
     // 获取触摸结束位置
     const endX = e.changedTouches[0].clientX;
     const endY = e.changedTouches[0].clientY;
-    const moveDistance = Math.sqrt(
-      Math.pow(endX - touchStartPos.current.x, 2) + 
-      Math.pow(endY - touchStartPos.current.y, 2)
-    );
+    const dx = endX - touchStartPos.current.x;
+    const dy = endY - touchStartPos.current.y;
+    const moveDistance = Math.sqrt(dx * dx + dy * dy);
     
-    // 计算水平移动距离
-    const horizontalDistance = endX - touchStartPos.current.x;
+    const isSwipe = touchDuration < 500 && moveDistance > 50;
+    const isTap = touchDuration < 300 && moveDistance < 10;
     
-    // 检测滑动手势
-    if (touchDuration < 500 && Math.abs(horizontalDistance) > 50) {
-      // 水平滑动距离大于50px且时间小于500ms
-      if (horizontalDistance > 0) {
-        // 右滑
-        handleSwipeRight();
+    if (isSwipe) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // 水平滑动：左/右
+        if (dx > 0) handleSwipeRight();
+        else handleSwipeLeft();
       } else {
-        // 左滑
-        handleSwipeLeft();
+        // 垂直滑动：上滑=good，下滑=again；未翻面时先翻面
+        if (dy < 0) {
+          if (isFlipped) handleResponse('good');
+          else handleFlip();
+        } else {
+          if (isFlipped) handleResponse('again');
+          else handleFlip();
+        }
       }
-    } else if (touchDuration < 300 && moveDistance < 10) {
-      // 快速点击（小于300ms且移动距离小于10px）
+    } else if (isTap) {
       if (action) {
         action();
       }
@@ -347,7 +350,7 @@ const LearningSessionPage: React.FC = () => {
     // 重置触摸状态
     touchStartPos.current = null;
     touchStartTime.current = 0;
-  }, [handleSwipeLeft, handleSwipeRight]);
+  }, [isFlipped, handleFlip, handleSwipeLeft, handleSwipeRight, handleResponse]);
 
   // Derived memos must be declared before any early returns to keep hook order stable
   const currentStrategyDisplay = useMemo(() => {
@@ -375,6 +378,52 @@ const LearningSessionPage: React.FC = () => {
     sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0,
     [sessionStats.correct, sessionStats.total]
   );
+
+  // 题型轮换：flashcard/choice/spelling/listening（最小可执行占位）
+  type QuestionType = 'flashcard' | 'choice' | 'spelling' | 'listening';
+  const questionType: QuestionType = useMemo(() => {
+    const map: QuestionType[] = ['flashcard', 'choice', 'spelling', 'listening'];
+    return map[currentItemIndex % map.length];
+  }, [currentItemIndex]);
+
+  // 选择题选项（占位：正确释义 + 常见干扰项）
+  const choiceOptions = useMemo(() => {
+    const correct = ((currentItem as any)?.item?.details?.definition as string) || 'No definition provided.';
+    const pool = [
+      'A commonly confused term.',
+      'An unrelated concept.',
+      'A close but not exact meaning.'
+    ];
+    const opts = [correct, ...pool].slice(0, 4);
+    for (let i = opts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [opts[i], opts[j]] = [opts[j], opts[i]];
+    }
+    return opts;
+  }, [currentItem]);
+
+  // 拼写输入与校验（占位）
+  const [spellingInput, setSpellingInput] = useState('');
+  const checkSpelling = useCallback(() => {
+    const target = String((currentItem as any)?.item?.content || '');
+    const ok = spellingInput.trim().toLowerCase() === target.trim().toLowerCase();
+    handleResponse(ok ? 'good' : 'again');
+  }, [spellingInput, currentItem, handleResponse]);
+
+  // 听力：浏览器语音合成（占位）
+  const speakCurrent = useCallback(() => {
+    try {
+      const word = String((currentItem as any)?.item?.content || '');
+      if ('speechSynthesis' in window && word) {
+        const u = new SpeechSynthesisUtterance(word);
+        u.lang = 'en-US';
+        u.rate = 0.9;
+        window.speechSynthesis.speak(u);
+      }
+    } catch (e) {
+      console.error('speak failed', e);
+    }
+  }, [currentItem]);
 
   const segmentDots = useMemo(() => {
     try {
@@ -495,17 +544,85 @@ const LearningSessionPage: React.FC = () => {
             {segmentDots}
           </div>
           
-          {/* 卡片区域 */}
-          <div className="session-card-area">
+          {/* 卡片区域：按题型渲染 */}
+          <div
+            className="session-card-area"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={(e) => handleTouchEnd(e, () => { if (!isFlipped) handleFlip(); })}
+          >
             <ErrorBoundary fallback={<div className="card-error">卡片加载失败</div>}>
-              <LearningFlashcard
-                frontContent={frontContent}
-                backContent={backContent}
-                isFlipped={isFlipped}
-                onFlip={handleFlip}
-                onSwipeLeft={handleSwipeLeft}
-                onSwipeRight={handleSwipeRight}
-              />
+              {questionType === 'flashcard' && (
+                <LearningFlashcard
+                  frontContent={frontContent}
+                  backContent={backContent}
+                  isFlipped={isFlipped}
+                  onFlip={handleFlip}
+                  onSwipeLeft={handleSwipeLeft}
+                  onSwipeRight={handleSwipeRight}
+                />
+              )}
+
+              {questionType === 'choice' && (
+                <div className="choice-card">
+                  <Title level={3} style={{ textAlign: 'center' }}>选择正确释义</Title>
+                  <Paragraph style={{ textAlign: 'center', marginBottom: 16 }}>
+                    {(currentItem as any)?.item?.content}
+                  </Paragraph>
+                  <div className="choice-options" style={{ display: 'grid', gap: 12 }}>
+                    {choiceOptions.map((opt, idx) => (
+                      <Button
+                        key={idx}
+                        block
+                        onClick={() => {
+                          const correct = ((currentItem as any)?.item?.details?.definition || '').toString();
+                          const ok = opt === correct;
+                          handleResponse(ok ? 'good' : 'again');
+                        }}
+                      >
+                        {opt}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {questionType === 'spelling' && (
+                <div className="spelling-card">
+                  <Title level={3} style={{ textAlign: 'center' }}>拼写该单词</Title>
+                  <Paragraph type="secondary" style={{ textAlign: 'center' }}>
+                    {(currentItem as any)?.item?.details?.definition || 'Definition hidden'}
+                  </Paragraph>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <input
+                      value={spellingInput}
+                      onChange={(e) => setSpellingInput(e.target.value)}
+                      placeholder="输入拼写并回车"
+                      style={{ flex: 1, padding: '10px 12px', fontSize: 16 }}
+                      onKeyDown={(e) => { if ((e as any).key === 'Enter') checkSpelling(); }}
+                    />
+                    <Button type="primary" onClick={checkSpelling}>提交</Button>
+                  </div>
+                </div>
+              )}
+
+              {questionType === 'listening' && (
+                <div className="listening-card">
+                  <Title level={3} style={{ textAlign: 'center' }}>听写该单词</Title>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
+                    <Button onClick={speakCurrent}>播放发音</Button>
+                    <Button onClick={handleFlip}>显示答案</Button>
+                  </div>
+                  {isFlipped && (
+                    <div style={{ textAlign: 'center' }}>
+                      <Title level={4}>{(currentItem as any)?.item?.content}</Title>
+                      <Space>
+                        <Button danger onClick={() => handleResponse('again')}>没听出</Button>
+                        <Button type="primary" onClick={() => handleResponse('good')}>听出来了</Button>
+                      </Space>
+                    </div>
+                  )}
+                </div>
+              )}
             </ErrorBoundary>
           </div>
 
