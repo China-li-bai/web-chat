@@ -137,10 +137,7 @@ const LearningSessionPage: React.FC = () => {
     [activeItems, session]
   );
   
-  const currentItem = useMemo(() => 
-    itemsSource[currentItemIndex] as ScheduledItem & { item: { details?: any }},
-    [itemsSource, currentItemIndex]
-  );
+  const currentItem = useMemo(() => itemsSource[currentItemIndex], [itemsSource, currentItemIndex]);
 
   const handleResponse = useCallback(async (response: 'again' | 'hard' | 'good' | 'easy') => {
     
@@ -185,7 +182,9 @@ const LearningSessionPage: React.FC = () => {
       const retrievability = typeof ms.newRetrievability === 'number' ? ms.newRetrievability : (typeof ms.retrievability === 'number' ? ms.retrievability : 0);
       const nextReview: Date | undefined = ms.newDueDate || ms.nextReview;
       lastEntry = { id: String(currentItem.item.id), content: String(currentItem.item.content), response, retrievability, nextReview };
-      setSummaryItems(prev => [...prev, lastEntry]);
+      if (lastEntry) {
+        setSummaryItems(prev => [...prev, lastEntry]);
+      }
     } catch (e: any) {
       console.error(`Failed to process response: ${e.message}`);
       message.error('Failed to save your progress. Please try again.');
@@ -350,6 +349,53 @@ const LearningSessionPage: React.FC = () => {
     touchStartTime.current = 0;
   }, [handleSwipeLeft, handleSwipeRight]);
 
+  // Derived memos must be declared before any early returns to keep hook order stable
+  const currentStrategyDisplay = useMemo(() => {
+    const rawType = (currentItem as any)?.strategy?.type as string | undefined;
+    const rawDiff = (currentItem as any)?.strategy?.difficulty as string | undefined;
+    const currentStrategyLabel = rawType === 'recognition' ? '识别'
+      : rawType === 'cued_recall' ? '提示回忆'
+      : rawType === 'free_recall' ? '自由回忆'
+      : rawType === 'elaborative_retrieval' ? '精细回忆'
+      : '检索';
+    return rawDiff ? `${currentStrategyLabel} · ${rawDiff}` : currentStrategyLabel;
+  }, [currentItem]);
+
+  const progressPercent = useMemo(() =>
+    (itemsSource && itemsSource.length > 0) ? (currentItemIndex / itemsSource.length) * 100 : 0,
+    [itemsSource.length, currentItemIndex]
+  );
+
+  const sessionDuration = useMemo(() =>
+    Math.round((Date.now() - sessionStats.startTime) / 1000 / 60),
+    [sessionStats.startTime]
+  );
+
+  const accuracy = useMemo(() =>
+    sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0,
+    [sessionStats.correct, sessionStats.total]
+  );
+
+  const segmentDots = useMemo(() => {
+    try {
+      if (!itemsSource || itemsSource.length === 0) {
+        return [];
+      }
+      return Array.from({ length: Math.min(itemsSource.length, 10) }, (_, i) => {
+        let dotClass = 'segment-dot';
+        if (i < currentItemIndex) {
+          dotClass += ' completed';
+        } else if (i === currentItemIndex) {
+          dotClass += ' active';
+        }
+        return <div key={i} className={dotClass} />;
+      });
+    } catch (error) {
+      console.error('Error creating segment dots:', error);
+      return [];
+    }
+  }, [itemsSource.length, currentItemIndex]);
+
   if (isLoading) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><Spin size="large" tip="Loading session..." /></div>;
   }
@@ -384,52 +430,16 @@ const LearningSessionPage: React.FC = () => {
     </div>
   );
   
-  const currentStrategyDisplay = useMemo(() => {
-    const rawType = (currentItem as any)?.strategy?.type as string | undefined;
-    const rawDiff = (currentItem as any)?.strategy?.difficulty as string | undefined;
-    const currentStrategyLabel = rawType === 'recognition' ? '识别'
-      : rawType === 'cued_recall' ? '提示回忆'
-      : rawType === 'free_recall' ? '自由回忆'
-      : rawType === 'elaborative_retrieval' ? '精细回忆'
-      : '检索';
-    return rawDiff ? `${currentStrategyLabel} · ${rawDiff}` : currentStrategyLabel;
-  }, [currentItem]);
 
-  const progressPercent = useMemo(() => 
-    itemsSource.length > 0 ? (currentItemIndex / itemsSource.length) * 100 : 0,
-    [itemsSource.length, currentItemIndex]
-  );
 
-  const sessionDuration = useMemo(() => 
-    Math.round((Date.now() - sessionStats.startTime) / 1000 / 60),
-    [sessionStats.startTime]
-  );
 
-  const accuracy = useMemo(() => 
-    sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0,
-    [sessionStats.correct, sessionStats.total]
-  );
+
+
+
+
   
   // 创建分段进度指示器
-  const segmentDots = useMemo(() => {
-    try {
-      if (!itemsSource || itemsSource.length === 0) {
-        return [];
-      }
-      return Array.from({ length: Math.min(itemsSource.length, 10) }, (_, i) => {
-        let dotClass = 'segment-dot';
-        if (i < currentItemIndex) {
-          dotClass += ' completed';
-        } else if (i === currentItemIndex) {
-          dotClass += ' active';
-        }
-        return <div key={i} className={dotClass} />;
-      });
-    } catch (error) {
-      console.error('Error creating segment dots:', error);
-      return [];
-    }
-  }, [itemsSource.length, currentItemIndex]);
+
 
   return (
     <ErrorBoundary>
@@ -610,7 +620,8 @@ const LearningSessionPage: React.FC = () => {
             }}
             onScheduleNextReview={async () => {
               try {
-                const classify = (si: { response: 'again'|'hard'|'good'|'easy'; retrievability: number }) => {
+                type Category = 'mastered' | 'shaky' | 'forgotten';
+                const classify = (si: { response: 'again'|'hard'|'good'|'easy'; retrievability: number }): Category => {
                   if (si.response === 'again' || si.retrievability < 0.6) return 'forgotten';
                   if (si.response === 'hard' || (si.retrievability >= 0.6 && si.retrievability < 0.85)) return 'shaky';
                   return 'mastered';
@@ -621,7 +632,7 @@ const LearningSessionPage: React.FC = () => {
                   return;
                 }
                 
-                const planned = summaryItems.map(si => ({
+                const planned: { itemId: string; category: Category; nextReview: Date }[] = summaryItems.map(si => ({
                   itemId: String(si.id),
                   category: classify(si as any),
                   nextReview: si.nextReview ? si.nextReview : new Date(Date.now() + 24 * 60 * 60 * 1000)

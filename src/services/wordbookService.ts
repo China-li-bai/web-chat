@@ -64,15 +64,21 @@ async function seedFromFile(db: any, fileData: ImportFile, userId: string) {
 
   // Batch insert words and their learning progress
   for (const word of words) {
+    // 幂等插入 words
     await db.exec({
-      sql: 'INSERT INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?, ?)',
+      sql: 'INSERT OR IGNORE INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?, ?)',
       args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.example || null],
     });
-    const wordIdResult = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
-    const wordId = wordIdResult[0].id as number;
+    // 获取已存在或新插入的 wordId
+    const gotWordId = await db.exec({
+      sql: 'SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "word" = ?',
+      args: [wordbookId, word.word],
+    });
+    const wordId = gotWordId?.[0]?.id as number;
 
+    // 幂等插入 learning_progress（wordId 唯一）
     await db.exec({
-      sql: 'INSERT INTO "learning_progress" ("wordId", "userId", "nextReview") VALUES (?, ?, ?)',
+      sql: 'INSERT OR IGNORE INTO "learning_progress" ("wordId", "userId", "nextReview") VALUES (?, ?, ?)',
       args: [wordId, userId, new Date().toISOString()],
     });
   }
@@ -215,17 +221,21 @@ export async function importWordbook(jsonContent: string, userId: string): Promi
 
   // 3. Batch insert new words and their learning progress for the given user
   for (const word of data.words) {
-    // Insert word
+    // 幂等插入 words
     await db.exec({
-      sql: 'INSERT INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?, ?)',
+      sql: 'INSERT OR IGNORE INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?, ?)',
       args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.example || null],
     });
-    const wordIdResult = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
-    const wordId = wordIdResult[0].id as number;
+    // 获取已存在或新插入的 wordId
+    const gotWordId = await db.exec({
+      sql: 'SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "word" = ?',
+      args: [wordbookId, word.word],
+    });
+    const wordId = gotWordId?.[0]?.id as number;
 
-    // Create initial learning progress for the new word
+    // 幂等插入 learning_progress
     await db.exec({
-      sql: 'INSERT INTO "learning_progress" ("wordId", "userId", "nextReview") VALUES (?, ?, ?)',
+      sql: 'INSERT OR IGNORE INTO "learning_progress" ("wordId", "userId", "nextReview") VALUES (?, ?, ?)',
       args: [wordId, userId, new Date().toISOString()],
     });
   }

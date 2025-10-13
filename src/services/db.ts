@@ -105,6 +105,7 @@ async function migrateDB(db: Database) {
   for (const sql of migrationStatements) {
     try {
       await db.exec({ sql });
+
     } catch (e: any) {
       // Ignore "duplicate column name" error, which is expected if the migration has already run.
       if (!e.message.includes('duplicate column name')) {
@@ -119,6 +120,70 @@ async function migrateDB(db: Database) {
  * Initializes the database, creates tables if they don't exist,
  * and returns a database instance.
  */
+/**
+ * Ensure words table unique constraint includes userId so that different users
+ * can have the same word in the same wordbook without conflicts.
+ * This migration rebuilds the table safely if needed.
+ */
+async function migrateWordsUniqueConstraint(db: Database) {
+  // Check if the desired unique index exists
+  let hasDesired = false;
+  try {
+    const indices = await db.exec({ sql: "PRAGMA index_list('words')" });
+    if (Array.isArray(indices)) {
+      hasDesired = indices.some((i: any) => String(i.name) === 'idx_words_unique_book_user_word');
+    }
+  } catch {
+    // ignore
+  }
+  if (hasDesired) return;
+
+  try {
+    await db.exec({ sql: 'BEGIN' });
+
+    await db.exec({
+      sql: `
+      CREATE TABLE "words_new" (
+        "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+        "wordbookId" INTEGER NOT NULL,
+        "userId" TEXT NOT NULL,
+        "word" TEXT NOT NULL,
+        "type" TEXT NOT NULL DEFAULT 'vocabulary',
+        "phonetic" TEXT,
+        "definition" TEXT NOT NULL,
+        "example" TEXT,
+        "createdAt" TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY ("wordbookId") REFERENCES "wordbooks" ("id") ON DELETE CASCADE,
+        UNIQUE ("wordbookId","userId","word")
+      );
+    `
+    });
+
+    // Copy data; INSERT OR IGNORE to respect the new uniqueness if duplicates exist
+    await db.exec({
+      sql: `
+      INSERT OR IGNORE INTO "words_new"
+        ("id","wordbookId","userId","word","type","phonetic","definition","example","createdAt")
+      SELECT
+        "id","wordbookId","userId","word","type","phonetic","definition","example","createdAt"
+      FROM "words";
+    `
+    });
+
+    await db.exec({ sql: 'DROP TABLE "words";' });
+    await db.exec({ sql: 'ALTER TABLE "words_new" RENAME TO "words";' });
+
+    await db.exec({
+      sql: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_words_unique_book_user_word ON "words" ("wordbookId","userId","word");'
+    });
+
+    await db.exec({ sql: 'COMMIT' });
+  } catch (e) {
+    await db.exec({ sql: 'ROLLBACK' }).catch(() => {});
+    console.error('Migration migrateWordsUniqueConstraint failed', e);
+  }
+}
+
 export async function getDB(): Promise<Database> {
   if (dbInstance) {
     return dbInstance;
@@ -139,6 +204,9 @@ export async function getDB(): Promise<Database> {
 
   // After ensuring tables exist, run migrations to add columns.
   await migrateDB(db);
+
+  // Ensure unique constraint on words includes userId
+  await migrateWordsUniqueConstraint(db);
 
   dbInstance = db;
   return dbInstance;

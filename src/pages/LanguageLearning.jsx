@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card,
   Button,
@@ -40,6 +40,7 @@ import {
 import { MemoryLearningManager } from '../lib/memo/MemoryLearningManager';
 // 导入数据初始化服务
 import { initializeDatabase, isDatabaseInitialized } from '../services/dataInitService';
+import { useAppStore } from '../store/useAppStore';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -69,20 +70,29 @@ const LanguageLearning = () => {
   const [difficultyLevel, setDifficultyLevel] = useState('intermediate');
   const [sessionDuration, setSessionDuration] = useState(1800); // 30分钟
 
+  // 从全局状态获取 userId
+  const userId = useAppStore(state => state.userId);
+
   // 初始化记忆学习系统
+  const initRef = useRef(false);
   useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
     initializeSystem();
   }, []);
+
+  const withTimeout = (promise, ms) =>
+    Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
 
   const initializeSystem = async () => {
     try {
       setLoading(true);
       
       // 检查并初始化数据库
-      const isInitialized = await isDatabaseInitialized();
+      const isInitialized = await withTimeout(isDatabaseInitialized(), 15000);
       if (!isInitialized) {
         console.log('Initializing database with sample data...');
-        await initializeDatabase();
+        await withTimeout(initializeDatabase(userId), 30000);
         message.success('数据库初始化完成');
       }
       
@@ -222,7 +232,7 @@ const LanguageLearning = () => {
 
     setLoading(true);
     try {
-      const userId = 'user_001'; // 实际应用中应该从用户系统获取
+      // 使用全局 userId
       
       // 创建个性化学习会话
       const session = await memoryManager.createPersonalizedSession(

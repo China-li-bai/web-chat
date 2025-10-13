@@ -33,7 +33,7 @@ export const WordbookSelectionPage: React.FC = () => {
   useEffect(() => {
     if (!userId) return;
     (async () => {
-      await initializeDatabase(userId);
+      // initializeDatabase 统一在 LanguageLearning 首次进入时做，避免并发初始化
       await seedInitialData(userId);
       await loadWordbooks();
     })();

@@ -5,12 +5,12 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Home from './pages/Home';
 import Practice from './pages/Practice';
-import LanguageLearning from './pages/LanguageLearning/index.tsx';
+import LanguageLearning from './pages/LanguageLearning/index';
 import Progress from './pages/Progress';
 import Settings from './pages/Settings';
 import LearningSessionPage from './pages/LanguageLearning/LearningSessionPage';
 import StatisticsPage from './pages/LanguageLearning/StatisticsPage';
-import TodayPlanPage from './pages/TodayPlan/today-plan-page.tsx';
+import TodayPlanPage from './pages/TodayPlan/today-plan-page';
 import ReviewPlannerPage from './pages/ReviewPlanner/review-planner-page';
 import './styles/App.css';
 

@@ -44,24 +44,29 @@ async function insertSampleData(db: any, userId: string): Promise<void> {
       console.warn('Skipping word with missing content:', wordData);
       continue;
     }
+    // 幂等插入：忽略重复并查询已有ID
     await db.exec({
-      sql: `INSERT INTO words (wordbookId, userId, word, type, phonetic, definition, example)
+      sql: `INSERT OR IGNORE INTO words (wordbookId, userId, word, type, phonetic, definition, example)
             VALUES (?, ?, ?, ?, ?, ?, ?)`,
       args: [wbId, userId, wordData.word, 'vocabulary', wordData.phonetic || null, wordData.definition, wordData.example || null]
     });
-    const row = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
-    const newWordId = row[0].id as number;
+    const existing = await db.exec({
+      sql: 'SELECT id FROM words WHERE wordbookId = ? AND word = ?',
+      args: [wbId, wordData.word]
+    });
+    const newWordId = Number(existing?.[0]?.id);
 
     // Find corresponding progress data, if it exists
     const progress = sampleData.learningProgress.find(p => Number(p.itemId) === newWordId);
     
+    // 幂等插入学习进度（wordId 唯一）
     await db.exec({
-      sql: `INSERT INTO learning_progress (wordId, userId, nextReview, state, stability, difficulty, retrievability, reviewCount, lapseCount) 
+      sql: `INSERT OR IGNORE INTO learning_progress (wordId, userId, nextReview, state, stability, difficulty, retrievability, reviewCount, lapseCount) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        newWordId, 
-        userId, 
-        progress?.nextReview ?? new Date().toISOString(), 
+        newWordId,
+        userId,
+        progress?.nextReview ?? new Date().toISOString(),
         progress?.state ?? 'new',
         progress?.stability ?? 0,
         progress?.difficulty ?? 0.3,
