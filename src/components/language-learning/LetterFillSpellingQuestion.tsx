@@ -58,6 +58,7 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
   // 当前填入状态
   const [fills, setFills] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState<null | boolean>(null);
+  const [locked, setLocked] = useState<boolean>(false);
   const [activePos, setActivePos] = useState<number | null>(null);
 
   // 为每个空位生成候选字母：正确字母 + 干扰项
@@ -134,8 +135,11 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
   const check = useCallback(() => {
     const ok = composed.toLowerCase() === normalized.toLowerCase();
     setSubmitted(ok);
-    onResult(ok);
-    try { if (navigator.vibrate) navigator.vibrate(ok ? 10 : 30); } catch {}
+    setLocked(true);
+    try { if (navigator.vibrate) navigator.vibrate(ok ? 12 : 32); } catch {}
+    setTimeout(() => {
+      onResult(ok);
+    }, 1000);
   }, [composed, normalized, onResult]);
 
   // 翻面时自动填充正确答案并禁用继续选择
@@ -228,7 +232,7 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
                   size="small"
                   type={picked === o ? 'primary' : 'default'}
                   onClick={() => handlePick(pos, o)}
-                  disabled={!!isFlipped}
+                  disabled={!!isFlipped || locked}
                   style={{ minWidth: 36 }}
                 >
                   {o.toUpperCase()}
