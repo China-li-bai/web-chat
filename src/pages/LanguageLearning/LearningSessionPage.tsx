@@ -500,9 +500,18 @@ const LearningSessionPage: React.FC = () => {
     return rawDiff ? `${currentStrategyLabel} · ${rawDiff}` : currentStrategyLabel;
   }, [currentItem]);
 
+  const baseTotal = useMemo(() => {
+    try {
+      const total = (session && Array.isArray(session.items)) ? session.items.length : (itemsSource ? itemsSource.length : 0);
+      return total;
+    } catch {
+      return (itemsSource ? itemsSource.length : 0);
+    }
+  }, [session, itemsSource.length]);
+
   const progressPercent = useMemo(() =>
-    (itemsSource && itemsSource.length > 0) ? (currentItemIndex / itemsSource.length) * 100 : 0,
-    [itemsSource.length, currentItemIndex]
+    (baseTotal && baseTotal > 0) ? (currentItemIndex / baseTotal) * 100 : 0,
+    [baseTotal, currentItemIndex]
   );
 
   const sessionDuration = useMemo(() =>
@@ -684,7 +693,7 @@ const LearningSessionPage: React.FC = () => {
                 />
               </div>
               <div className="session-progress-text" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>{currentItemIndex + 1} / {itemsSource.length} · {currentStrategyDisplay}</span>
+                <span>{currentItemIndex + 1} / {baseTotal} · {currentStrategyDisplay}</span>
                 {questionMode === 'adaptive' && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <Tag color="geekblue">{qtsDifficultyTarget}</Tag>
@@ -709,7 +718,7 @@ const LearningSessionPage: React.FC = () => {
                 <div className="session-stat-label">分钟</div>
               </div>
               <div className="session-stat">
-                <div className="session-stat-value">{sessionStats.total}/{itemsSource.length}</div>
+                <div className="session-stat-value">{sessionStats.total}/{baseTotal}</div>
                 <div className="session-stat-label">进度</div>
               </div>
             </div>
