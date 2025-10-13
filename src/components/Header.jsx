@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layout, Avatar, Dropdown, Space, Typography } from 'antd';
 import { UserOutlined, LogoutOutlined, SettingOutlined } from '@ant-design/icons';
+import ThemeToggle from './ui/theme-toggle';
 
 const { Header: AntHeader } = Layout;
 const { Text } = Typography;
@@ -52,8 +53,8 @@ const Header = () => {
       className="app-header"
       style={{
         padding: '0 24px',
-        background: '#fff',
-        borderBottom: '1px solid #f0f0f0',
+        background: 'var(--background)',
+        borderBottom: '1px solid var(--border)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -68,6 +69,7 @@ const Header = () => {
       
       <div className="header-right">
         <Space size="middle">
+          <ThemeToggle />
           <Text type="secondary">今日练习时间: 25分钟</Text>
           <Dropdown
             menu={{

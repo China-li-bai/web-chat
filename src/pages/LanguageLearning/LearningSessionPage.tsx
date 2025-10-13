@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Flashcard } from '@/components/language-learning/Flashcard';
-import { Button, Space, Spin, Result, Typography, message, Progress, Card, Statistic, Row, Col, Modal } from 'antd';
+import { LearningFlashcard } from '@/components/language-learning/LearningFlashcard';
+import { SessionSummaryModal } from '@/components/language-learning/SessionSummaryModal';
+import { Button, Space, Spin, Result, Typography, message, Progress } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews, startSessionFromTodayPlan } from '@/services/learningService';
 import { evaluateRewardsOnEvent, addDailyFocusProgress } from '@/services/rewardService';
 import { importWordbook } from '@/services/wordbookService';
 import { useAppStore } from '@/store/useAppStore';
+import './LearningSessionPage.css';
+
 type SetLastWordbookId = (id: string) => void;
 import type { ScheduledItem } from '@/lib/memo/types';
 import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
@@ -72,6 +75,46 @@ const LearningSessionPage: React.FC = () => {
       setActiveItems(session.items);
     }
   }, [session]);
+
+  // 键盘事件处理
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (showSummary) return; // 总结模态框打开时不处理键盘事件
+      
+      if (!isFlipped) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          handleFlip();
+        }
+      } else {
+        switch (e.code) {
+          case 'Digit1':
+            e.preventDefault();
+            handleResponse('again');
+            break;
+          case 'Digit2':
+            e.preventDefault();
+            handleResponse('hard');
+            break;
+          case 'Digit3':
+            e.preventDefault();
+            handleResponse('good');
+            break;
+          case 'Digit4':
+            e.preventDefault();
+            handleResponse('easy');
+            break;
+          case 'Space':
+            e.preventDefault();
+            handleFlip();
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isFlipped, showSummary]);
 
   const handleFlip = () => {
     if (!isFlipped) {
@@ -162,7 +205,7 @@ const LearningSessionPage: React.FC = () => {
       } catch (err) {
         console.error('collect session stats failed', err);
       }
-      // 后台自动生成“下次复习词书”并写入 lastWordbookId（最小增量，弱项为主）
+      // 后台自动生成"下次复习词书"并写入 lastWordbookId（最小增量，弱项为主）
       try {
         const weakIds = new Set(
           (lastEntry ? [...summaryItems, lastEntry] : summaryItems)
@@ -238,217 +281,191 @@ const LearningSessionPage: React.FC = () => {
     : rawType === 'elaborative_retrieval' ? '精细回忆'
     : '检索';
   const currentStrategyDisplay = rawDiff ? `${currentStrategyLabel} · ${rawDiff}` : currentStrategyLabel;
-  const progressPercent = ()=>itemsSource.length > 0 ? (currentItemIndex / itemsSource.length) * 100 : 0;
+  const progressPercent = itemsSource.length > 0 ? (currentItemIndex / itemsSource.length) * 100 : 0;
   const sessionDuration = Math.round((Date.now() - sessionStats.startTime) / 1000 / 60);
   const accuracy = sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0;
   
+  // 创建分段进度指示器
+  const segmentDots = Array.from({ length: Math.min(itemsSource.length, 10) }, (_, i) => {
+    let dotClass = 'segment-dot';
+    if (i < currentItemIndex) {
+      dotClass += ' completed';
+    } else if (i === currentItemIndex) {
+      dotClass += ' active';
+    }
+    return <div key={i} className={dotClass} />;
+  });
+
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
-      {/* Header with stats */}
-      <Card style={{ margin: '16px', marginBottom: '24px' }}>
-        <Row align="middle" justify="space-between">
-          <Col>
-            <Button 
-              icon={<ArrowLeftOutlined />} 
-              onClick={() => navigate('/language-learning')}
-              type="text"
-            >
-              Back to Wordbooks
-            </Button>
-          </Col>
-          <Col flex={1} style={{ margin: '0 24px' }}>
-            <Progress 
-              percent={progressPercent()} 
-              showInfo={false} 
-              strokeColor="#1890ff"
-              size="small"
-            />
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-              {currentItemIndex + 1} of {itemsSource.length} words · Strategy: {currentStrategyDisplay}
-            </Text>
-          </Col>
-          <Col>
-            <Row gutter={16}>
-              <Col>
-                <Statistic
-                  title="Accuracy"
-                  value={accuracy}
-                  suffix="%"
-                  prefix={<TrophyOutlined />}
-                  valueStyle={{ fontSize: '16px', color: accuracy >= 80 ? '#52c41a' : accuracy >= 60 ? '#fa8c16' : '#ff4d4f' }}
-                />
-              </Col>
-              <Col>
-                <Statistic
-                  title="Time"
-                  value={sessionDuration}
-                  suffix="min"
-                  prefix={<ClockCircleOutlined />}
-                  valueStyle={{ fontSize: '16px' }}
-                />
-              </Col>
-              <Col>
-                <Statistic
-                  title="Progress"
-                  value={`${sessionStats.total}/${itemsSource.length}`}
-                  prefix={<BookOutlined />}
-                  valueStyle={{ fontSize: '16px' }}
-                />
-              </Col>
-            </Row>
-          </Col>
-        </Row>
-      </Card>
+    <div className="learning-session-container">
+      {/* 顶部状态栏 */}
+      <div className="session-header">
+        <div className="session-header-content">
+          <Button 
+            icon={<ArrowLeftOutlined />} 
+            onClick={() => navigate('/language-learning')}
+            type="text"
+          >
+            返回
+          </Button>
+          
+          <div className="session-progress">
+            <div className="session-progress-bar">
+              <Progress 
+                percent={progressPercent} 
+                showInfo={false} 
+                strokeColor="#1890ff"
+                size="small"
+              />
+            </div>
+            <div className="session-progress-text">
+              {currentItemIndex + 1} / {itemsSource.length} · {currentStrategyDisplay}
+            </div>
+          </div>
+          
+          <div className="session-stats">
+            <div className="session-stat">
+              <div className="session-stat-value" style={{ color: accuracy >= 80 ? '#52c41a' : accuracy >= 60 ? '#fa8c16' : '#ff4d4f' }}>
+                {accuracy}%
+              </div>
+              <div className="session-stat-label">准确率</div>
+            </div>
+            <div className="session-stat">
+              <div className="session-stat-value">{sessionDuration}</div>
+              <div className="session-stat-label">分钟</div>
+            </div>
+            <div className="session-stat">
+              <div className="session-stat-value">{sessionStats.total}/{itemsSource.length}</div>
+              <div className="session-stat-label">进度</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {/* Main learning area */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', minHeight: 'calc(100vh - 200px)' }}>
-      
-      <Flashcard
-        frontContent={frontContent}
-        backContent={backContent}
-        isFlipped={isFlipped}
-        onFlip={handleFlip}
-      />
+      {/* 主内容区域 */}
+      <div className="session-main">
+        {/* 分段进度指示器 */}
+        <div className="segment-indicator">
+          {segmentDots}
+        </div>
+        
+        {/* 卡片区域 */}
+        <div className="session-card-area">
+          <LearningFlashcard
+            frontContent={frontContent}
+            backContent={backContent}
+            isFlipped={isFlipped}
+            onFlip={handleFlip}
+          />
+        </div>
 
-        <div style={{ marginTop: '24px', width: '100%', maxWidth: '500px' }}>
+        {/* 操作按钮区域 */}
+        <div className="session-actions">
           {!isFlipped ? (
-            <Button type="primary" onClick={handleFlip} block size="large">
-              Show Answer
+            <Button 
+              type="primary" 
+              onClick={handleFlip} 
+              block 
+              size="large"
+              className="session-action-button"
+            >
+              显示答案 (空格键)
             </Button>
           ) : (
-            <Row gutter={8} style={{ width: '100%' }}>
-              <Col span={6}>
-                <Button danger onClick={() => handleResponse('again')} block size="large">
-                  Again
-                </Button>
-              </Col>
-              <Col span={6}>
-                <Button onClick={() => handleResponse('hard')} block size="large">
-                  Hard
-                </Button>
-              </Col>
-              <Col span={6}>
-                <Button type="primary" onClick={() => handleResponse('good')} block size="large">
-                  Good
-                </Button>
-              </Col>
-              <Col span={6}>
-                <Button type="primary" ghost onClick={() => handleResponse('easy')} block size="large">
-                  Easy
-                </Button>
-              </Col>
-            </Row>
+            <div className="session-response-buttons">
+              <Button 
+                danger 
+                onClick={() => handleResponse('again')} 
+                className="session-response-button again"
+              >
+                再学<br/>1
+              </Button>
+              <Button 
+                onClick={() => handleResponse('hard')} 
+                className="session-response-button hard"
+              >
+                困难<br/>2
+              </Button>
+              <Button 
+                type="primary" 
+                onClick={() => handleResponse('good')} 
+                className="session-response-button good"
+              >
+                掌握<br/>3
+              </Button>
+              <Button 
+                type="primary" 
+                ghost 
+                onClick={() => handleResponse('easy')} 
+                className="session-response-button easy"
+              >
+                简单<br/>4
+              </Button>
+            </div>
           )}
         </div>
       </div>
 
-      <Modal
-        open={showSummary}
-        title="学习总结"
-        onCancel={() => setShowSummary(false)}
-        footer={[
-          <Button key="micro" onClick={() => {
-            const weakIds = new Set(
-              summaryItems
-                .filter(si => si.response === 'hard' || si.response === 'again' || si.retrievability < 0.85)
-                .map(si => String(si.id))
-            );
-            const allItems = session?.items || [];
-            const weakItems = allItems.filter(si => weakIds.has(String(si.item.id)));
-            if (weakItems.length === 0) {
-              message.info('本次没有可复习的弱项，建议查看统计或返回词书。');
-            } else {
-              setActiveItems(weakItems);
-              setCurrentItemIndex(0);
-              setIsFlipped(false);
-              setSessionStats({ correct: 0, total: 0, startTime: Date.now() });
-              setShowSummary(false);
-              message.success(`已进入弱项微复习，共 ${weakItems.length} 个词`);
-            }
-          }}>
-            立即复习弱项
-          </Button>,
-          <Button key="plan" onClick={async () => {
-            const classify = (si: { response: 'again'|'hard'|'good'|'easy'; retrievability: number }) => {
-              if (si.response === 'again' || si.retrievability < 0.6) return 'forgotten';
-              if (si.response === 'hard' || (si.retrievability >= 0.6 && si.retrievability < 0.85)) return 'shaky';
-              return 'mastered';
-            };
-            const planned = summaryItems.map(si => ({
-              itemId: String(si.id),
-              category: classify(si as any),
-              nextReview: si.nextReview ? si.nextReview : new Date(Date.now() + 24 * 60 * 60 * 1000)
-            }));
-            try {
-              const res = await schedulePlannedReviews({
-                userId,
-                wordbookId: Number(wordbookId),
-                planned
-              });
-              message.success(`已安排下次复习（${res.updated} 项）`);
-            } catch (e: any) {
-              console.error(e);
-              message.error('安排复习失败，请稍后重试');
-            }
-          }}>
-            安排下次复习
-          </Button>,
-          <Button key="continue" type="primary" onClick={() => { setShowSummary(false); navigate('/language-learning'); }}>
-            继续学习
-          </Button>,
-          <Button key="stats" onClick={() => { setShowSummary(false); navigate('/statistics'); }}>
-            查看统计
-          </Button>,
-        ]}
-        bodyStyle={{ backdropFilter: 'blur(8px)' }}
-        style={{ background: 'rgba(255,255,255,0.6)' }}
-      >
-        <Row gutter={16}>
-          <Col span={8}>
-            <Statistic title="准确率" value={accuracy} suffix="%" />
-          </Col>
-          <Col span={8}>
-            <Statistic title="用时" value={sessionDuration} suffix="min" />
-          </Col>
-          <Col span={8}>
-            <Statistic title="总题数" value={sessionStats.total} />
-          </Col>
-        </Row>
-        <Row gutter={16} style={{ marginTop: 12 }}>
-          <Col span={12}>
-            <Card size="small" title="预计保持率">
-              <Text>{summaryStats ? `${Math.round(summaryStats.estimatedRetention * 100)}%` : '-'}</Text>
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card size="small" title="实际认知负荷">
-              <Text>{summaryStats ? Number(summaryStats.cognitiveLoad).toFixed(2) : '-'}</Text>
-            </Card>
-          </Col>
-        </Row>
-        <div style={{ marginTop: 8 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            提示：预计保持率基于本次正确率与实际认知负荷估算；若本次全错或未作答则显示 0%。实际认知负荷由题目难度、用时与错误率综合计算，范围 0–1（建议控制在 0.8 以下）。
-          </Text>
-        </div>
-        <Row gutter={16} style={{ marginTop: 16 }}>
-          <Col span={8}>
-            <Card size="small" title="已掌握">
-              <Text>{summaryCounts.mastered} 个</Text>
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small" title="生疏">
-              <Text>{summaryCounts.shaky} 个</Text>
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small" title="遗忘">
-              <Text>{summaryCounts.forgotten} 个</Text>
-            </Card>
-          </Col>
-        </Row>
-      </Modal>
+      {/* 学习总结模态框 */}
+      <SessionSummaryModal
+        visible={showSummary}
+        onClose={() => setShowSummary(false)}
+        accuracy={accuracy}
+        sessionDuration={sessionDuration}
+        totalItems={sessionStats.total}
+        summaryCounts={summaryCounts}
+        summaryStats={summaryStats}
+        onReviewWeakItems={() => {
+          const weakIds = new Set(
+            summaryItems
+              .filter(si => si.response === 'hard' || si.response === 'again' || si.retrievability < 0.85)
+              .map(si => String(si.id))
+          );
+          const allItems = session?.items || [];
+          const weakItems = allItems.filter(si => weakIds.has(String(si.item.id)));
+          if (weakItems.length === 0) {
+            message.info('本次没有可复习的弱项，建议查看统计或返回词书。');
+          } else {
+            setActiveItems(weakItems);
+            setCurrentItemIndex(0);
+            setIsFlipped(false);
+            setSessionStats({ correct: 0, total: 0, startTime: Date.now() });
+            setShowSummary(false);
+            message.success(`已进入弱项微复习，共 ${weakItems.length} 个词`);
+          }
+        }}
+        onScheduleNextReview={async () => {
+          const classify = (si: { response: 'again'|'hard'|'good'|'easy'; retrievability: number }) => {
+            if (si.response === 'again' || si.retrievability < 0.6) return 'forgotten';
+            if (si.response === 'hard' || (si.retrievability >= 0.6 && si.retrievability < 0.85)) return 'shaky';
+            return 'mastered';
+          };
+          const planned = summaryItems.map(si => ({
+            itemId: String(si.id),
+            category: classify(si as any),
+            nextReview: si.nextReview ? si.nextReview : new Date(Date.now() + 24 * 60 * 60 * 1000)
+          }));
+          try {
+            const res = await schedulePlannedReviews({
+              userId,
+              wordbookId: Number(wordbookId),
+              planned
+            });
+            message.success(`已安排下次复习（${res.updated} 项）`);
+          } catch (e: any) {
+            console.error(e);
+            message.error('安排复习失败，请稍后重试');
+          }
+        }}
+        onContinueLearning={() => { 
+          setShowSummary(false); 
+          navigate('/language-learning'); 
+        }}
+        onViewStatistics={() => { 
+          setShowSummary(false); 
+          navigate('/statistics'); 
+        }}
+      />
     </div>
   );
 };

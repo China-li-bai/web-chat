@@ -1,0 +1,123 @@
+/* LearningFlashcard组件样式 - 移动优先响应式设计 */
+
+.learning-flashcard-container {
+  perspective: 1000px;
+  width: 100%;
+  max-width: 500px;
+  height: 300px;
+  cursor: pointer;
+  position: relative;
+  margin: 0 auto;
+  /* 移动端优化 */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.learning-flashcard {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.learning-flashcard.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.flashcard-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  background: #fff;
+}
+
+.flashcard-back {
+  transform: rotateY(180deg);
+}
+
+.flashcard-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  overflow: auto;
+}
+
+.flashcard-hint {
+  position: absolute;
+  bottom: -30px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  color: #8c8c8c;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.learning-flashcard-container:hover .flashcard-hint {
+  opacity: 1;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .learning-flashcard-container {
+    height: 280px;
+    max-width: 90%;
+  }
+  
+  .flashcard-content {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .learning-flashcard-container {
+    height: 260px;
+    max-width: 95%;
+  }
+  
+  .flashcard-content {
+    padding: 16px;
+  }
+  
+  .flashcard-hint {
+    font-size: 11px;
+    bottom: -25px;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .flashcard-face {
+    background: #1f1f1f;
+    color: #fff;
+  }
+  
+  .flashcard-hint {
+    color: #a0a0a0;
+  }
+}
+
+/* 减少动画效果 */
+@media (prefers-reduced-motion: reduce) {
+  .learning-flashcard {
+    transition: none;
+  }
+  
+  .flashcard-hint {
+    transition: none;
+  }
+}

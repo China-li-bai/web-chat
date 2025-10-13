@@ -1,0 +1,263 @@
+/* SessionSummaryModal组件样式 - 移动优先响应式设计 */
+
+.session-summary-modal .ant-modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.session-summary-modal .ant-modal-header {
+  background: linear-gradient(135deg, #f0f5ff 0%, #e6f4ff 100%);
+  border-bottom: 1px solid #e6f4ff;
+  padding: 20px 24px;
+}
+
+.session-summary-modal .ant-modal-title {
+  font-weight: 600;
+  font-size: 18px;
+  color: #1a1a1a;
+}
+
+.summary-content {
+  padding: 8px 0;
+}
+
+.summary-stats {
+  margin-bottom: 20px;
+}
+
+.summary-stats .ant-statistic {
+  text-align: center;
+}
+
+.summary-stats .ant-statistic-title {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.summary-stats .ant-statistic-content {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.summary-metrics {
+  margin-bottom: 20px;
+}
+
+.metric-card {
+  border-radius: 12px;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  height: 100%;
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.metric-icon {
+  margin-right: 8px;
+  color: #1890ff;
+  font-size: 16px;
+}
+
+.metric-title {
+  font-size: 14px;
+  color: #595959;
+}
+
+.metric-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.metric-status {
+  font-size: 12px;
+  font-weight: normal;
+  margin-left: 8px;
+  opacity: 0.8;
+}
+
+.summary-distribution {
+  margin-bottom: 20px;
+}
+
+.distribution-card {
+  border-radius: 12px;
+  text-align: center;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  height: 100%;
+}
+
+.distribution-card.mastered {
+  background: linear-gradient(135deg, #f6ffed 0%, #e6f7ff 100%);
+  border-top: 3px solid #52c41a;
+}
+
+.distribution-card.shaky {
+  background: linear-gradient(135deg, #fffbe6 0%, #fff7e6 100%);
+  border-top: 3px solid #fa8c16;
+}
+
+.distribution-card.forgotten {
+  background: linear-gradient(135deg, #fff2f0 0%, #fff1f0 100%);
+  border-top: 3px solid #ff4d4f;
+}
+
+.distribution-value {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.distribution-label {
+  font-size: 14px;
+  color: #595959;
+}
+
+.summary-tip {
+  padding: 12px 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.action-button {
+  flex: 1;
+  min-width: 100px;
+  height: 40px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.action-button.primary {
+  background: #1890ff;
+  border-color: #1890ff;
+}
+
+.action-button.secondary {
+  background: #fff;
+  border-color: #d9d9d9;
+  color: #595959;
+}
+
+.action-button.secondary:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .session-summary-modal {
+    width: 95% !important;
+    margin: 0 auto;
+  }
+  
+  .summary-stats .ant-statistic-content {
+    font-size: 20px;
+  }
+  
+  .metric-value {
+    font-size: 18px;
+  }
+  
+  .distribution-value {
+    font-size: 20px;
+  }
+  
+  .summary-actions {
+    flex-direction: column;
+  }
+  
+  .action-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .session-summary-modal .ant-modal-header {
+    padding: 16px 20px;
+  }
+  
+  .summary-stats .ant-statistic-content {
+    font-size: 18px;
+  }
+  
+  .metric-value {
+    font-size: 16px;
+  }
+  
+  .distribution-value {
+    font-size: 18px;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .session-summary-modal .ant-modal-content {
+    background: #1f1f1f;
+    color: #fff;
+  }
+  
+  .session-summary-modal .ant-modal-header {
+    background: linear-gradient(135deg, #111b26 0%, #0a1628 100%);
+    border-bottom-color: #303030;
+  }
+  
+  .session-summary-modal .ant-modal-title {
+    color: #fff;
+  }
+  
+  .metric-card {
+    background: #262626;
+    border-color: #303030;
+  }
+  
+  .metric-title {
+    color: #a0a0a0;
+  }
+  
+  .metric-value {
+    color: #fff;
+  }
+  
+  .distribution-card {
+    background: #262626;
+  }
+  
+  .distribution-card.mastered {
+    background: linear-gradient(135deg, #162312 0%, #111b26 100%);
+  }
+  
+  .distribution-card.shaky {
+    background: linear-gradient(135deg, #2b2111 0%, #1f1a0f 100%);
+  }
+  
+  .distribution-card.forgotten {
+    background: linear-gradient(135deg, #2a1215 0%, #1f0f11 100%);
+  }
+  
+  .distribution-label {
+    color: #a0a0a0;
+  }
+  
+  .summary-tip {
+    background: #262626;
+  }
+  
+  .action-button.secondary {
+    background: #262626;
+    border-color: #434343;
+    color: #a0a0a0;
+  }
+}

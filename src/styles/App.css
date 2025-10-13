@@ -199,6 +199,80 @@
   color: #fff;
 }
 
+/* 深色模式样式 */
+.dark .app-layout {
+  background-color: #141414;
+  color: #fff;
+}
+
+.dark .sidebar {
+  background-color: #1f1f1f;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+}
+
+.dark .sidebar .logo {
+  background: #1f1f1f;
+  border-bottom: 1px solid #303030;
+  color: #1890ff;
+}
+
+.dark .sidebar .ant-menu {
+  background: #1f1f1f;
+  color: #fff;
+}
+
+.dark .sidebar .ant-menu-item {
+  color: #fff;
+}
+
+.dark .sidebar .ant-menu-item:hover {
+  background: #262626;
+}
+
+.dark .sidebar .ant-menu-item-selected {
+  background: #1890ff;
+  color: #fff;
+}
+
+.dark .sidebar .ant-menu-item-selected:hover {
+  background: #40a9ff;
+}
+
+.dark .app-header {
+  background: #1f1f1f;
+  border-bottom: 1px solid #303030;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dark .app-content {
+  background: #141414;
+}
+
+.dark .app-layout .ant-card {
+  background: #1f1f1f;
+  border-color: #303030;
+  color: #fff;
+}
+
+.dark .app-layout .ant-card-head {
+  background: #262626;
+  border-bottom: 1px solid #303030;
+}
+
+.dark .app-layout .ant-card-head-title {
+  color: #fff;
+}
+
+.dark .app-layout .ant-btn-primary {
+  background: #1890ff;
+  border-color: #1890ff;
+}
+
+.dark .app-layout .ant-btn-primary:hover {
+  background: #40a9ff;
+  border-color: #40a9ff;
+}
+
 /* 响应式布局 */
 @media (max-width: 768px) {
   .sidebar {

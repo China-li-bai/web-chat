@@ -1,0 +1,330 @@
+/* LearningSessionPage响应式CSS框架 - 移动优先设计 */
+
+/* 全局容器 */
+.learning-session-container {
+  min-height: 100vh;
+  background: #f0f2f5;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* 顶部状态栏 */
+.session-header {
+  background: #fff;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 16px;
+  margin-bottom: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.session-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.session-progress {
+  flex: 1;
+  margin: 0 16px;
+}
+
+.session-progress-bar {
+  margin-bottom: 4px;
+}
+
+.session-progress-text {
+  font-size: 12px;
+  color: #8c8c8c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.session-stat {
+  text-align: center;
+  min-width: 60px;
+}
+
+.session-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.session-stat-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 2px;
+}
+
+/* 主内容区域 */
+.session-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* 卡片区域 */
+.session-card-area {
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+/* 操作按钮区域 */
+.session-actions {
+  width: 100%;
+  max-width: 500px;
+}
+
+.session-action-button {
+  height: 48px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+.session-response-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.session-response-button {
+  height: 48px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.session-response-button:hover {
+  transform: translateY(-2px);
+}
+
+.session-response-button.again {
+  background-color: #fff2f0;
+  border-color: #ffccc7;
+  color: #ff4d4f;
+}
+
+.session-response-button.hard {
+  background-color: #fff7e6;
+  border-color: #ffd591;
+  color: #fa8c16;
+}
+
+.session-response-button.good {
+  background-color: #f6ffed;
+  border-color: #b7eb8f;
+  color: #52c41a;
+}
+
+.session-response-button.easy {
+  background-color: #e6f4ff;
+  border-color: #91caff;
+  color: #1890ff;
+}
+
+/* 分段进度指示器 */
+.segment-indicator {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.segment-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d9d9d9;
+  margin: 0 4px;
+  transition: all 0.2s ease;
+}
+
+.segment-dot.active {
+  background: #1890ff;
+  transform: scale(1.2);
+}
+
+.segment-dot.completed {
+  background: #52c41a;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .session-header {
+    padding: 12px 16px;
+    margin-bottom: 12px;
+  }
+  
+  .session-header-content {
+    flex-wrap: wrap;
+  }
+  
+  .session-progress {
+    order: 3;
+    flex-basis: 100%;
+    margin: 12px 0 0 0;
+  }
+  
+  .session-stats {
+    gap: 12px;
+  }
+  
+  .session-stat {
+    min-width: 50px;
+  }
+  
+  .session-stat-value {
+    font-size: 14px;
+  }
+  
+  .session-main {
+    padding: 12px;
+  }
+  
+  .session-card-area {
+    margin-bottom: 20px;
+  }
+  
+  .session-response-buttons {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .session-response-button {
+    height: 52px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .session-header {
+    padding: 8px 12px;
+  }
+  
+  .session-stats {
+    gap: 8px;
+  }
+  
+  .session-stat {
+    min-width: 45px;
+  }
+  
+  .session-stat-value {
+    font-size: 13px;
+  }
+  
+  .session-stat-label {
+    font-size: 11px;
+  }
+  
+  .session-main {
+    padding: 8px;
+  }
+  
+  .session-card-area {
+    margin-bottom: 16px;
+  }
+  
+  .session-action-button {
+    height: 52px;
+  }
+  
+  .session-response-button {
+    height: 56px;
+    font-size: 16px;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .learning-session-container {
+    background: #141414;
+  }
+  
+  .session-header {
+    background: #1f1f1f;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .session-progress-text {
+    color: #a0a0a0;
+  }
+  
+  .session-stat-label {
+    color: #a0a0a0;
+  }
+  
+  .session-response-button.again {
+    background-color: #2a1215;
+    border-color: #522029;
+    color: #ff7875;
+  }
+  
+  .session-response-button.hard {
+    background-color: #2b2111;
+    border-color: #613400;
+    color: #ffa940;
+  }
+  
+  .session-response-button.good {
+    background-color: #162312;
+    border-color: #274916;
+    color: #95de64;
+  }
+  
+  .session-response-button.easy {
+    background-color: #111b26;
+    border-color: #003a8c;
+    color: #69c0ff;
+  }
+}
+
+/* 减少动画效果 */
+@media (prefers-reduced-motion: reduce) {
+  .session-response-button:hover {
+    transform: none;
+  }
+  
+  .segment-dot {
+    transition: none;
+  }
+}
+
+/* 键盘导航支持 */
+.session-response-button:focus,
+.session-action-button:focus {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+  .session-header {
+    border: 1px solid #000;
+  }
+  
+  .session-response-button {
+    border-width: 2px;
+  }
+}
