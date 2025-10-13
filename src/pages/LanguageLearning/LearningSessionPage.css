@@ -54,18 +54,25 @@
 .session-stat {
   text-align: center;
   min-width: 60px;
+  transition: transform 0.2s ease;
+}
+
+.session-stat:hover {
+  transform: translateY(-2px);
 }
 
 .session-stat-value {
   font-size: 16px;
   font-weight: 600;
   line-height: 1.2;
+  transition: color 0.3s ease;
 }
 
 .session-stat-label {
   font-size: 12px;
   color: #8c8c8c;
   margin-top: 2px;
+  transition: color 0.3s ease;
 }
 
 /* 主内容区域 */
@@ -100,6 +107,38 @@
   font-size: 16px;
   font-weight: 500;
   border-radius: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.session-action-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+}
+
+.session-action-button:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 4px rgba(24, 144, 255, 0.2);
+}
+
+/* 主按钮点击波纹效果 */
+.session-action-button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.session-action-button:active::after {
+  width: 300px;
+  height: 300px;
 }
 
 .session-response-buttons {
@@ -113,11 +152,41 @@
   font-size: 14px;
   font-weight: 500;
   border-radius: 8px;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  /* 启用硬件加速 */
+  will-change: transform;
+  transform: translateZ(0);
+  position: relative;
+  overflow: hidden;
 }
 
 .session-response-button:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) translateZ(0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.session-response-button:active {
+  transform: translateY(0) translateZ(0) scale(0.98);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 按钮点击波纹效果 */
+.session-response-button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.session-response-button:active::after {
+  width: 300px;
+  height: 300px;
 }
 
 .session-response-button.again {
@@ -157,16 +226,52 @@
   border-radius: 50%;
   background: #d9d9d9;
   margin: 0 4px;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  /* 启用硬件加速 */
+  will-change: transform, background-color;
+  transform: translateZ(0);
+  position: relative;
 }
 
 .segment-dot.active {
   background: #1890ff;
-  transform: scale(1.2);
+  transform: scale(1.2) translateZ(0);
+  box-shadow: 0 0 8px rgba(24, 144, 255, 0.5);
 }
 
 .segment-dot.completed {
   background: #52c41a;
+  transform: scale(1.1) translateZ(0);
+}
+
+/* 进度点脉冲动画 */
+.segment-dot.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #1890ff;
+  transform: scale(1);
+  opacity: 0.7;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
 }
 
 /* 响应式设计 */
@@ -306,7 +411,24 @@
     transform: none;
   }
   
+  .session-action-button:hover {
+    transform: none;
+  }
+  
+  .session-stat:hover {
+    transform: none;
+  }
+  
   .segment-dot {
+    transition: none;
+  }
+  
+  .segment-dot.active::before {
+    animation: none;
+  }
+  
+  .session-response-button::after,
+  .session-action-button::after {
     transition: none;
   }
 }
@@ -326,5 +448,54 @@
   
   .session-response-button {
     border-width: 2px;
+  }
+}
+
+/* 触摸优化样式 */
+.session-card-area {
+  /* 提升触摸区域的可访问性 */
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.session-card-area * {
+  /* 防止文本选择和长按菜单 */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.session-response-buttons {
+  /* 优化触摸响应 */
+  touch-action: manipulation;
+}
+
+.session-response-button {
+  /* 增加触摸区域 */
+  min-height: 48px;
+  min-width: 48px;
+  /* 优化触摸反馈 */
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
+/* 触摸设备上的滑动提示 */
+@media (hover: none) and (pointer: coarse) {
+  .session-card-area::after {
+    content: '← 左滑困难 · 右滑简单 →';
+    position: absolute;
+    bottom: -24px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 12px;
+    color: #8c8c8c;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  
+  .session-card-area:hover::after {
+    opacity: 1;
   }
 }

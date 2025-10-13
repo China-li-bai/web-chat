@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Modal, Button, Row, Col, Card, Statistic, Typography } from 'antd';
 import { TrophyOutlined, ClockCircleOutlined, BookOutlined, FireOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import './SessionSummaryModal.css';
@@ -26,7 +26,7 @@ interface SessionSummaryModalProps {
   onViewStatistics: () => void;
 }
 
-export const SessionSummaryModal: React.FC<SessionSummaryModalProps> = ({
+export const SessionSummaryModal: React.FC<SessionSummaryModalProps> = memo(({
   visible,
   onClose,
   accuracy,
@@ -183,4 +183,4 @@ export const SessionSummaryModal: React.FC<SessionSummaryModalProps> = ({
       </div>
     </Modal>
   );
-};
+});

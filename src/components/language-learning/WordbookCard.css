@@ -1,0 +1,168 @@
+/* WordbookCard组件样式 - 移动优先响应式设计 */
+
+.wordbook-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.wordbook-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.wordbook-card .ant-card-head {
+  border-bottom: 1px solid #f0f0f0;
+  min-height: auto;
+}
+
+.wordbook-card .ant-card-head-title {
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.wordbook-card .ant-card-body {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.wordbook-description {
+  min-height: 44px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wordbook-stats {
+  margin-bottom: 12px;
+}
+
+.wordbook-statistic {
+  text-align: center;
+}
+
+.wordbook-statistic .ant-statistic-title {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.wordbook-statistic .ant-statistic-content {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wordbook-meta {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 16px;
+}
+
+.wordbook-progress {
+  margin-bottom: 12px;
+}
+
+.wordbook-button {
+  width: 100%;
+  height: 40px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .wordbook-card .ant-card-body {
+    padding: 14px;
+  }
+  
+  .wordbook-card .ant-card-head-title {
+    font-size: 15px;
+  }
+  
+  .wordbook-description {
+    font-size: 13px;
+    min-height: 40px;
+  }
+  
+  .wordbook-statistic .ant-statistic-content {
+    font-size: 15px;
+  }
+  
+  .wordbook-button {
+    height: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .wordbook-card .ant-card-body {
+    padding: 12px;
+  }
+  
+  .wordbook-card .ant-card-head-title {
+    font-size: 14px;
+  }
+  
+  .wordbook-description {
+    font-size: 12px;
+    min-height: 36px;
+  }
+  
+  .wordbook-statistic .ant-statistic-title {
+    font-size: 11px;
+  }
+  
+  .wordbook-statistic .ant-statistic-content {
+    font-size: 14px;
+  }
+  
+  .wordbook-meta {
+    font-size: 11px;
+  }
+  
+  .wordbook-button {
+    height: 32px;
+    font-size: 13px;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .wordbook-card {
+    background: #1f1f1f;
+    border-color: #303030;
+  }
+  
+  .wordbook-card .ant-card-head {
+    border-bottom-color: #303030;
+    background: #1f1f1f;
+  }
+  
+  .wordbook-card .ant-card-head-title {
+    color: #fff;
+  }
+  
+  .wordbook-description {
+    color: #a0a0a0;
+  }
+  
+  .wordbook-meta {
+    color: #8c8c8c;
+  }
+}
+
+/* 减少动画效果 */
+@media (prefers-reduced-motion: reduce) {
+  .wordbook-card {
+    transition: none;
+  }
+  
+  .wordbook-card:hover {
+    transform: none;
+  }
+}

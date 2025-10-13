@@ -11,7 +11,10 @@
   height: 100%;
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 0.6s;
+  transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+  /* 启用硬件加速 */
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .flashcard.is-flipped {
@@ -25,8 +28,25 @@
   backface-visibility: hidden;
   display: flex;
   flex-direction: column;
+  /* 启用硬件加速 */
+  transform: translateZ(0);
 }
 
 .flashcard-back {
   transform: rotateY(180deg);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .flashcard-container {
+    height: 280px;
+    max-width: 90%;
+  }
+}
+
+@media (max-width: 480px) {
+  .flashcard-container {
+    height: 260px;
+    max-width: 95%;
+  }
 }

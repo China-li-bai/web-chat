@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, Button, Progress, Typography, Space, Statistic, Row, Col } from 'antd';
 import { BookOutlined, TrophyOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import './WordbookCard.css';
 
 const { Paragraph, Text } = Typography;
 
@@ -42,21 +43,22 @@ export const WordbookCard: React.FC<WordbookCardProps> = ({
   return (
     <Card
       title={name}
-      style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+      className="wordbook-card"
       bodyStyle={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
     >
       <div>
-        <Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ minHeight: '44px', marginBottom: '12px' }}>
+        <Paragraph type="secondary" ellipsis={{ rows: 2 }} className="wordbook-description">
           {description || 'No description available.'}
         </Paragraph>
         
-        <Row gutter={8} style={{ marginBottom: '12px' }}>
+        <Row gutter={8} className="wordbook-stats">
           <Col span={8}>
             <Statistic
               title="Total"
               value={wordCount}
               prefix={<BookOutlined />}
               valueStyle={{ fontSize: '14px' }}
+              className="wordbook-statistic"
             />
           </Col>
           <Col span={8}>
@@ -65,6 +67,7 @@ export const WordbookCard: React.FC<WordbookCardProps> = ({
               value={masteredCount}
               prefix={<TrophyOutlined />}
               valueStyle={{ fontSize: '14px', color: '#52c41a' }}
+              className="wordbook-statistic"
             />
           </Col>
           <Col span={8}>
@@ -73,23 +76,24 @@ export const WordbookCard: React.FC<WordbookCardProps> = ({
               value={dueCount}
               prefix={<ClockCircleOutlined />}
               valueStyle={{ fontSize: '14px', color: dueCount > 0 ? '#fa8c16' : '#8c8c8c' }}
+              className="wordbook-statistic"
             />
           </Col>
         </Row>
         
         <Space direction="vertical" size="small" style={{ width: '100%' }}>
-          <Text type="secondary" style={{ fontSize: '12px' }}>
+          <Text type="secondary" className="wordbook-meta">
             Last studied: {formatLastStudied(lastStudied)}
           </Text>
         </Space>
       </div>
       
-      <div style={{ marginTop: '16px' }}>
-        <Progress percent={Math.round(progress)} size="small" strokeColor="#1890ff" />
+      <div>
+        <Progress percent={Math.round(progress)} size="small" strokeColor="#1890ff" className="wordbook-progress" />
         <Button
           type="primary"
           onClick={onStart}
-          style={{ width: '100%', marginTop: '12px' }}
+          className="wordbook-button"
           loading={isLoading}
           disabled={dueCount === 0 && progress === 100}
         >

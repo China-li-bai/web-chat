@@ -1,0 +1,137 @@
+/* 段末反馈组件样式 */
+.session-feedback-modal {
+  .feedback-content {
+    .ant-card {
+      background-color: var(--card-background);
+      border-color: var(--border);
+      box-shadow: var(--card-shadow);
+    }
+    
+    .ant-typography {
+      color: var(--text-primary);
+    }
+    
+    .ant-typography-secondary {
+      color: var(--text-secondary) !important;
+    }
+    
+    ul {
+      color: var(--text-primary);
+    }
+    
+    .ant-tag {
+      background-color: var(--tag-background);
+      border-color: var(--border);
+      color: var(--text-primary);
+    }
+    
+    .ant-divider {
+      border-color: var(--border);
+    }
+  }
+}
+
+/* 深色模式下的样式调整 */
+.dark .session-feedback-modal {
+  .ant-modal-content {
+    background-color: var(--card-background);
+    color: var(--text-primary);
+  }
+  
+  .ant-modal-header {
+    background-color: var(--card-background);
+    border-bottom-color: var(--border);
+  }
+  
+  .ant-modal-title {
+    color: var(--text-primary);
+  }
+  
+  .ant-modal-close {
+    color: var(--text-secondary);
+    
+    &:hover {
+      color: var(--text-primary);
+    }
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .session-feedback-modal {
+    .ant-modal {
+      margin: 16px;
+      max-width: calc(100vw - 32px);
+    }
+    
+    .feedback-content {
+      .ant-card {
+        margin-bottom: 16px;
+      }
+      
+      .ant-typography h3 {
+        font-size: 18px;
+      }
+      
+      .ant-typography p {
+        font-size: 14px;
+      }
+      
+      .ant-tag {
+        margin: 2px 4px 2px 0;
+        font-size: 12px;
+      }
+      
+      .ant-btn {
+        height: 40px;
+        font-size: 14px;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .session-feedback-modal {
+    .ant-modal {
+      margin: 8px;
+      max-width: calc(100vw - 16px);
+    }
+    
+    .feedback-content {
+      .ant-card {
+        margin-bottom: 12px;
+      }
+      
+      .ant-typography h3 {
+        font-size: 16px;
+      }
+      
+      .ant-typography p {
+        font-size: 13px;
+      }
+      
+      .ant-tag {
+        margin: 2px 2px 2px 0;
+        font-size: 11px;
+        padding: 0 4px;
+      }
+      
+      .ant-btn {
+        height: 44px;
+        font-size: 13px;
+      }
+      
+      .ant-space {
+        width: 100%;
+        
+        .ant-space-item {
+          flex: 1;
+          
+          .ant-btn {
+            width: 100%;
+          }
+        }
+      }
+    }
+  }
+}

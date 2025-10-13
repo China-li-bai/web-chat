@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Card } from 'antd';
 import './Flashcard.css';
 
@@ -9,7 +9,7 @@ interface FlashcardProps {
   onFlip: () => void;
 }
 
-export const Flashcard: React.FC<FlashcardProps> = ({ frontContent, backContent, isFlipped, onFlip }) => {
+export const Flashcard: React.FC<FlashcardProps> = memo(({ frontContent, backContent, isFlipped, onFlip }) => {
   return (
     <div className="flashcard-container" onClick={onFlip}>
       <div className={`flashcard ${isFlipped ? 'is-flipped' : ''}`}>
@@ -26,4 +26,4 @@ export const Flashcard: React.FC<FlashcardProps> = ({ frontContent, backContent,
       </div>
     </div>
   );
-};
+});
