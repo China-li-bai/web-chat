@@ -771,6 +771,7 @@ const LearningSessionPage: React.FC = () => {
                   <LetterFillSpellingQuestion
                     word={String(((currentItem as any)?.item?.content) || '')}
                     definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                    isFlipped={isFlipped}
                     onResult={(ok) => handleResponse(ok ? 'good' : 'again')}
                   />
                 ) : (

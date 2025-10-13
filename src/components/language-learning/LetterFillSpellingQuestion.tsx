@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { Button, Typography } from 'antd';
 
 const { Title, Paragraph, Text } = Typography;
@@ -10,6 +10,7 @@ export interface LetterFillSpellingQuestionProps {
   blanksCount?: number;      // 可选：空位数量（默认按单词长度自适应）
   distractorCount?: number;  // 每个空位的干扰项数量（默认 3）
   seed?: number;             // 稳定随机种子（可选）
+  isFlipped?: boolean;       // 翻面后显示答案并禁用选项
 }
 
 /**
@@ -25,7 +26,8 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
   onResult,
   blanksCount,
   distractorCount = 3,
-  seed
+  seed,
+  isFlipped
 }) => {
   const normalized = useMemo(() => (word || '').trim(), [word]);
   const letters = useMemo(() => Array.from(normalized), [normalized]);
@@ -56,19 +58,18 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
   // 当前填入状态
   const [fills, setFills] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState<null | boolean>(null);
+  const [activePos, setActivePos] = useState<number | null>(null);
 
   // 为每个空位生成候选字母：正确字母 + 干扰项
   const optionsForBlank = useCallback((pos: number): string[] => {
     const correct = letters[pos];
     const pool = new Set<string>();
     pool.add(correct.toLowerCase());
-    // 先从单词内取不同字母
     for (const ch of letters) {
       if (pool.size > distractorCount) break;
       const low = ch.toLowerCase();
       if (low !== correct.toLowerCase()) pool.add(low);
     }
-    // 再补全英文字母
     const alphabet = 'abcdefghijklmnopqrstuvwxyz';
     let tries = 0;
     while (pool.size < distractorCount + 1 && tries < alphabet.length * 2) {
@@ -76,7 +77,6 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
       if (pick.toLowerCase() !== correct.toLowerCase()) pool.add(pick.toLowerCase());
       tries++;
     }
-    // 打乱顺序
     const arr = Array.from(pool);
     for (let j = arr.length - 1; j > 0; j--) {
       const k = Math.floor(rng() * (j + 1));
@@ -84,6 +84,41 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
     }
     return arr.slice(0, distractorCount + 1);
   }, [letters, distractorCount, rng]);
+
+  // 稳定化每个空位的选项，避免每次渲染重排
+  const optionsMap = useMemo(() => {
+    const map: Record<number, string[]> = {};
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+    const makeOptions = (pos: number): string[] => {
+      const correct = letters[pos];
+      const pool = new Set<string>();
+      pool.add(correct.toLowerCase());
+      for (const ch of letters) {
+        if (pool.size > distractorCount) break;
+        const low = ch.toLowerCase();
+        if (low !== correct.toLowerCase()) pool.add(low);
+      }
+      let localSeed = (typeof seed === 'number' ? seed : normalized.length) + pos * 7919;
+      const lcg = () => {
+        localSeed = (localSeed * 48271) % 2147483647;
+        return localSeed / 2147483647;
+      };
+      let tries = 0;
+      while (pool.size < distractorCount + 1 && tries < alphabet.length * 2) {
+        const pick = alphabet[Math.floor(lcg() * alphabet.length)];
+        if (pick.toLowerCase() !== correct.toLowerCase()) pool.add(pick.toLowerCase());
+        tries++;
+      }
+      const arr = Array.from(pool);
+      for (let j = arr.length - 1; j > 0; j--) {
+        const k = Math.floor(lcg() * (j + 1));
+        [arr[j], arr[k]] = [arr[k], arr[j]];
+      }
+      return arr.slice(0, distractorCount + 1);
+    };
+    blankPositions.forEach((p) => { map[p] = makeOptions(p); });
+    return map;
+  }, [letters, distractorCount, seed, blankPositions, normalized]);
 
   const isComplete = useMemo(() => blankPositions.every((p) => typeof fills[p] === 'string' && fills[p].length > 0), [blankPositions, fills]);
 
@@ -103,8 +138,22 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
     try { if (navigator.vibrate) navigator.vibrate(ok ? 10 : 30); } catch {}
   }, [composed, normalized, onResult]);
 
+  // 翻面时自动填充正确答案并禁用继续选择
+  useEffect(() => {
+    if (isFlipped) {
+      setSubmitted(null);
+      setActivePos(null);
+      setFills((prev) => {
+        const next = { ...prev };
+        blankPositions.forEach((p) => { next[p] = letters[p]; });
+        return next;
+      });
+    }
+  }, [isFlipped, blankPositions, letters]);
+
   const handlePick = useCallback((pos: number, ch: string) => {
     setSubmitted(null);
+    setActivePos(pos);
     setFills((prev) => ({ ...prev, [pos]: ch }));
   }, []);
 
@@ -120,28 +169,56 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
           const isBlank = blankPositions.includes(idx);
           const filled = fills[idx];
           return (
-            <span
-              key={idx}
-              style={{
-                minWidth: 28,
-                minHeight: 36,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderBottom: '2px solid #d9d9d9',
-                fontSize: 20,
-                margin: '0 4px'
-              }}
-            >
-              {isBlank ? (filled || '') : ch}
-            </span>
+            <>
+              {isBlank ? (
+                <input
+                  key={idx}
+                  value={filled || ''}
+                  onFocus={() => setActivePos(idx)}
+                  onChange={(e) => {
+                    const v = (e.target.value || '').slice(0, 1).toLowerCase();
+                    setSubmitted(null);
+                    setFills((prev) => ({ ...prev, [idx]: v }));
+                  }}
+                  disabled={!!isFlipped}
+                  aria-label={`blank-${idx}`}
+                  style={{
+                    width: 28,
+                    height: 36,
+                    textAlign: 'center',
+                    border: 'none',
+                    borderBottom: '2px solid #d9d9d9',
+                    outline: 'none',
+                    background: 'transparent',
+                    fontSize: 20,
+                    margin: '0 4px'
+                  }}
+                />
+              ) : (
+                <span
+                  key={idx}
+                  style={{
+                    minWidth: 28,
+                    minHeight: 36,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderBottom: '2px solid #d9d9d9',
+                    fontSize: 20,
+                    margin: '0 4px'
+                  }}
+                >
+                  {ch}
+                </span>
+              )}
+            </>
           );
         })}
       </div>
 
       <div style={{ marginTop: 12 }}>
         {blankPositions.map((pos) => {
-          const opts = optionsForBlank(pos);
+          const opts = optionsMap[pos] || [];
           const picked = fills[pos] ?? '';
           return (
             <div key={pos} style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
@@ -151,6 +228,7 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
                   size="small"
                   type={picked === o ? 'primary' : 'default'}
                   onClick={() => handlePick(pos, o)}
+                  disabled={!!isFlipped}
                   style={{ minWidth: 36 }}
                 >
                   {o.toUpperCase()}
