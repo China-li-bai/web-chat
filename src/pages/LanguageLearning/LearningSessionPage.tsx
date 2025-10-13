@@ -9,7 +9,7 @@ import { ListeningQuestion } from '@/components/language-learning/ListeningQuest
 
 // 懒加载组件
 const SessionEndFeedback = lazy(() => import('../../components/LanguageLearning/SessionEndFeedback'));
-import { Button, Space, Spin, Result, Typography, message, Progress } from 'antd';
+import { Button, Space, Spin, Result, Typography, message, Progress, Select } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews, startSessionFromTodayPlan } from '@/services/learningService';
 import { evaluateRewardsOnEvent, addDailyFocusProgress } from '@/services/rewardService';
@@ -382,12 +382,32 @@ const LearningSessionPage: React.FC = () => {
     [sessionStats.correct, sessionStats.total]
   );
 
-  // 题型轮换：flashcard/choice/spelling/listening（最小可执行占位）
+  // 题型模式：仅闪卡/混合/自适应（默认混合）
+  type QuestionMode = 'flashcard-only' | 'mixed' | 'adaptive';
+  const [questionMode, setQuestionMode] = useState<QuestionMode>('mixed');
+
+  // 题型决定：按模式/难度自适应
   type QuestionType = 'flashcard' | 'choice' | 'spelling' | 'listening';
   const questionType: QuestionType = useMemo(() => {
+    if (questionMode === 'flashcard-only') return 'flashcard';
     const map: QuestionType[] = ['flashcard', 'choice', 'spelling', 'listening'];
-    return map[currentItemIndex % map.length];
-  }, [currentItemIndex]);
+    if (questionMode === 'mixed') {
+      return map[currentItemIndex % map.length];
+    }
+    // adaptive: 基于 retrievability/strategy 决定
+    const ms: any = (currentItem as any)?.memoryStrength || {};
+    const r = typeof ms.retrievability === 'number' ? ms.retrievability : undefined;
+    const stType = (currentItem as any)?.strategy?.type as string | undefined;
+    if (typeof r === 'number') {
+      if (r < 0.6) return 'spelling';
+      if (r < 0.85) return 'choice';
+      // 偶尔穿插听力
+      return (currentItemIndex % 4 === 3) ? 'listening' : 'flashcard';
+    }
+    if (stType === 'free_recall') return 'spelling';
+    if (stType === 'recognition') return 'choice';
+    return (currentItemIndex % 5 === 4) ? 'listening' : 'flashcard';
+  }, [questionMode, currentItem, currentItemIndex]);
 
 
 
@@ -509,6 +529,20 @@ const LearningSessionPage: React.FC = () => {
 
         {/* 主内容区域 */}
         <div className="session-main">
+          {/* 题型模式切换 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '8px 0' }}>
+            <Select
+              size="small"
+              value={questionMode}
+              style={{ width: 180 }}
+              onChange={(v) => setQuestionMode(v as any)}
+              options={[
+                { label: '题型：仅闪卡', value: 'flashcard-only' },
+                { label: '题型：混合', value: 'mixed' },
+                { label: '题型：自适应', value: 'adaptive' },
+              ]}
+            />
+          </div>
           {/* 分段进度指示器 */}
           <div className="segment-indicator">
             {segmentDots}
