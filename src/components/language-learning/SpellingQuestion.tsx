@@ -24,6 +24,39 @@ export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, 
     [targetWord]
   );
 
+  // 计算相似度（简易 Levenshtein 距离转相似度）
+  const similarityInfo = useMemo(() => {
+    const a = value.trim().toLowerCase();
+    const b = normalizedTarget;
+    if (!a || !b) return { score: 0, highlighted: null as any };
+    const dp: number[][] = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+    for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+    for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + cost
+        );
+      }
+    }
+    const dist = dp[a.length][b.length];
+    const maxLen = Math.max(a.length, b.length) || 1;
+    const score = Math.max(0, Math.round((1 - dist / maxLen) * 100));
+    // 简易逐字高亮：正确字符绿色，错误字符红色
+    const highlighted = (
+      <span>
+        {Array.from(b).map((ch, idx) => {
+          const ok = a[idx] === ch;
+          return <span key={idx} style={{ color: ok ? '#52c41a' : '#ff4d4f' }}>{ch}</span>;
+        })}
+      </span>
+    );
+    return { score, highlighted };
+  }, [value, normalizedTarget]);
+
   const check = useCallback(() => {
     const ok = value.trim().toLowerCase() === normalizedTarget;
     setSubmitted(ok);
@@ -57,7 +90,12 @@ export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, 
           {submitted ? (
             <Text type="success">正确！</Text>
           ) : (
-            <Text type="danger">不正确，答案：{targetWord}</Text>
+            <>
+              <Text type="danger">不正确，答案：{targetWord}</Text>
+              <div style={{ marginTop: 6, fontSize: 12, color: '#888' }}>
+                相似度：{similarityInfo.score}%&nbsp;|&nbsp;目标：{similarityInfo.highlighted}
+              </div>
+            </>
           )}
         </div>
       )}

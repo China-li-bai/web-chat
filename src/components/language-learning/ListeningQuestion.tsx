@@ -20,14 +20,30 @@ export const ListeningQuestion: React.FC<ListeningQuestionProps> = ({ word, isFl
   const [rate, setRate] = useState<number>(0.9);
   const playingRef = useRef(false);
 
-  const voices = useMemo(() => {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  // 动态加载可用语音（部分浏览器需 onvoiceschanged 事件）
+  const loadVoices = useCallback(() => {
     try {
       const list = (window.speechSynthesis?.getVoices?.() || []).filter(v => v.lang.toLowerCase().startsWith('en'));
-      return list.length ? list : [];
+      setVoices(list);
     } catch {
-      return [];
+      setVoices([]);
     }
   }, []);
+
+  React.useEffect(() => {
+    loadVoices();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+    return () => {
+      if ('speechSynthesis' in window) {
+        // @ts-ignore
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, [loadVoices]);
 
   const speak = useCallback(() => {
     try {
@@ -65,6 +81,7 @@ export const ListeningQuestion: React.FC<ListeningQuestionProps> = ({ word, isFl
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
         <Button onClick={speak} disabled={!word}>播放发音</Button>
+        <Button onClick={speak} disabled={!word}>重复播放</Button>
         <Button onClick={onFlip}>显示答案</Button>
       </div>
       {isFlipped && (
