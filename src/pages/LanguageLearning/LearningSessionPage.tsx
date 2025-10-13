@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { LearningFlashcard } from '@/components/language-learning/LearningFlashcard';
 import { SessionSummaryModal } from '@/components/language-learning/SessionSummaryModal';
 import ErrorBoundary from '@/components/LanguageLearning/ErrorBoundary';
+import { ChoiceQuestion } from '@/components/language-learning/ChoiceQuestion';
+import { SpellingQuestion } from '@/components/language-learning/SpellingQuestion';
+import { ListeningQuestion } from '@/components/language-learning/ListeningQuestion';
 
 // 懒加载组件
 const SessionEndFeedback = lazy(() => import('../../components/LanguageLearning/SessionEndFeedback'));
@@ -386,44 +389,11 @@ const LearningSessionPage: React.FC = () => {
     return map[currentItemIndex % map.length];
   }, [currentItemIndex]);
 
-  // 选择题选项（占位：正确释义 + 常见干扰项）
-  const choiceOptions = useMemo(() => {
-    const correct = ((currentItem as any)?.item?.details?.definition as string) || 'No definition provided.';
-    const pool = [
-      'A commonly confused term.',
-      'An unrelated concept.',
-      'A close but not exact meaning.'
-    ];
-    const opts = [correct, ...pool].slice(0, 4);
-    for (let i = opts.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [opts[i], opts[j]] = [opts[j], opts[i]];
-    }
-    return opts;
-  }, [currentItem]);
 
-  // 拼写输入与校验（占位）
-  const [spellingInput, setSpellingInput] = useState('');
-  const checkSpelling = useCallback(() => {
-    const target = String((currentItem as any)?.item?.content || '');
-    const ok = spellingInput.trim().toLowerCase() === target.trim().toLowerCase();
-    handleResponse(ok ? 'good' : 'again');
-  }, [spellingInput, currentItem, handleResponse]);
 
-  // 听力：浏览器语音合成（占位）
-  const speakCurrent = useCallback(() => {
-    try {
-      const word = String((currentItem as any)?.item?.content || '');
-      if ('speechSynthesis' in window && word) {
-        const u = new SpeechSynthesisUtterance(word);
-        u.lang = 'en-US';
-        u.rate = 0.9;
-        window.speechSynthesis.speak(u);
-      }
-    } catch (e) {
-      console.error('speak failed', e);
-    }
-  }, [currentItem]);
+
+
+
 
   const segmentDots = useMemo(() => {
     try {
@@ -563,65 +533,28 @@ const LearningSessionPage: React.FC = () => {
               )}
 
               {questionType === 'choice' && (
-                <div className="choice-card">
-                  <Title level={3} style={{ textAlign: 'center' }}>选择正确释义</Title>
-                  <Paragraph style={{ textAlign: 'center', marginBottom: 16 }}>
-                    {(currentItem as any)?.item?.content}
-                  </Paragraph>
-                  <div className="choice-options" style={{ display: 'grid', gap: 12 }}>
-                    {choiceOptions.map((opt, idx) => (
-                      <Button
-                        key={idx}
-                        block
-                        onClick={() => {
-                          const correct = ((currentItem as any)?.item?.details?.definition || '').toString();
-                          const ok = opt === correct;
-                          handleResponse(ok ? 'good' : 'again');
-                        }}
-                      >
-                        {opt}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
+                <ChoiceQuestion
+                  word={String(((currentItem as any)?.item?.content) || '')}
+                  definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                  onAnswer={(ok) => handleResponse(ok ? 'good' : 'again')}
+                />
               )}
 
               {questionType === 'spelling' && (
-                <div className="spelling-card">
-                  <Title level={3} style={{ textAlign: 'center' }}>拼写该单词</Title>
-                  <Paragraph type="secondary" style={{ textAlign: 'center' }}>
-                    {(currentItem as any)?.item?.details?.definition || 'Definition hidden'}
-                  </Paragraph>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <input
-                      value={spellingInput}
-                      onChange={(e) => setSpellingInput(e.target.value)}
-                      placeholder="输入拼写并回车"
-                      style={{ flex: 1, padding: '10px 12px', fontSize: 16 }}
-                      onKeyDown={(e) => { if ((e as any).key === 'Enter') checkSpelling(); }}
-                    />
-                    <Button type="primary" onClick={checkSpelling}>提交</Button>
-                  </div>
-                </div>
+                <SpellingQuestion
+                  targetWord={String(((currentItem as any)?.item?.content) || '')}
+                  definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                  onResult={(ok) => handleResponse(ok ? 'good' : 'again')}
+                />
               )}
 
               {questionType === 'listening' && (
-                <div className="listening-card">
-                  <Title level={3} style={{ textAlign: 'center' }}>听写该单词</Title>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
-                    <Button onClick={speakCurrent}>播放发音</Button>
-                    <Button onClick={handleFlip}>显示答案</Button>
-                  </div>
-                  {isFlipped && (
-                    <div style={{ textAlign: 'center' }}>
-                      <Title level={4}>{(currentItem as any)?.item?.content}</Title>
-                      <Space>
-                        <Button danger onClick={() => handleResponse('again')}>没听出</Button>
-                        <Button type="primary" onClick={() => handleResponse('good')}>听出来了</Button>
-                      </Space>
-                    </div>
-                  )}
-                </div>
+                <ListeningQuestion
+                  word={String(((currentItem as any)?.item?.content) || '')}
+                  isFlipped={isFlipped}
+                  onFlip={handleFlip}
+                  onResult={(ok) => handleResponse(ok ? 'good' : 'again')}
+                />
               )}
             </ErrorBoundary>
           </div>
