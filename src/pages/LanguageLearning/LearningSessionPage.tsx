@@ -43,10 +43,25 @@ const LearningSessionPage: React.FC = () => {
     const slice = rolling.slice(-n);
     return slice.reduce((a, b) => a + (b ? 1 : 0), 0) / n;
   }, [rolling]);
+
+  // 段级策略闭环（先实现下一段题目难度/配比自动调整）
+  const SEGMENT_SIZE = 10;
+  const [segmentStats, setSegmentStats] = useState({ answered: 0, correct: 0 });
+  const [segmentPolicy, setSegmentPolicy] = useState<{
+    // 题型权重（仅在 adaptive 模式使用）
+    weights: { flashcard: number; choice: number; spelling: number; listening: number };
+    // 选择题是否允许提示
+    choiceHintAllowed: boolean;
+  }>({
+    weights: { flashcard: 0.35, choice: 0.35, spelling: 0.2, listening: 0.1 },
+    choiceHintAllowed: true
+  });
   const [summaryItems, setSummaryItems] = useState<Array<{ id: string; content: string; response: 'again'|'hard'|'good'|'easy'; retrievability: number; nextReview?: Date }>>([]);
   const [summaryStats, setSummaryStats] = useState<{ estimatedRetention: number; cognitiveLoad: number } | null>(null);
   const [activeItems, setActiveItems] = useState<ScheduledItem[]>([]);
   const responseStartTime = useRef<number>(0);
+  // 记录近期反应时（毫秒），用于认知负荷回退计算
+  const responseTimesRef = useRef<number[]>([]);
   const userId = useAppStore((state) => state.userId);
   const setLastWordbookId = useAppStore((state) => state.setLastWordbookId as SetLastWordbookId);
   
@@ -161,6 +176,12 @@ const LearningSessionPage: React.FC = () => {
     let lastEntry: { id: string; content: string; response: 'again'|'hard'|'good'|'easy'; retrievability: number; nextReview?: Date } | null = null;
 
     const responseTime = Date.now() - responseStartTime.current;
+    // 累积反应时（最多200条）
+    try {
+      const arr = responseTimesRef.current;
+      arr.push(responseTime);
+      if (arr.length > 200) arr.splice(0, arr.length - 200);
+    } catch {}
     const isCorrect = response === 'good' || response === 'easy';
 
     // 验证响应时间是否合理
@@ -179,6 +200,36 @@ const LearningSessionPage: React.FC = () => {
       setRolling(prev => {
         const next = [...prev, isCorrect];
         return next.length > 50 ? next.slice(-50) : next;
+      });
+      // 段级统计与策略更新（每 SEGMENT_SIZE 题或达段尾时触发一次）
+      setSegmentStats(prev => {
+        const nextAnswered = prev.answered + 1;
+        const nextCorrect = prev.correct + (isCorrect ? 1 : 0);
+        // 判断是否到达段末（不阻塞 UI，策略用于“下一段”）
+        const reachSegmentEnd = (nextAnswered % SEGMENT_SIZE === 0) || (currentItemIndex === (itemsSource.length - 1));
+        if (reachSegmentEnd) {
+          const acc = nextAnswered > 0 ? nextCorrect / nextAnswered : 0;
+          // 计算下一段策略
+          // 高命中：提高难度（更多 spelling/listening），禁用提示
+          // 低命中：降低难度（更多 flashcard/choice），允许提示
+          // 中间：均衡
+          let weights = segmentPolicy.weights;
+          let choiceHintAllowed = segmentPolicy.choiceHintAllowed;
+          if (acc >= 0.85) {
+            weights = { flashcard: 0.15, choice: 0.25, spelling: 0.4, listening: 0.2 };
+            choiceHintAllowed = false;
+          } else if (acc < 0.7) {
+            weights = { flashcard: 0.45, choice: 0.35, spelling: 0.15, listening: 0.05 };
+            choiceHintAllowed = true;
+          } else {
+            weights = { flashcard: 0.3, choice: 0.4, spelling: 0.2, listening: 0.1 };
+            choiceHintAllowed = true;
+          }
+          setSegmentPolicy({ weights, choiceHintAllowed });
+          // 重置下一段统计
+          return { answered: 0, correct: 0 };
+        }
+        return { answered: nextAnswered, correct: nextCorrect };
       });
       
       // Update local summary counts by response category
@@ -253,9 +304,23 @@ const LearningSessionPage: React.FC = () => {
             (manager as any).completeSession(session as any);
             const stats = (manager as any).getSessionStatistics(session as any);
             if (stats && typeof (stats as any).estimatedRetention === 'number') {
+              // 读取上游的认知负荷，若缺省或接近 0.49，则采用回退计算
+              const rawLoad = (stats as any).cognitiveLoadActual ?? (stats as any).cognitiveLoad;
+              const localTotal = sessionStats.total + 1; // 此处与上文 localTotal 一致节拍
+              const localCorrect = sessionStats.correct; // 此处无需 +1，上一段已计算展示
+              const acc = localTotal > 0 ? localCorrect / localTotal : 0;
+              // 最近最多50条反应时
+              const rts = responseTimesRef.current;
+              const N = Math.min(50, rts.length);
+              const avgRT = N > 0 ? rts.slice(-N).reduce((a, b) => a + b, 0) / N : 0;
+              // 以 900ms 为适中基准，>2400ms 接近高负荷
+              const normRT = Math.max(0, Math.min(1, (avgRT - 900) / 1500));
+              // 混合指标：错误率权重 0.65，反应时权重 0.35
+              const fallbackLoad = Math.max(0, Math.min(1, 0.65 * (1 - acc) + 0.35 * normRT));
+              const useFallback = !(typeof rawLoad === 'number' && isFinite(rawLoad)) || (rawLoad >= 0.48 && rawLoad <= 0.50);
               setSummaryStats({
                 estimatedRetention: (stats as any).estimatedRetention,
-                cognitiveLoad: (stats as any).cognitiveLoadActual ?? (stats as any).cognitiveLoad ?? 0
+                cognitiveLoad: useFallback ? fallbackLoad : rawLoad
               });
             }
           }
@@ -403,24 +468,59 @@ const LearningSessionPage: React.FC = () => {
   type QuestionType = 'flashcard' | 'choice' | 'spelling' | 'listening';
   const questionType: QuestionType = useMemo(() => {
     if (questionMode === 'flashcard-only') return 'flashcard';
-    const map: QuestionType[] = ['flashcard', 'choice', 'spelling', 'listening'];
+
+    // 基础映射（混合模式固定轮换）
+    const baseCycle: QuestionType[] = ['flashcard', 'choice', 'spelling', 'listening'];
     if (questionMode === 'mixed') {
-      return map[currentItemIndex % map.length];
+      return baseCycle[currentItemIndex % baseCycle.length];
     }
-    // adaptive: 基于 retrievability/strategy 决定
+
+    // adaptive：先根据检索性/策略做基线决策，再叠加段级配比权重进行“稳定加权”选择
     const ms: any = (currentItem as any)?.memoryStrength || {};
     const r = typeof ms.retrievability === 'number' ? ms.retrievability : undefined;
     const stType = (currentItem as any)?.strategy?.type as string | undefined;
+
+    let baseline: QuestionType;
     if (typeof r === 'number') {
-      if (r < 0.6) return 'spelling';
-      if (r < 0.85) return 'choice';
-      // 偶尔穿插听力
-      return (currentItemIndex % 4 === 3) ? 'listening' : 'flashcard';
+      if (r < 0.6) baseline = 'spelling';
+      else if (r < 0.85) baseline = 'choice';
+      else baseline = (currentItemIndex % 4 === 3) ? 'listening' : 'flashcard';
+    } else if (stType === 'free_recall') {
+      baseline = 'spelling';
+    } else if (stType === 'recognition') {
+      baseline = 'choice';
+    } else {
+      baseline = (currentItemIndex % 5 === 4) ? 'listening' : 'flashcard';
     }
-    if (stType === 'free_recall') return 'spelling';
-    if (stType === 'recognition') return 'choice';
-    return (currentItemIndex % 5 === 4) ? 'listening' : 'flashcard';
-  }, [questionMode, currentItem, currentItemIndex]);
+
+    // 段级权重稳定选择：按当前 index 做简易可复现随机，按权重落桶
+    const w = segmentPolicy.weights;
+    const buckets: Array<{ t: QuestionType; w: number }> = [
+      { t: 'flashcard', w: w.flashcard },
+      { t: 'choice', w: w.choice },
+      { t: 'spelling', w: w.spelling },
+      { t: 'listening', w: w.listening },
+    ];
+    const total = buckets.reduce((s, b) => s + b.w, 0) || 1;
+    const normalized = buckets.map(b => ({ t: b.t, w: b.w / total }));
+
+    // 生成 0..1 稳定值：使用当前索引与词内容作为种子扰动
+    const seedStr = String(((currentItem as any)?.item?.content) || '') + ':' + currentItemIndex;
+    let hash = 2166136261 >>> 0;
+    for (let i = 0; i < seedStr.length; i++) { hash ^= seedStr.charCodeAt(i); hash = Math.imul(hash, 16777619) >>> 0; }
+    const rnd = (hash % 1000) / 1000;
+
+    let acc = 0;
+    for (const b of normalized) {
+      acc += b.w;
+      if (rnd <= acc) {
+        // 在选择的桶与基线之间做轻微偏置：如果差异很大，20% 概率回退到基线，保持语义合理性
+        if (b.t !== baseline && (hash & 0xf) < 3) return baseline;
+        return b.t;
+      }
+    }
+    return baseline;
+  }, [questionMode, currentItem, currentItemIndex, segmentPolicy.weights]);
 
 
 
@@ -585,6 +685,7 @@ const LearningSessionPage: React.FC = () => {
                   definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
                   retrievability={(currentItem as any)?.memoryStrength?.retrievability}
                   rollingAccuracy={rollingAccuracy}
+                  allowHint={segmentPolicy.choiceHintAllowed}
                   onAnswer={(ok) => handleResponse(ok ? 'good' : 'again')}
                 />
               )}
