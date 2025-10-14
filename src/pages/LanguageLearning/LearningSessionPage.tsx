@@ -694,6 +694,11 @@ const LearningSessionPage: React.FC = () => {
               </div>
               <div className="session-progress-text" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span>{currentItemIndex + 1} / {baseTotal} · {currentStrategyDisplay}</span>
+                {(activeItems && session?.items && activeItems.length > 0 && activeItems.length !== session.items.length) && (
+                  <Tag color="volcano" style={{ marginLeft: 8 }}>
+                    弱项子集 {activeItems.length}/{session.items.length}
+                  </Tag>
+                )}
                 {questionMode === 'adaptive' && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <Tag color="geekblue">{qtsDifficultyTarget}</Tag>
