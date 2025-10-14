@@ -285,6 +285,50 @@ export async function getTodayPlan(params: {
     allocated += q.quota;
   });
 
+  // 基于昨日统计的轻量配额微调：按词书昨日 again/hard 占比，上调今日 quota，封顶 20%
+  try {
+    const db = await getDB();
+    const yesterday = new Date(Date.now() - 24 * 3600 * 1000).toISOString().split('T')[0];
+    const rows = await db.exec({
+      sql: `
+        SELECT 
+          w.wordbookId AS wordbookId,
+          COUNT(*) AS total,
+          SUM(CASE WHEN sl.response IN ('again','hard') THEN 1 ELSE 0 END) AS bad
+        FROM study_logs sl
+        JOIN words w ON w.id = sl.itemId
+        WHERE sl.userId = ? AND sl.timestamp LIKE ?
+        GROUP BY w.wordbookId
+      `,
+      args: [userId, yesterday + '%']
+    });
+
+    const byBook: Map<number, { total: number; bad: number }> = new Map();
+    (rows || []).forEach((r: any) => {
+      const wid = Number(r.wordbookId);
+      const total = Number(r.total || 0);
+      const bad = Number(r.bad || 0);
+      if (Number.isFinite(wid) && total > 0) {
+        byBook.set(wid, { total, bad });
+      }
+    });
+
+    quotas.forEach(q => {
+      const entry = byBook.get(q.wordbookId);
+      if (entry && entry.total > 0 && q.quota > 0) {
+        const ratio = entry.bad / entry.total; // 昨日困难占比
+        const boost = Math.min(0.2, ratio * 0.2); // 最多上调 20%，线性映射
+        const inc = Math.round(q.quota * boost);
+        q.quota = Math.min(q.quota + inc, q.dueCount);
+      }
+    });
+
+    // 重新计算 allocated，后续统一误差与最小保障处理
+    allocated = quotas.reduce((acc, qq) => acc + qq.quota, 0);
+  } catch (e: any) {
+    console.error('Yesterday quota adjust failed:', e?.message || e);
+  }
+
   // 处理取整误差：超分则减，未满则补
   const adjust = (delta: number) => {
     if (delta > 0) {
