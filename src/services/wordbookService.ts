@@ -1,35 +1,10 @@
 import { getDB } from './db';
-type Row = any;
 import cet4Data from '@/data/cet4-core.json';
 import gmatData from '@/data/gmat-core.json';
 import satData from '@/data/sat-advanced.json';
-export interface Wordbook extends Row {
-  id: number;
-  name: string;
-  description: string | null;
-  createdAt: string;
-}
+import { ImportFile, Wordbook, WordbookWithStats } from '@/types/wordbook';
+import { ensureImportFileSchema } from '@/types/wordbook';
 
-export interface WordbookWithStats extends Wordbook {
-  wordCount: number;
-  progress: number; // 0-100
-  masteredCount: number;
-  dueCount: number;
-  lastStudied?: string;
-}
-
-interface ImportWord {
-  word: string;
-  phonetic?: string;
-  definition: string;
-  example?: string;
-}
-
-interface ImportFile {
-  name: string;
-  description?: string;
-  words: ImportWord[];
-}
 
 async function seedFromFile(db: any, fileData: ImportFile, userId: string) {
   const { name, description, words } = fileData;
@@ -170,22 +145,11 @@ export async function checkWordbookExists(name: string): Promise<boolean> {
   return existing.length > 0;
 }
 
-interface ImportWord {
-  word: string;
-  phonetic?: string;
-  definition: string;
-  example?: string;
-}
-
-interface ImportFile {
-  name: string;
-  description?: string;
-  words: ImportWord[];
-}
 
 export async function importWordbook(jsonContent: string, userId: string): Promise<{ status: 'created' | 'updated', wordbookId: number }> {
   const db = await getDB();
-  const data: ImportFile = JSON.parse(jsonContent);
+  const parsed = JSON.parse(jsonContent);
+  const data: ImportFile = ensureImportFileSchema(parsed);
 
   // 1. Check if wordbook with the same name already exists
   const existingResult = await db.exec({
