@@ -1,5 +1,4 @@
 import { getDB } from './db';
-import type { Row } from '@/packages/wa-sqlite-adapter/types';
 
 export interface OverallStats {
   totalWords: number;
@@ -205,4 +204,124 @@ export async function getWordTypeStatistics(userId: string, days: number = 30): 
     avgStability: row.avgStability as number,
     avgRetrievability: row.avgRetrievability as number
   }));
+}
+
+/**
+ * 会话结束批量统计重算：
+ * - 基于 study_logs 聚合当天统计，写入 learning_statistics 与 word_type_statistics
+ * - 不改变 words/learning_progress 的结构，不触碰 wordCount
+ */
+export async function finalizeSessionStatistics(userId: string, date?: string): Promise<{ ok: boolean; updatedDates: string[] }> {
+  const db = await getDB();
+  const nowIso = new Date().toISOString();
+  const day = (date || nowIso.split('T')[0]);
+
+  try {
+    // 聚合当天 study_logs
+    const logs = await db.exec({
+      sql: `
+        SELECT 
+          sl.itemId, sl.response, sl.responseTime, sl.newStability, sl.newRetrievability,
+          w.type as wordType
+        FROM study_logs sl
+        JOIN words w ON w.id = sl.itemId
+        WHERE sl.userId = ? AND sl.timestamp LIKE ?
+      `,
+      args: [userId, `${day}%`],
+    });
+
+    const total = logs.length;
+    if (total === 0) {
+      // 无学习事件，返回成功但不更新
+      return { ok: true, updatedDates: [] };
+    }
+
+    const correct = logs.filter((r: any) => r.response === 'good' || r.response === 'easy').length;
+    const avgResponseTime = logs.reduce((acc: number, r: any) => acc + (Number(r.responseTime) || 0), 0) / total;
+    const avgStability = logs.reduce((acc: number, r: any) => acc + (Number(r.newStability) || 0), 0) / total;
+    const avgRetrievability = logs.reduce((acc: number, r: any) => acc + (Number(r.newRetrievability) || 0), 0) / total;
+
+    // 写入/更新 learning_statistics（覆盖到当日）
+    const exist = await db.exec({
+      sql: 'SELECT id,totalReviews FROM learning_statistics WHERE userId = ? AND date = ?',
+      args: [userId, day],
+    });
+
+    if (exist.length > 0) {
+      await db.exec({
+        sql: `
+          UPDATE learning_statistics
+          SET 
+            totalReviews = ?, 
+            correctReviews = ?, 
+            avgResponseTime = ?, 
+            avgStability = ?, 
+            avgRetrievability = ?, 
+            lastUpdated = ?
+          WHERE userId = ? AND date = ?
+        `,
+        args: [total, correct, avgResponseTime, avgStability, avgRetrievability, nowIso, userId, day],
+      });
+    } else {
+      // 简化 streakDays：暂设为1（后续可结合昨日记录计算）
+      await db.exec({
+        sql: `
+          INSERT INTO learning_statistics
+          (userId, date, totalReviews, correctReviews, avgResponseTime, avgStability, avgRetrievability, streakDays, lastUpdated)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        `,
+        args: [userId, day, total, correct, avgResponseTime, avgStability, avgRetrievability, nowIso],
+      });
+    }
+
+    // 按类型聚合写入 word_type_statistics
+    const byType = new Map<string, Array<any>>();
+    logs.forEach((r: any) => {
+      const t = String(r.wordType || 'vocabulary');
+      if (!byType.has(t)) byType.set(t, []);
+      byType.get(t)!.push(r);
+    });
+
+    for (const [wordType, arr] of byType.entries()) {
+      const tTotal = arr.length;
+      const tCorrect = arr.filter(r => r.response === 'good' || r.response === 'easy').length;
+      const tAvgStability = arr.reduce((acc, r) => acc + (Number(r.newStability) || 0), 0) / tTotal;
+      const tAvgRetrievability = arr.reduce((acc, r) => acc + (Number(r.newRetrievability) || 0), 0) / tTotal;
+
+      const existType = await db.exec({
+        sql: 'SELECT id,totalReviews FROM word_type_statistics WHERE userId = ? AND date = ? AND wordType = ?',
+        args: [userId, day, wordType],
+      });
+
+      if (existType.length > 0) {
+        await db.exec({
+          sql: `
+            UPDATE word_type_statistics
+            SET 
+              totalReviews = ?, 
+              correctReviews = ?, 
+              avgStability = ?, 
+              avgRetrievability = ?, 
+              lastUpdated = ?
+            WHERE userId = ? AND date = ? AND wordType = ?
+          `,
+          args: [tTotal, tCorrect, tAvgStability, tAvgRetrievability, nowIso, userId, day, wordType],
+        });
+      } else {
+        await db.exec({
+          sql: `
+            INSERT INTO word_type_statistics
+            (userId, date, wordType, totalReviews, correctReviews, avgStability, avgRetrievability, lastUpdated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          args: [userId, day, wordType, tTotal, tCorrect, tAvgStability, tAvgRetrievability, nowIso],
+        });
+      }
+    }
+
+    return { ok: true, updatedDates: [day] };
+  } catch (e: any) {
+    console.error('finalizeSessionStatistics failed:', e?.message || e);
+    return { ok: false, updatedDates: [] };
+  }
 }

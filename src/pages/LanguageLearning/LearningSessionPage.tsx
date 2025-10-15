@@ -13,8 +13,9 @@ import { LetterFillSpellingQuestion } from '@/components/language-learning/Lette
 const SessionEndFeedback = lazy(() => import('../../components/LanguageLearning/SessionEndFeedback'));
 import { Button, Space, Spin, Result, Typography, message, Progress, Select, Tag, Tooltip } from 'antd';
 import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews, startSessionFromTodayPlan } from '@/services/learningService';
+import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews, startSessionFromTodayPlan, aggregateDailyStudyAndUpdateProgress } from '@/services/learningService';
 import { evaluateRewardsOnEvent, addDailyFocusProgress } from '@/services/rewardService';
+import { finalizeSessionStatistics } from '@/services/statsService';
 import { importWordbook } from '@/services/wordbookService';
 import { useAppStore } from '@/store/useAppStore';
 import './LearningSessionPage.css';
@@ -384,33 +385,37 @@ const LearningSessionPage: React.FC = () => {
           // 不阻止流程继续
         }
         
-        // 后台自动生成"下次复习词书"并写入 lastWordbookId（最小增量，弱项为主）
-        try {
-          const weakIds = new Set(
-            (lastEntry ? [...summaryItems, lastEntry] : summaryItems)
-              .filter(si => si.response === 'hard' || si.response === 'again' || si.retrievability < 0.85)
-              .map(si => String(si.id))
-          );
-          const allItems = session?.items || [];
-          const weakItems = allItems.filter(si => weakIds.has(String(si.item.id)));
-          if (weakItems.length > 0) {
-            const name = `Next Review - ${new Date().toLocaleDateString()}`;
-            const description = `Auto-generated review list from session ${wordbookId}`;
-            const words = weakItems.map((si) => ({
-              word: String(si.item.content),
-              type: (si.item as any).type || 'word',
-              phonetic: (si.item as any).details?.phonetic || null,
-              definition: (si.item as any).details?.definition || '',
-              example: (si.item as any).details?.example || null
-            }));
-            const payload = JSON.stringify({ name, description, words });
-            const result = await importWordbook(payload, userId);
-            const newWordbookId = result.wordbookId;
-            setLastWordbookId(String(newWordbookId));
+        // 后台自动生成“下次复习词书”逻辑已禁用，改由复习计划页统一安排
+        // 说明：避免在学习会话中新增词书，复习与计划由 ReviewPlannerPage 负责
+        const autoCreateReviewWordbook = false;
+        if (autoCreateReviewWordbook) {
+          try {
+            const weakIds = new Set(
+              (lastEntry ? [...summaryItems, lastEntry] : summaryItems)
+                .filter(si => si.response === 'hard' || si.response === 'again' || si.retrievability < 0.85)
+                .map(si => String(si.id))
+            );
+            const allItems = session?.items || [];
+            const weakItems = allItems.filter(si => weakIds.has(String(si.item.id)));
+            if (weakItems.length > 0) {
+              const name = `Next Review - ${new Date().toLocaleDateString()}`;
+              const description = `Auto-generated review list from session ${wordbookId}`;
+              const words = weakItems.map((si) => ({
+                word: String(si.item.content),
+                type: (si.item as any).type || 'word',
+                phonetic: (si.item as any).details?.phonetic || null,
+                definition: (si.item as any).details?.definition || '',
+                example: (si.item as any).details?.example || null
+              }));
+              const payload = JSON.stringify({ name, description, words });
+              const result = await importWordbook(payload, userId);
+              const newWordbookId = result.wordbookId;
+              setLastWordbookId(String(newWordbookId));
+            }
+          } catch (e: any) {
+            console.error('Auto-create next review wordbook failed:', e?.message || e);
+            // 不阻止流程继续
           }
-        } catch (e: any) {
-          console.error('Auto-create next review wordbook failed:', e?.message || e);
-          // 不阻止流程继续
         }
         
         // Show end feedback first, then summary modal
@@ -879,8 +884,21 @@ const LearningSessionPage: React.FC = () => {
           <SessionEndFeedback
             visible={showEndFeedback}
             onClose={() => setShowEndFeedback(false)}
-            onComplete={() => {
+            onComplete={async () => {
               setShowEndFeedback(false);
+              try {
+                const day = new Date().toISOString().split('T')[0];
+                const resStats = await finalizeSessionStatistics(userId, day);
+                await aggregateDailyStudyAndUpdateProgress({ userId, date: day } as any);
+                if (resStats && resStats.ok) {
+                  message.success('批量统计已更新');
+                } else {
+                  message.error('批量统计更新失败');
+                }
+              } catch (e: any) {
+                console.error('Finalize session stats failed:', e?.message || e);
+                message.error('批量统计更新失败，请稍后重试');
+              }
               setShowSummary(true);
             }}
             sessionStats={{
