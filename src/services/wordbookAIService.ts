@@ -4,7 +4,7 @@ import { ensureImportFileSchema, ImportFile } from '@/types/wordbook';
 import { importWordbook } from '@/services/wordbookService';
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { openrouter } from '@ai-sdk/openrouter';
+
 
 import { generateTextWithFreePriority } from '@/services/llmService';
 
@@ -125,7 +125,19 @@ export async function generateWordbookViaAI(options: GenerateOptions): Promise<I
       text = (result?.text || '').trim();
     } else if (provider === 'openrouter') {
       const modelId = options.model || 'deepseek/deepseek-r1:free';
-      const result = await generateText({ model: openrouter(modelId, { apiKey }), prompt });
+      const result = await generateText({
+        model: openai(modelId, {
+          apiKey,
+          baseURL: 'https://openrouter.ai/api/v1',
+          headers: {
+            // 按 OpenRouter 要求可选设置（非必须，但推荐）
+            // Referer 和 X-Title 用于速率与配额识别
+            'HTTP-Referer': window?.location?.origin || 'http://localhost',
+            'X-Title': 'ai-speech-practice'
+          }
+        }),
+        prompt
+      });
       text = (result?.text || '').trim();
     } else {
       throw new Error(`不支持的 Provider: ${provider}`);

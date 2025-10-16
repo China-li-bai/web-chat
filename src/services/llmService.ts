@@ -1,6 +1,6 @@
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { openrouter } from '@ai-sdk/openrouter';
+
 import { GoogleGenAI } from '@google/genai';
 
 // Provider 枚举
@@ -137,7 +137,17 @@ export async function generateTextUnified(options: {
   }
 
   if (provider === LLMProvider.OpenRouter) {
-    const result = await generateText({ model: openrouter(modelId, { apiKey }), prompt: options.prompt });
+    const result = await generateText({
+      model: openai(modelId, {
+        apiKey,
+        baseURL: 'https://openrouter.ai/api/v1',
+        headers: {
+          'HTTP-Referer': (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : 'http://localhost',
+          'X-Title': 'ai-speech-practice'
+        }
+      }),
+      prompt: options.prompt
+    });
     const text = (result?.text || '').trim();
     if (!text) throw new Error('OpenRouter 返回空内容');
     return text;

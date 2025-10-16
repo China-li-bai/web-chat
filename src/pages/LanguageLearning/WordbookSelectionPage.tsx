@@ -65,7 +65,6 @@ export const WordbookSelectionPage: React.FC = () => {
   const handleCloseAiModal = () => {
     if (!aiLoading) setAiModalOpen(false);
   };
-  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

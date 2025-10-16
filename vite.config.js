@@ -45,5 +45,9 @@ export default defineConfig(async () => ({
     minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
     // produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
+    // mark optional deps as external to avoid bundle resolution errors
+    rollupOptions: {
+      external: ["@ai-sdk/openrouter"]
+    }
   },
 }));

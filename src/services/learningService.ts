@@ -235,11 +235,15 @@ export async function getTodayPlan(params: {
   userId: string;
   dailyQuota: number;
   includeUpcoming?: boolean; // false=仅到期；true=含24h内
+  quotaBoostCap?: number; // 昨日困难占比上调上限（0~1），默认 0.2
 }): Promise<TodayPlan> {
   const { userId } = params;
   const dailyQuota = Math.max(1, Math.min(500, params.dailyQuota || 60));
   const includeUpcoming = !!params.includeUpcoming;
   const timeWindowHours = includeUpcoming ? 24 : 0;
+  const quotaBoostCap = typeof params.quotaBoostCap === 'number'
+    ? Math.max(0, Math.min(1, params.quotaBoostCap))
+    : 0.2;
 
   // 拉取分组统计（到期/24h内）
   const grouped = await getReviewQueueGroupedByWordbook({
@@ -317,7 +321,7 @@ export async function getTodayPlan(params: {
       const entry = byBook.get(q.wordbookId);
       if (entry && entry.total > 0 && q.quota > 0) {
         const ratio = entry.bad / entry.total; // 昨日困难占比
-        const boost = Math.min(0.2, ratio * 0.2); // 最多上调 20%，线性映射
+        const boost = Math.min(quotaBoostCap, ratio * quotaBoostCap); // 使用可配置上限
         const inc = Math.round(q.quota * boost);
         q.quota = Math.min(q.quota + inc, q.dueCount);
       }
