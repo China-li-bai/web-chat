@@ -77,8 +77,9 @@ const Settings = () => {
   const handleSave = async (values) => {
     setLoading(true);
     try {
-      // 这里调用保存设置的API
-      console.log('保存设置:', values);
+      // 这里调用保存设置的API（避免输出敏感信息）
+      const { llmApiKey: _redacted, ...rest } = values;
+      console.log('保存设置: (llmApiKey 已隐藏)', rest);
       await new Promise(resolve => setTimeout(resolve, 1000)); // 模拟API调用
       message.success('设置保存成功！');
     } catch (error) {

@@ -2,6 +2,9 @@ import { GoogleGenAI } from '@google/genai';
 import { apiManager } from '@/utils/apiManager';
 import { ensureImportFileSchema, ImportFile } from '@/types/wordbook';
 import { importWordbook } from '@/services/wordbookService';
+import { generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { openrouter } from '@ai-sdk/openrouter';
 
 export interface GenerateOptions {
   name: string; // 生成后词书名称
@@ -10,6 +13,9 @@ export interface GenerateOptions {
   targetLanguage?: string; // 目标语言，例如 "English", "Chinese"
   level?: 'beginner' | 'intermediate' | 'advanced' | 'cet4' | 'cet6' | 'sat' | 'gmat';
   wordCount?: number; // 希望生成的词条数量
+  provider?: 'gemini' | 'openai' | 'openrouter'; // 统一前端方案：可选 Provider
+  model?: string; // 具体模型 ID（可选）
+  apiKey?: string; // 对应 Provider 的 API Key（优先使用此字段）
 }
 
 function buildPrompt(opts: GenerateOptions): string {
@@ -99,8 +105,53 @@ export async function generateWordbookWithGemini(options: GenerateOptions): Prom
   }
 }
 
+export async function generateWordbookViaAI(options: GenerateOptions): Promise<ImportFile> {
+  const provider = options.provider || 'openrouter';
+  if (provider === 'gemini') {
+    return generateWordbookWithGemini(options);
+  }
+  const apiKey = options.apiKey || '';
+  if (!apiKey) {
+    throw new Error('未配置所选 Provider 的 API 密钥');
+  }
+  const prompt = buildPrompt(options);
+  try {
+    let text = '';
+    if (provider === 'openai') {
+      const modelId = options.model || 'gpt-4o-mini';
+      const result = await generateText({ model: openai(modelId, { apiKey }), prompt });
+      text = (result?.text || '').trim();
+    } else if (provider === 'openrouter') {
+      const modelId = options.model || 'deepseek/deepseek-r1:free';
+      const result = await generateText({ model: openrouter(modelId, { apiKey }), prompt });
+      text = (result?.text || '').trim();
+    } else {
+      throw new Error(`不支持的 Provider: ${provider}`);
+    }
+
+    if (!text) {
+      throw new Error('所选 Provider 返回空内容');
+    }
+
+    const raw = extractJson(text);
+    // 填充缺失的元信息
+    if (!raw.name) raw.name = options.name;
+    if (options.description && !raw.description) raw.description = options.description;
+
+    const normalized = ensureImportFileSchema(raw);
+    return normalized;
+  } catch (error: any) {
+    console.error('[WordbookAIService] 生成失败:', error);
+    const msg = String(error?.message || error);
+    throw new Error(`AI 生成失败(${provider}): ${msg}`);
+  }
+}
+
 export async function generateAndImportWordbook(options: GenerateOptions, userId: string) {
-  const file: ImportFile = await generateWordbookWithGemini(options);
+  const provider = options.provider || 'openrouter';
+  const file: ImportFile = provider === 'gemini'
+    ? await generateWordbookWithGemini(options)
+    : await generateWordbookViaAI(options);
   const json = JSON.stringify(file);
   return importWordbook(json, userId);
 }
