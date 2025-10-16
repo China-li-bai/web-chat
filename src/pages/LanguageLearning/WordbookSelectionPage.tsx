@@ -132,13 +132,23 @@ export const WordbookSelectionPage: React.FC = () => {
 
   // 提交 AI 生成
   const handleAiGenerate = async (values: any) => {
-    const { name, topic, targetLanguage, level, wordCount, description } = values || {};
+    const { name, topic, targetLanguage, level, wordCount, description, provider, model, apiKey, baseUrl } = values || {};
     if (!name || !String(name).trim()) {
       messageApi.error('Please input a valid name');
       return;
     }
 
-    const options = {
+    const providerValue = (provider || 'free-priority') as string;
+    const defaultBaseByProvider: Record<string, string | undefined> = {
+      'zhipu': 'https://open.bigmodel.cn/api/paas/v4',
+      'ernie': undefined, // 需自行提供网关
+      'hunyuan': undefined, // 需自行提供 OpenAI 兼容网关
+      'openrouter': 'https://openrouter.ai/api/v1',
+      'gemini': undefined,
+      'openai': undefined,
+    };
+
+    const baseOptions = {
       name: String(name).trim(),
       topic: topic ? String(topic).trim() : undefined,
       targetLanguage: targetLanguage ? String(targetLanguage).trim() : 'English',
@@ -150,9 +160,29 @@ export const WordbookSelectionPage: React.FC = () => {
     const proceed = async () => {
       try {
         setAiLoading(true);
-        const { generateAndImportWordbookUnified } = await import('@/services/wordbookAIService');
-        await generateAndImportWordbookUnified(options as any, userId);
-        messageApi.success(`Wordbook "${options.name}" generated successfully!`);
+        const { generateAndImportWordbookUnified, generateAndImportWordbook } = await import('@/services/wordbookAIService');
+
+        if (providerValue === 'free-priority') {
+          await generateAndImportWordbookUnified(baseOptions as any, userId);
+        } else {
+          const mappedProvider = providerValue; // 直接透传：'zhipu'|'ernie'|'hunyuan'|'openrouter'|'gemini'|'openai'
+          if (!apiKey || !String(apiKey).trim()) {
+            messageApi.error('Please provide API Key for the selected provider');
+            return;
+          }
+          const explicitOptions = {
+            ...baseOptions,
+            provider: mappedProvider,
+            model: model ? String(model).trim() : undefined,
+            apiKey: String(apiKey).trim(),
+            baseUrl: typeof baseUrl === 'string' && baseUrl.trim()
+              ? String(baseUrl).trim()
+              : defaultBaseByProvider[mappedProvider]
+          };
+          await generateAndImportWordbook(explicitOptions as any, userId);
+        }
+
+        messageApi.success(`Wordbook "${baseOptions.name}" generated successfully!`);
         setAiModalOpen(false);
         aiForm.resetFields();
         await loadWordbooks();
@@ -165,11 +195,11 @@ export const WordbookSelectionPage: React.FC = () => {
     };
 
     try {
-      const exists = await checkWordbookExists(options.name);
+      const exists = await checkWordbookExists(baseOptions.name);
       if (exists) {
         Modal.confirm({
           title: 'Confirm Overwrite',
-          content: `A wordbook named "${options.name}" already exists. Do you want to overwrite it?`,
+          content: `A wordbook named "${baseOptions.name}" already exists. Do you want to overwrite it?`,
           onOk: proceed,
         });
       } else {
@@ -247,7 +277,7 @@ export const WordbookSelectionPage: React.FC = () => {
         <Form
           form={aiForm}
           layout="vertical"
-          initialValues={{ level: 'intermediate', wordCount: 50, targetLanguage: 'English' }}
+          initialValues={{ level: 'intermediate', wordCount: 50, targetLanguage: 'English', provider: 'free-priority' }}
           onFinish={handleAiGenerate}
           onFinishFailed={() => messageApi.error('Please complete required fields')}
         >
@@ -278,6 +308,61 @@ export const WordbookSelectionPage: React.FC = () => {
           </Form.Item>
           <Form.Item label="Description" name="description">
             <TextArea rows={3} placeholder="Short description for this wordbook" />
+          </Form.Item>
+
+          <Form.Item label="Provider" name="provider">
+            <Select
+              options={[
+                { label: 'Free Priority (GLM → ERNIE → Hunyuan → OpenRouter:free → Gemini → OpenAI)', value: 'free-priority' },
+                { label: 'Zhipu AI (GLM)', value: 'zhipu' },
+                { label: 'Baidu ERNIE', value: 'ernie' },
+                { label: 'Tencent Hunyuan', value: 'hunyuan' },
+                { label: 'OpenRouter', value: 'openrouter' },
+                { label: 'Gemini', value: 'gemini' },
+                { label: 'OpenAI', value: 'openai' },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item noStyle shouldUpdate={(prev, curr) => prev.provider !== curr.provider}>
+            {({ getFieldValue }) => {
+              const p = getFieldValue('provider');
+              if (p && p !== 'free-priority') {
+                const modelPh =
+                  p === 'zhipu' ? 'e.g., glm-4-flash' :
+                  p === 'ernie' ? 'e.g., ernie-speed' :
+                  p === 'hunyuan' ? 'e.g., hunyuan-lite' :
+                  p === 'openrouter' ? 'e.g., deepseek/deepseek-r1:free' :
+                  p === 'openai' ? 'e.g., gpt-4o-mini' :
+                  'e.g., gemini-1.5-flash';
+                const basePh =
+                  p === 'zhipu' ? 'https://open.bigmodel.cn/api/paas/v4' :
+                  p === 'openrouter' ? 'https://openrouter.ai/api/v1' :
+                  p === 'ernie' ? 'Your ERNIE-compatible gateway base URL' :
+                  p === 'hunyuan' ? 'Your Hunyuan OpenAI-compatible gateway base URL' :
+                  '';
+                return (
+                  <>
+                    <Form.Item label="Model (optional)" name="model">
+                      <Input placeholder={modelPh} />
+                    </Form.Item>
+                    <Form.Item label="API Key" name="apiKey" rules={[{ required: true, message: 'Please input API Key for the selected provider' }]}>
+                      <Input.Password placeholder="Your API Key" />
+                    </Form.Item>
+                    <Form.Item label="Base URL (optional)" name="baseUrl">
+                      <Input placeholder={basePh} />
+                    </Form.Item>
+                  </>
+                );
+              }
+              return (
+                <Form.Item>
+                  <Text type="secondary">
+                    Using Free Priority chain by default: GLM-4-Flash → ERNIE-Speed → hunyuan-lite → OpenRouter:free → Gemini → OpenAI
+                  </Text>
+                </Form.Item>
+              );
+            }}
           </Form.Item>
         </Form>
       </Modal>

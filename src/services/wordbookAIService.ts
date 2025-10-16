@@ -6,7 +6,7 @@ import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 
 
-import { generateTextWithFreePriority } from '@/services/llmService';
+import { generateTextWithFreePriority, generateTextUnified, LLMProvider } from '@/services/llmService';
 
 export interface GenerateOptions {
   name: string; // 生成后词书名称
@@ -107,8 +107,9 @@ export async function generateWordbookWithGemini(options: GenerateOptions): Prom
   }
 }
 
-export async function generateWordbookViaAI(options: GenerateOptions): Promise<ImportFile> {
+export async function generateWordbookViaAI(options: GenerateOptions & { baseUrl?: string }): Promise<ImportFile> {
   const provider = options.provider || 'openrouter';
+  // 单独走 Gemini 官方 SDK（已实现）
   if (provider === 'gemini') {
     return generateWordbookWithGemini(options);
   }
@@ -119,29 +120,22 @@ export async function generateWordbookViaAI(options: GenerateOptions): Promise<I
   const prompt = buildPrompt(options);
   try {
     let text = '';
-    if (provider === 'openai') {
-      const modelId = options.model || 'gpt-4o-mini';
-      const result = await generateText({ model: openai(modelId, { apiKey }), prompt });
-      text = (result?.text || '').trim();
-    } else if (provider === 'openrouter') {
-      const modelId = options.model || 'deepseek/deepseek-r1:free';
-      const result = await generateText({
-        model: openai(modelId, {
-          apiKey,
-          baseURL: 'https://openrouter.ai/api/v1',
-          headers: {
-            // 按 OpenRouter 要求可选设置（非必须，但推荐）
-            // Referer 和 X-Title 用于速率与配额识别
-            'HTTP-Referer': window?.location?.origin || 'http://localhost',
-            'X-Title': 'ai-speech-practice'
-          }
-        }),
-        prompt
-      });
-      text = (result?.text || '').trim();
-    } else {
-      throw new Error(`不支持的 Provider: ${provider}`);
-    }
+    // 统一入口：通过 llmService.generateTextUnified，支持 zhipu/ernie/hunyuan/openrouter/gemini/openai
+    const mappedProvider =
+      provider === 'openai' ? LLMProvider.OpenAI :
+      provider === 'openrouter' ? LLMProvider.OpenRouter :
+      provider === 'zhipu' ? LLMProvider.Zhipu :
+      provider === 'ernie' ? LLMProvider.Ernie :
+      provider === 'hunyuan' ? LLMProvider.Hunyuan :
+      LLMProvider.OpenAI;
+    const t = await generateTextUnified({
+      provider: mappedProvider,
+      prompt,
+      apiKey,
+      modelName: options.model,
+      baseUrl: options.baseUrl
+    });
+    text = (t || '').trim();
 
     if (!text) {
       throw new Error('所选 Provider 返回空内容');
@@ -161,7 +155,7 @@ export async function generateWordbookViaAI(options: GenerateOptions): Promise<I
   }
 }
 
-export async function generateAndImportWordbook(options: GenerateOptions, userId: string) {
+export async function generateAndImportWordbook(options: GenerateOptions & { baseUrl?: string }, userId: string) {
   const provider = options.provider || 'openrouter';
   const file: ImportFile = provider === 'gemini'
     ? await generateWordbookWithGemini(options)
