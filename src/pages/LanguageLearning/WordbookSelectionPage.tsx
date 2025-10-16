@@ -4,10 +4,11 @@ import { WordbookCard } from '@/components/language-learning/WordbookCard';
 import { seedInitialData, getAllWordbooksWithStats, importWordbook, checkWordbookExists, type WordbookWithStats } from '@/services/wordbookService';
 import { initializeDatabase } from '@/services/dataInitService';
 import { useAppStore } from '@/store/useAppStore';
-import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal } from 'antd';
+import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal, Form, Input, Select, InputNumber } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
+const { TextArea } = Input;
 
 export const WordbookSelectionPage: React.FC = () => {
   const [wordbooks, setWordbooks] = useState<WordbookWithStats[]>([]);
@@ -16,6 +17,16 @@ export const WordbookSelectionPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const userId = useAppStore((state) => state.userId);
+
+  // AI 生成相关状态
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiForm] = Form.useForm();
+
+  // 引入 AI 统一生成并导入
+  // 延后导入声明，避免循环依赖风险（实际为静态导入，保持简单）
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  type _Keep = void;
 
   const loadWordbooks = async () => {
     try {
@@ -45,6 +56,15 @@ export const WordbookSelectionPage: React.FC = () => {
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleOpenAiModal = () => {
+    setAiModalOpen(true);
+  };
+
+  const handleCloseAiModal = () => {
+    if (!aiLoading) setAiModalOpen(false);
+  };
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,6 +131,57 @@ export const WordbookSelectionPage: React.FC = () => {
     event.target.value = '';
   };
 
+  // 提交 AI 生成
+  const handleAiGenerate = async (values: any) => {
+    const { name, topic, targetLanguage, level, wordCount, description } = values || {};
+    if (!name || !String(name).trim()) {
+      messageApi.error('Please input a valid name');
+      return;
+    }
+
+    const options = {
+      name: String(name).trim(),
+      topic: topic ? String(topic).trim() : undefined,
+      targetLanguage: targetLanguage ? String(targetLanguage).trim() : 'English',
+      level: level || 'intermediate',
+      wordCount: Number(wordCount || 50),
+      description: description ? String(description).trim() : undefined,
+    };
+
+    const proceed = async () => {
+      try {
+        setAiLoading(true);
+        const { generateAndImportWordbookUnified } = await import('@/services/wordbookAIService');
+        await generateAndImportWordbookUnified(options as any, userId);
+        messageApi.success(`Wordbook "${options.name}" generated successfully!`);
+        setAiModalOpen(false);
+        aiForm.resetFields();
+        await loadWordbooks();
+      } catch (e: any) {
+        console.error('AI generate/import failed:', e);
+        messageApi.error(String(e?.message || 'AI generate failed'));
+      } finally {
+        setAiLoading(false);
+      }
+    };
+
+    try {
+      const exists = await checkWordbookExists(options.name);
+      if (exists) {
+        Modal.confirm({
+          title: 'Confirm Overwrite',
+          content: `A wordbook named "${options.name}" already exists. Do you want to overwrite it?`,
+          onOk: proceed,
+        });
+      } else {
+        await proceed();
+      }
+    } catch (e: any) {
+      console.error('checkWordbookExists failed:', e);
+      messageApi.error(String(e?.message || 'Check wordbook failed'));
+    }
+  };
+
   return (
     <>
       {contextHolder}
@@ -123,6 +194,9 @@ export const WordbookSelectionPage: React.FC = () => {
           <Space>
             <Button type="primary" icon={<UploadOutlined />} onClick={handleImportClick}>
               Import Wordbook
+            </Button>
+            <Button onClick={handleOpenAiModal}>
+              AI Generate
             </Button>
             <input
               type="file"
@@ -160,6 +234,54 @@ export const WordbookSelectionPage: React.FC = () => {
         )}
         </main>
       </div>
+
+      {/* AI 生成词书表单 Modal */}
+      <Modal
+        title="AI Generate Wordbook"
+        open={aiModalOpen}
+        onCancel={handleCloseAiModal}
+        onOk={() => aiForm.submit()}
+        okText={aiLoading ? 'Generating...' : 'Generate'}
+        confirmLoading={aiLoading}
+        destroyOnClose
+      >
+        <Form
+          form={aiForm}
+          layout="vertical"
+          initialValues={{ level: 'intermediate', wordCount: 50, targetLanguage: 'English' }}
+          onFinish={handleAiGenerate}
+          onFinishFailed={() => messageApi.error('Please complete required fields')}
+        >
+          <Form.Item label="Name" name="name" rules={[{ required: true, message: 'Please input name' }]}>
+            <Input placeholder="e.g., Travel English Starter" />
+          </Form.Item>
+          <Form.Item label="Topic" name="topic">
+            <Input placeholder="e.g., Travel, Business, IT" />
+          </Form.Item>
+          <Form.Item label="Target Language" name="targetLanguage">
+            <Input placeholder="e.g., English, Chinese" />
+          </Form.Item>
+          <Form.Item label="Level" name="level">
+            <Select
+              options={[
+                { label: 'Beginner', value: 'beginner' },
+                { label: 'Intermediate', value: 'intermediate' },
+                { label: 'Advanced', value: 'advanced' },
+                { label: 'CET4', value: 'cet4' },
+                { label: 'CET6', value: 'cet6' },
+                { label: 'SAT', value: 'sat' },
+                { label: 'GMAT', value: 'gmat' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="Word Count" name="wordCount" rules={[{ type: 'number', min: 10, max: 200 }]}>
+            <InputNumber min={10} max={200} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="Description" name="description">
+            <TextArea rows={3} placeholder="Short description for this wordbook" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
 };

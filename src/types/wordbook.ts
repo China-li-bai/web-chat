@@ -5,6 +5,8 @@ export interface ImportWord {
   phonetic?: string | null;
   definition: string;
   example?: string | null;
+  // 与 DB "words"."type" 字段对齐，默认 'vocabulary'
+  type?: string | null;
 }
 
 export interface ImportFile {
@@ -27,6 +29,8 @@ export interface WordbookWithStats extends Wordbook {
   dueCount: number;
   lastStudied?: string;
 }
+
+export const DEFAULT_WORD_TYPE = 'vocabulary';
 
 // Validate and normalize an arbitrary object into ImportFile schema
 export function ensureImportFileSchema(input: any): ImportFile {
@@ -52,7 +56,8 @@ export function ensureImportFileSchema(input: any): ImportFile {
     }
     const phonetic = w?.phonetic != null ? String(w.phonetic) : null;
     const example = w?.example != null ? String(w.example) : null;
-    return { word, phonetic, definition, example };
+    const type = w?.type != null && String(w.type).trim() ? String(w.type).trim() : DEFAULT_WORD_TYPE;
+    return { word, phonetic, definition, example, type };
   });
 
   return { name, description, words };
