@@ -16,15 +16,43 @@ function normalizeBaseOptions(values: any): WordbookGenerateBaseOptions {
     name: trimmedName,
     topic: topic ? String(topic).trim() : undefined,
     targetLanguage: targetLanguage ? String(targetLanguage).trim() : 'English',
-    level: level || 'intermediate',
+    level: (level as WordbookGenerateBaseOptions['level']) || 'intermediate',
     wordCount: Number(wordCount || 50),
     description: description ? String(description).trim() : undefined,
   };
 }
 
+/**
+ * 将页面表单值规范化为“显式 Provider”配置（非 free-priority）
+ * - 校验 apiKey
+ * - 解析 baseUrl（如果未提供且存在默认值，则填充默认）
+ */
 function buildExplicitOptions(values: any, base: WordbookGenerateBaseOptions): ExplicitProviderOptions {
   const { provider, model, apiKey, baseUrl } = values || {};
   const providerValue = (provider || 'free-priority') as ProviderKey;
+
+  if (providerValue === 'free-priority') {
+    throw new Error('Explicit provider options requested but provider is free-priority');
+  }
+  if (!apiKey || !String(apiKey).trim()) {
+    throw new Error('Please provide API Key for the selected provider');
+  }
+  const mappedProvider = providerValue as Exclude<ProviderKey, 'free-priority'>;
+
+  return {
+    ...base,
+    provider: mappedProvider,
+    model: model ? String(model).trim() : undefined,
+    apiKey: String(apiKey).trim(),
+    baseUrl: resolveBaseUrl(mappedProvider, baseUrl),
+  };
+}
+
+/**
+ * 仅生成 ImportFile（不落库），供页面预览导入
+ * - free-priority：使用统一免费优先链
+ * - 显式 Provider：走对应 Provider（需 apiKey / 可选 baseUrl / model）
+ */
 export async function generateWordbookFile(values: any): Promise<ImportFile> {
   const baseOptions = normalizeBaseOptions(values);
   const providerValue = (values?.provider || 'free-priority') as ProviderKey;
@@ -40,22 +68,6 @@ export async function generateWordbookFile(values: any): Promise<ImportFile> {
     const file: ImportFile = await generateWordbookViaAI(explicitOptions as any);
     return file;
   }
-}
-
-  if (providerValue === 'free-priority') {
-    throw new Error('Explicit provider options requested but provider is free-priority');
-  }
-  if (!apiKey || !String(apiKey).trim()) {
-    throw new Error('Please provide API Key for the selected provider');
-  }
-  const mappedProvider = providerValue as Exclude<ProviderKey, 'free-priority'>;
-  return {
-    ...base,
-    provider: mappedProvider,
-    model: model ? String(model).trim() : undefined,
-    apiKey: String(apiKey).trim(),
-    baseUrl: resolveBaseUrl(mappedProvider, baseUrl),
-  };
 }
 
 /**

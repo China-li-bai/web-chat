@@ -1,4 +1,4 @@
-import { LLMProvider, defaultModels, defaultBaseUrls, setLLMApiKey, getLLMApiKey, setCurrentLLMProvider, getCurrentLLMConfig, generateTextUnified, generateTextWithFreePriority } from '@/services/llmService';
+import { LLMProvider, defaultModels, defaultBaseUrls, setLLMApiKey, getLLMApiKey, setCurrentLLMProvider, getCurrentLLMConfig, generateTextUnified, generateTextWithFreePriority } from '@/modules/ai/llmService';
 import type { ProviderKey } from './types';
 import { resolveBaseUrl } from './provider';
 

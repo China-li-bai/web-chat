@@ -14,6 +14,11 @@ export enum LLMProvider {
   Hunyuan = 'hunyuan',
 }
 
+const systemRole = {
+  "role": "system",
+  content:  ``
+}
+
 // 模型 ID 类型（各 Provider 的字符串）
 export type LLMModel = string;
 

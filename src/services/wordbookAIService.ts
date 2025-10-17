@@ -2,11 +2,8 @@ import { GoogleGenAI } from '@google/genai';
 import { apiManager } from '@/utils/apiManager';
 import { ensureImportFileSchema, ImportFile } from '@/types/wordbook';
 import { importWordbook } from '@/services/wordbookService';
-import { generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
 
-
-import { generateTextWithFreePriority, generateTextUnified, LLMProvider } from '@/services/llmService';
+import { generateTextWithFreePriority, generateTextUnified, LLMProvider } from '@/modules/ai/llmService';
 
 export interface GenerateOptions {
   name: string; // 生成后词书名称

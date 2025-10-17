@@ -2,19 +2,17 @@
 
 ## Core Features
 
-- src/data 三个 JSON 所有词条补全准确中文释义 translation
+- src/data 三个 JSON 词条包含 translation
 
-- ai 模块新增 generateWordbookFile（仅生成 ImportFile，不落库）
+- ai 模块提供 generateWordbookFile/handleAiGenerate 并页面调用
 
-- 新增导入预览 Modal（可编辑中文释义 translation）
+- free-priority 链路与显式 Provider 统一入口
 
-- 页面改造：AI 生成与本地导入均先预览再导入
+- 导入前预览 Modal 支持编辑并二次确认
 
-- 卡片组件支持展示中文释义 translation（可选）
+- learningService 透传 translation（DB→session.details）
 
-- 学习会话页面为卡片传入 translation 字段
-
-- 学习会话装配透传 translation（DB→session.details）
+- 卡片组件可显示中文释义 translation（可选）
 
 ## Tech Stack
 
@@ -27,7 +25,7 @@
 
 ## Design
 
-DB words 表含 translation；learningService 在 SELECT 中取出 w.translation，并在 details 映射中透传 translation；LearningSessionPage 将 details.translation 传给卡片组件展示。
+页面在 AI 生成时仅调用 modules/ai 暴露的函数；ai/wordbook.ts 负责 Provider 选择与 ImportFile 生成；入库统一走 wordbookService。
 
 ## Plan
 
@@ -53,6 +51,6 @@ Note:
 
 [X] 学习会话装配透传 translation
 
-[/] 回归验证预览与导入流程
+[X] 修复 ai/wordbook.ts 函数结构错误
 
-[X] 修正 translation 传值空串导致不显示
+[/] 回归验证预览与导入流程
