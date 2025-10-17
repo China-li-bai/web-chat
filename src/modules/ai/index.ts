@@ -13,5 +13,3 @@ export { getCurrentConfig as getCurrentLLMConfig } from './llm';
 export { AiDefaultModels as defaultModels } from './llm';
 export { AiDefaultBaseUrls as defaultBaseUrls } from './llm';
 
-// 直通导出词书生成服务，便于统一从 modules/ai 引用
-export { generateAndImportWordbookUnified, generateAndImportWordbook } from '@/services/wordbookAIService';

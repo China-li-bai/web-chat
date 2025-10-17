@@ -8,7 +8,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal, Form, Input, Select, InputNumber } from 'antd';
 import ImportPreviewModal from '@/components/language-learning/import-preview-modal';
 import { UploadOutlined } from '@ant-design/icons';
-
+import { generateWordbookFile } from '@/modules/ai'
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
@@ -145,7 +145,7 @@ export const WordbookSelectionPage: React.FC = () => {
     });
     try {
       setAiLoading(true);
-      const { generateWordbookFile } = await import('@/modules/ai');
+
       const file = await generateWordbookFile(values);
       setPreviewFile(file as any);
       setPreviewOpen(true);
@@ -228,30 +228,30 @@ export const WordbookSelectionPage: React.FC = () => {
           </Space>
         </div>
         <main>
-        {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '50px' }}>
-            <Spin size="large" />
-          </div>
-        ) : wordbooks.length > 0 ? (
-          <Row gutter={[16, 16]}>
-            {wordbooks.map((book) => (
-              <Col xs={24} sm={12} md={8} lg={6} key={book.id}>
-                <WordbookCard
-                  name={book.name}
-                  description={book.description}
-                  wordCount={book.wordCount}
-                  progress={book.progress}
-                  masteredCount={book.masteredCount}
-                  dueCount={book.dueCount}
-                  lastStudied={book.lastStudied}
-                  onStart={() => handleStartLearning(book.id)}
-                />
-              </Col>
-            ))}
-          </Row>
-        ) : (
-          <Empty description="No wordbooks found. Try importing one to get started." />
-        )}
+          {isLoading ? (
+            <div style={{ textAlign: 'center', padding: '50px' }}>
+              <Spin size="large" />
+            </div>
+          ) : wordbooks.length > 0 ? (
+            <Row gutter={[16, 16]}>
+              {wordbooks.map((book) => (
+                <Col xs={24} sm={12} md={8} lg={6} key={book.id}>
+                  <WordbookCard
+                    name={book.name}
+                    description={book.description}
+                    wordCount={book.wordCount}
+                    progress={book.progress}
+                    masteredCount={book.masteredCount}
+                    dueCount={book.dueCount}
+                    lastStudied={book.lastStudied}
+                    onStart={() => handleStartLearning(book.id)}
+                  />
+                </Col>
+              ))}
+            </Row>
+          ) : (
+            <Empty description="No wordbooks found. Try importing one to get started." />
+          )}
         </main>
       </div>
 
@@ -321,17 +321,17 @@ export const WordbookSelectionPage: React.FC = () => {
               if (p && p !== 'free-priority') {
                 const modelPh =
                   p === 'zhipu' ? 'e.g., glm-4-flash' :
-                  p === 'ernie' ? 'e.g., ernie-speed' :
-                  p === 'hunyuan' ? 'e.g., hunyuan-lite' :
-                  p === 'openrouter' ? 'e.g., deepseek/deepseek-r1:free' :
-                  p === 'openai' ? 'e.g., gpt-4o-mini' :
-                  'e.g., gemini-1.5-flash';
+                    p === 'ernie' ? 'e.g., ernie-speed' :
+                      p === 'hunyuan' ? 'e.g., hunyuan-lite' :
+                        p === 'openrouter' ? 'e.g., deepseek/deepseek-r1:free' :
+                          p === 'openai' ? 'e.g., gpt-4o-mini' :
+                            'e.g., gemini-1.5-flash';
                 const basePh =
                   p === 'zhipu' ? 'https://open.bigmodel.cn/api/paas/v4' :
-                  p === 'openrouter' ? 'https://openrouter.ai/api/v1' :
-                  p === 'ernie' ? 'Your ERNIE-compatible gateway base URL' :
-                  p === 'hunyuan' ? 'Your Hunyuan OpenAI-compatible gateway base URL' :
-                  '';
+                    p === 'openrouter' ? 'https://openrouter.ai/api/v1' :
+                      p === 'ernie' ? 'Your ERNIE-compatible gateway base URL' :
+                        p === 'hunyuan' ? 'Your Hunyuan OpenAI-compatible gateway base URL' :
+                          '';
                 return (
                   <>
                     <Form.Item label="Model (optional)" name="model">

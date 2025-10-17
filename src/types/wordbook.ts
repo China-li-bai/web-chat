@@ -64,3 +64,15 @@ export function ensureImportFileSchema(input: any): ImportFile {
 
   return { name, description, words };
 }
+
+export interface GenerateOptions {
+  name: string; // 生成后词书名称
+  description?: string; // 词书描述
+  topic?: string; // 主题，例如 "Travel", "IT", "Business"
+  targetLanguage?: string; // 目标语言，例如 "English", "Chinese"
+  level?: 'beginner' | 'intermediate' | 'advanced' | 'cet4' | 'cet6' | 'sat' | 'gmat';
+  wordCount?: number; // 希望生成的词条数量
+  provider?: 'gemini' | 'openai' | 'openrouter'; // 统一前端方案：可选 Provider
+  model?: string; // 具体模型 ID（可选）
+  apiKey?: string; // 对应 Provider 的 API Key（优先使用此字段）
+}

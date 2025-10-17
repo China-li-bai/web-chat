@@ -2,6 +2,7 @@ import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 
 import { GoogleGenAI } from '@google/genai';
+import Prompts from './prompts/Prompts';
 
 // Provider 枚举
 export enum LLMProvider {
@@ -14,9 +15,16 @@ export enum LLMProvider {
   Hunyuan = 'hunyuan',
 }
 
-const systemRole = {
-  "role": "system",
-  content:  ``
+const messages = async (msg: { role: string, content: string }) => {
+  const content = await Prompts.get('anthropic_thinking_protocol');
+  
+  return [
+    {
+      role: "system",
+      content
+    },
+    msg
+  ]
 }
 
 // 模型 ID 类型（各 Provider 的字符串）
@@ -125,7 +133,7 @@ export async function generateTextUnified(options: {
     const ai = new GoogleGenAI({ apiKey });
     const resp = await ai.models.generateContent({
       model: modelId,
-      contents: [{ parts: [{ text: options.prompt }]}],
+      contents: [{ parts: [{ text: options.prompt }] }],
       config: { responseModalities: ['TEXT'] },
     });
     const parts = resp?.candidates?.[0]?.content?.parts || [];
@@ -166,7 +174,7 @@ export async function generateTextUnified(options: {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: modelId,
-        messages: [{ role: 'user', content: options.prompt }],
+        messages:await messages({ role: 'user', content: options.prompt }),
       }),
     });
     const data = await resp.json();
@@ -183,7 +191,7 @@ export async function generateTextUnified(options: {
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) },
-      body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: options.prompt }] }),
+      body: JSON.stringify({ model: modelId, messages:await messages({ role: 'user', content: options.prompt })}),
     });
     const data = await resp.json();
     const text = data?.choices?.[0]?.message?.content || '';
@@ -199,7 +207,7 @@ export async function generateTextUnified(options: {
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) },
-      body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: options.prompt }] }),
+      body: JSON.stringify({ model: modelId, messages:await  messages({ role: 'user', content: options.prompt })}),
     });
     const data = await resp.json();
     const text = data?.choices?.[0]?.message?.content || '';
