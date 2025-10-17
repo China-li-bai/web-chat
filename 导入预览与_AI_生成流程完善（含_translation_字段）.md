@@ -12,6 +12,10 @@
 
 - 卡片组件支持展示中文释义 translation（可选）
 
+- 学习会话页面为卡片传入 translation 字段
+
+- 学习会话装配透传 translation（DB→session.details）
+
 ## Tech Stack
 
 {
@@ -23,7 +27,7 @@
 
 ## Design
 
-在 Flashcard 与 LearningFlashcard 背面区域追加可选的中文释义展示，向后兼容不破坏现有调用。
+DB words 表含 translation；learningService 在 SELECT 中取出 w.translation，并在 details 映射中透传 translation；LearningSessionPage 将 details.translation 传给卡片组件展示。
 
 ## Plan
 
@@ -45,4 +49,10 @@ Note:
 
 [X] 卡片组件支持 translation 展示
 
+[X] 学习会话卡片传入 translation
+
+[X] 学习会话装配透传 translation
+
 [/] 回归验证预览与导入流程
+
+[X] 修正 translation 传值空串导致不显示

@@ -649,7 +649,8 @@ const LearningSessionPage: React.FC = () => {
       }
     />;
   }
-
+  console.log(currentItem.item);
+  
   const details = (currentItem.item as any).details || {};
 
   const frontContent = <Title level={2}>{currentItem.item.content}</Title>;
@@ -771,6 +772,7 @@ const LearningSessionPage: React.FC = () => {
                   onFlip={handleFlip}
                   onSwipeLeft={handleSwipeLeft}
                   onSwipeRight={handleSwipeRight}
+                  translation={details?.translation}
                 />
               )}
 
@@ -778,6 +780,7 @@ const LearningSessionPage: React.FC = () => {
                 <ChoiceQuestion
                   word={String(((currentItem as any)?.item?.content) || '')}
                   definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                  translation={(currentItem as any)?.item?.details?.translation}
                   retrievability={(currentItem as any)?.memoryStrength?.retrievability}
                   rollingAccuracy={rollingAccuracy}
                   allowHint={segmentPolicy.choiceHintAllowed}
@@ -790,6 +793,7 @@ const LearningSessionPage: React.FC = () => {
                   <LetterFillSpellingQuestion
                     word={String(((currentItem as any)?.item?.content) || '')}
                     definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                    translation={(currentItem as any)?.item?.details?.translation}
                     isFlipped={isFlipped}
                     onResult={(ok) => handleResponse(ok ? 'good' : 'again')}
                   />
@@ -799,12 +803,14 @@ const LearningSessionPage: React.FC = () => {
                       word={String(((currentItem as any)?.item?.content) || '')}
                       sentence={String((((currentItem as any)?.item?.details)?.example) || '')}
                       definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                      translation={(currentItem as any)?.item?.details?.translation}
                       onResult={(ok) => handleResponse(ok ? 'good' : 'again')}
                     />
                   ) : (
                     <SpellingQuestion
                       targetWord={String(((currentItem as any)?.item?.content) || '')}
                       definition={String((((currentItem as any)?.item?.details)?.definition) || '')}
+                      translation={(currentItem as any)?.item?.details?.translation}
                       onResult={(ok) => handleResponse(ok ? 'good' : 'again')}
                     />
                   )
@@ -814,6 +820,7 @@ const LearningSessionPage: React.FC = () => {
               {questionType === 'listening' && (
                 <ListeningQuestion
                   word={String(((currentItem as any)?.item?.content) || '')}
+                  translation={(currentItem as any)?.item?.details?.translation}
                   isFlipped={isFlipped}
                   onFlip={handleFlip}
                   onResult={(ok) => handleResponse(ok ? 'good' : 'again')}

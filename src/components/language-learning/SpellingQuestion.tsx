@@ -7,6 +7,7 @@ export interface SpellingQuestionProps {
   targetWord: string;
   definition: string;
   onResult: (ok: boolean) => void;
+  translation?: string; // 可选中文释义
 }
 
 /**
@@ -15,7 +16,7 @@ export interface SpellingQuestionProps {
  * - 提交方式：Enter 或按钮
  * - 容错：大小写/首尾空格无关
  */
-export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, definition, onResult }) => {
+export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, definition, onResult, translation }) => {
   const [value, setValue] = useState('');
   const [submitted, setSubmitted] = useState<null | boolean>(null);
 
@@ -76,6 +77,7 @@ export const SpellingQuestion: React.FC<SpellingQuestionProps> = ({ targetWord, 
       <Paragraph type="secondary" style={{ textAlign: 'center' }}>
         {definition || 'Definition hidden'}
       </Paragraph>
+      {translation ? <Paragraph type="secondary" style={{ textAlign: 'center', marginTop: -6 }}>中文释义：{translation}</Paragraph> : null}
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
         <input
           value={value}

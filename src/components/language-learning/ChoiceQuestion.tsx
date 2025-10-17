@@ -11,6 +11,7 @@ export interface ChoiceQuestionProps {
   retrievability?: number;          // 当前条目检索性（0~1）
   rollingAccuracy?: number;         // 最近窗口滚动准确率（0~1）
   allowHint?: boolean;              // 是否允许使用提示（默认：高难度 L3 禁用）
+  translation?: string;             // 可选中文释义（辅助提示）
 }
 
 /**
@@ -18,7 +19,7 @@ export interface ChoiceQuestionProps {
  * - 稳定随机：基于 word 的哈希作为种子，避免重渲染导致选项顺序抖动
  * - 按钮点击后禁用，提供轻微振动反馈
  */
-export const ChoiceQuestion: React.FC<ChoiceQuestionProps> = ({ word, definition, onAnswer, retrievability, rollingAccuracy, allowHint }) => {
+export const ChoiceQuestion: React.FC<ChoiceQuestionProps> = ({ word, definition, onAnswer, retrievability, rollingAccuracy, allowHint, translation }) => {
   const [answered, setAnswered] = useState(false);
 
   const { opts, correctIndex, level } = useMemo(() => {
@@ -62,6 +63,7 @@ export const ChoiceQuestion: React.FC<ChoiceQuestionProps> = ({ word, definition
     <div className="choice-card">
       <Title level={3} style={{ textAlign: 'center' }}>选择正确释义</Title>
       <Paragraph style={{ textAlign: 'center', marginBottom: 16 }}>{word}</Paragraph>
+      {translation ? <Paragraph type="secondary" style={{ textAlign: 'center', marginTop: -8, marginBottom: 8 }}>中文释义：{translation}</Paragraph> : null}
       <Space style={{ marginBottom: 8 }}>
         <Button size="small" onClick={useHint} disabled={!canUseHint || hintUsed || opts.length - (eliminated !== null ? 1 : 0) <= 2}>
           提示（消除一个错误项）

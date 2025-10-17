@@ -8,6 +8,7 @@ export interface ClozeSpellingQuestionProps {
   sentence?: string; // 例句优先
   definition?: string; // 无例句时作为提示
   onResult: (ok: boolean) => void;
+  translation?: string; // 可选中文释义
 }
 
 /**
@@ -16,7 +17,7 @@ export interface ClozeSpellingQuestionProps {
  * - 即时反馈：输入过程前缀匹配提示与边框颜色
  * - 提交：Enter 或按钮；大小写/首尾空格无关
  */
-export const ClozeSpellingQuestion: React.FC<ClozeSpellingQuestionProps> = ({ word, sentence, definition, onResult }) => {
+export const ClozeSpellingQuestion: React.FC<ClozeSpellingQuestionProps> = ({ word, sentence, definition, onResult, translation }) => {
   const [value, setValue] = useState('');
   const [submitted, setSubmitted] = useState<null | boolean>(null);
 
@@ -95,6 +96,7 @@ export const ClozeSpellingQuestion: React.FC<ClozeSpellingQuestionProps> = ({ wo
           {definition ? `提示：${definition}` : '请根据提示输入单词'}
         </Paragraph>
       )}
+      {translation ? <Paragraph type="secondary" style={{ textAlign: 'center', marginTop: -6 }}>中文释义：{translation}</Paragraph> : null}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
         <input

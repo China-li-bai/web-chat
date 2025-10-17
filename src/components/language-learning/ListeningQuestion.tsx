@@ -8,6 +8,7 @@ export interface ListeningQuestionProps {
   isFlipped: boolean;
   onFlip: () => void;
   onResult: (ok: boolean) => void;
+  translation?: string; // 可选中文释义
 }
 
 /**
@@ -15,7 +16,7 @@ export interface ListeningQuestionProps {
  * - 语音/语速选择
  * - 播放节流，防止连续触发
  */
-export const ListeningQuestion: React.FC<ListeningQuestionProps> = ({ word, isFlipped, onFlip, onResult }) => {
+export const ListeningQuestion: React.FC<ListeningQuestionProps> = ({ word, isFlipped, onFlip, onResult, translation }) => {
   const [voiceName, setVoiceName] = useState<string>('default');
   const [rate, setRate] = useState<number>(0.9);
   const playingRef = useRef(false);
@@ -87,6 +88,7 @@ export const ListeningQuestion: React.FC<ListeningQuestionProps> = ({ word, isFl
       {isFlipped && (
         <div style={{ textAlign: 'center' }}>
           <Title level={4}>{word}</Title>
+          {translation ? <div style={{ color: '#8c8c8c', marginBottom: 8 }}>中文释义：{translation}</div> : null}
           <Space>
             <Button danger onClick={() => onResult(false)}>没听出</Button>
             <Button type="primary" onClick={() => onResult(true)}>听出来了</Button>

@@ -27,7 +27,7 @@ export async function createLearningSessionForWordbook(wordbookId: number, userI
   const wordsAndProgress = (await db.exec({
     sql: `
       SELECT
-        w.id, w.word, w.type, w.phonetic, w.definition, w.example, w.createdAt,
+        w.id, w.word, w.type, w.phonetic, w.definition, w.translation, w.example, w.createdAt,
         lp.stability, lp.retrievability, lp.difficulty, lp.nextReview, lp.lastReview, lp.state
       FROM words w
       JOIN learning_progress lp ON w.id = lp.wordId
@@ -47,6 +47,7 @@ export async function createLearningSessionForWordbook(wordbookId: number, userI
     details: {
       phonetic: row.phonetic,
       definition: row.definition,
+      translation: row.translation,
       example: row.example,
       stability: row.stability,
       retrievability: row.retrievability,
@@ -127,7 +128,7 @@ export async function startSessionFromTodayPlan(params: {
     rows = await db.exec({
       sql: `
         SELECT
-          w.id, w.word, w.type, w.phonetic, w.definition, w.example, w.createdAt,
+          w.id, w.word, w.type, w.phonetic, w.definition, w.translation, w.example, w.createdAt,
           lp.stability, lp.retrievability, lp.difficulty, lp.nextReview, lp.lastReview, lp.state
         FROM words w
         JOIN learning_progress lp ON w.id = lp.wordId
@@ -147,6 +148,7 @@ export async function startSessionFromTodayPlan(params: {
     details: {
       phonetic: row.phonetic,
       definition: row.definition,
+      translation: row.translation,
       example: row.example,
       stability: row.stability,
       retrievability: row.retrievability,
@@ -968,7 +970,7 @@ export async function createLearningSessionForWordbookExtended(params: {
   const rows = await db.exec({
     sql: `
       SELECT
-        w.id, w.word, w.type, w.phonetic, w.definition, w.example, w.createdAt,
+        w.id, w.word, w.type, w.phonetic, w.definition, w.translation, w.example, w.createdAt,
         lp.stability, lp.retrievability, lp.difficulty, lp.nextReview, lp.lastReview, lp.state
       FROM words w
       JOIN learning_progress lp ON w.id = lp.wordId
@@ -994,6 +996,7 @@ export async function createLearningSessionForWordbookExtended(params: {
     details: {
       phonetic: row.phonetic,
       definition: row.definition,
+      translation: row.translation,
       example: row.example,
       stability: row.stability,
       retrievability: row.retrievability,

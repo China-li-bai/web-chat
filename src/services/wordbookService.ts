@@ -41,8 +41,8 @@ async function seedFromFile(db: any, fileData: ImportFile, userId: string) {
   for (const word of words) {
     // 幂等插入 words
     await db.exec({
-      sql: 'INSERT OR IGNORE INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?, ?)',
-      args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.example || null],
+      sql: 'INSERT OR IGNORE INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "translation", "example") VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.translation || null, word.example || null],
     });
     // 获取已存在或新插入的 wordId
     const gotWordId = await db.exec({
@@ -187,8 +187,8 @@ export async function importWordbook(jsonContent: string, userId: string): Promi
   for (const word of data.words) {
     // 幂等插入 words
     await db.exec({
-      sql: 'INSERT OR IGNORE INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "example") VALUES (?, ?, ?, ?, ?, ?)',
-      args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.example || null],
+      sql: 'INSERT OR IGNORE INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "translation", "example") VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.translation || null, word.example || null],
     });
     // 获取已存在或新插入的 wordId
     const gotWordId = await db.exec({

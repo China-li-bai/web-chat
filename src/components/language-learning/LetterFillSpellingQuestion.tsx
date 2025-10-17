@@ -11,6 +11,7 @@ export interface LetterFillSpellingQuestionProps {
   distractorCount?: number;  // 每个空位的干扰项数量（默认 3）
   seed?: number;             // 稳定随机种子（可选）
   isFlipped?: boolean;       // 翻面后显示答案并禁用选项
+  translation?: string;      // 可选中文释义
 }
 
 /**
@@ -27,7 +28,8 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
   blanksCount,
   distractorCount = 3,
   seed,
-  isFlipped
+  isFlipped,
+  translation
 }) => {
   const normalized = useMemo(() => (word || '').trim(), [word]);
   const letters = useMemo(() => Array.from(normalized), [normalized]);
@@ -167,6 +169,7 @@ export const LetterFillSpellingQuestion: React.FC<LetterFillSpellingQuestionProp
       {definition && (
         <Paragraph type="secondary" style={{ textAlign: 'center' }}>{definition}</Paragraph>
       )}
+      {translation ? <Paragraph type="secondary" style={{ textAlign: 'center', marginTop: -6 }}>中文释义：{translation}</Paragraph> : null}
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }} aria-label="letter-fill-word">
         {letters.map((ch, idx) => {
