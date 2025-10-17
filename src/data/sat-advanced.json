@@ -2,15 +2,15 @@
   "name": "SAT Advanced Vocabulary",
   "description": "Scholastic Assessment Test advanced vocabulary.",
   "words": [
-    { "word": "anachronistic", "phonetic": "/əˌnækrəˈnɪstɪk/", "definition": "adj. belonging to a period other than that being portrayed" },
-    { "word": "ephemeral", "phonetic": "/ɪˈfemərəl/", "definition": "adj. lasting for a very short time" },
-    { "word": "gregarious", "phonetic": "/ɡrɪˈɡeəriəs/", "definition": "adj. (of a person) fond of company; sociable" },
-    { "word": "impetuous", "phonetic": "/ɪmˈpetʃuəs/", "definition": "adj. acting or done quickly and without thought or care" },
-    { "word": "laudable", "phonetic": "/ˈlɔːdəbl/", "definition": "adj. (of an action, idea, or goal) deserving praise and commendation" },
-    { "word": "mitigate", "phonetic": "/ˈmɪtɪɡeɪt/", "definition": "v. to make less severe, serious, or painful" },
-    { "word": "obsequious", "phonetic": "/əbˈsiːkwiəs/", "definition": "adj. obedient or attentive to an excessive or servile degree" },
-    { "word": "pedestrian", "phonetic": "/pəˈdestriən/", "definition": "adj. lacking inspiration or excitement; dull" },
-    { "word": "pragmatic", "phonetic": "/præɡˈmætɪk/", "definition": "adj. dealing with things sensibly and realistically in a way that is based on practical rather than theoretical considerations" },
-    { "word": "venerable", "phonetic": "/ˈvenərəbl/", "definition": "adj. accorded a great deal of respect, especially because of age, wisdom, or character" }
+    { "word": "anachronistic", "phonetic": "/əˌnækrəˈnɪstɪk/", "definition": "adj. belonging to a period other than that being portrayed", "translation": "时代错误的；过时的" },
+    { "word": "ephemeral", "phonetic": "/ɪˈfemərəl/", "definition": "adj. lasting for a very short time", "translation": "短暂的；转瞬即逝的" },
+    { "word": "gregarious", "phonetic": "/ɡrɪˈɡeəriəs/", "definition": "adj. (of a person) fond of company; sociable", "translation": "合群的；爱社交的" },
+    { "word": "impetuous", "phonetic": "/ɪmˈpetʃuəs/", "definition": "adj. acting or done quickly and without thought or care", "translation": "冲动的；鲁莽的" },
+    { "word": "laudable", "phonetic": "/ˈlɔːdəbl/", "definition": "adj. (of an action, idea, or goal) deserving praise and commendation", "translation": "值得称赞的；可嘉的" },
+    { "word": "mitigate", "phonetic": "/ˈmɪtɪɡeɪt/", "definition": "v. to make less severe, serious, or painful", "translation": "缓解；减轻；缓和" },
+    { "word": "obsequious", "phonetic": "/əbˈsiːkwiəs/", "definition": "adj. obedient or attentive to an excessive or servile degree", "translation": "谄媚的；奉承的" },
+    { "word": "pedestrian", "phonetic": "/pəˈdestriən/", "definition": "adj. lacking inspiration or excitement; dull", "translation": "平庸的；乏味的；缺乏新意的" },
+    { "word": "pragmatic", "phonetic": "/præɡˈmætɪk/", "definition": "adj. dealing with things sensibly and realistically in a way that is based on practical rather than theoretical considerations", "translation": "务实的；实用主义的" },
+    { "word": "venerable", "phonetic": "/ˈvenərəbl/", "definition": "adj. accorded a great deal of respect, especially because of age, wisdom, or character", "translation": "德高望重的；令人尊敬的" }
   ]
 }

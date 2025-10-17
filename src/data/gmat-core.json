@@ -2,15 +2,15 @@
   "name": "GMAT Core Vocabulary",
   "description": "Graduate Management Admission Test core vocabulary.",
   "words": [
-    { "word": "abate", "phonetic": "/əˈbeɪt/", "definition": "v. to become less strong; to make something less strong" },
-    { "word": "aberrant", "phonetic": "/əˈberənt/", "definition": "adj. different from what is typical or usual, especially in a way that is unwelcome" },
-    { "word": "alacrity", "phonetic": "/əˈlækrəti/", "definition": "n. speed and eagerness" },
-    { "word": "assuage", "phonetic": "/əˈsweɪdʒ/", "definition": "v. to make an unpleasant feeling less severe" },
-    { "word": "audacious", "phonetic": "/ɔːˈdeɪʃəs/", "definition": "adj. showing a willingness to take surprisingly bold risks" },
-    { "word": "bolster", "phonetic": "/ˈboʊlstər/", "definition": "v. to support or strengthen" },
-    { "word": "cacophony", "phonetic": "/kəˈkɒfəni/", "definition": "n. a harsh, discordant mixture of sounds" },
-    { "word": "capricious", "phonetic": "/kəˈprɪʃəs/", "definition": "adj. given to sudden and unaccountable changes of mood or behavior" },
-    { "word": "corroborate", "phonetic": "/kəˈrɒbəreɪt/", "definition": "v. to confirm or give support to (a statement, theory, or finding)" },
-    { "word": "desiccate", "phonetic": "/ˈdesɪkeɪt/", "definition": "v. to remove the moisture from (something); to cause to become completely dry" }
+    { "word": "abate", "phonetic": "/əˈbeɪt/", "definition": "v. to become less strong; to make something less strong", "translation": "减弱；缓和" },
+    { "word": "aberrant", "phonetic": "/əˈberənt/", "definition": "adj. different from what is typical or usual, especially in a way that is unwelcome", "translation": "反常的；异常的" },
+    { "word": "alacrity", "phonetic": "/əˈlækrəti/", "definition": "n. speed and eagerness", "translation": "敏捷；欣然" },
+    { "word": "assuage", "phonetic": "/əˈsweɪdʒ/", "definition": "v. to make an unpleasant feeling less severe", "translation": "缓解；减轻" },
+    { "word": "audacious", "phonetic": "/ɔːˈdeɪʃəs/", "definition": "adj. showing a willingness to take surprisingly bold risks", "translation": "大胆的；敢于冒险的；放肆的" },
+    { "word": "bolster", "phonetic": "/ˈboʊlstər/", "definition": "v. to support or strengthen", "translation": "支持；加强；巩固" },
+    { "word": "cacophony", "phonetic": "/kəˈkɒfəni/", "definition": "n. a harsh, discordant mixture of sounds", "translation": "刺耳的噪音；嘈杂" },
+    { "word": "capricious", "phonetic": "/kəˈprɪʃəs/", "definition": "adj. given to sudden and unaccountable changes of mood or behavior", "translation": "反复无常的；任性的" },
+    { "word": "corroborate", "phonetic": "/kəˈrɒbəreɪt/", "definition": "v. to confirm or give support to (a statement, theory, or finding)", "translation": "证实；支持" },
+    { "word": "desiccate", "phonetic": "/ˈdesɪkeɪt/", "definition": "v. to remove the moisture from (something); to cause to become completely dry", "translation": "使干燥；脱水" }
   ]
 }

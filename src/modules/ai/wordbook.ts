@@ -4,7 +4,7 @@ import type { WordbookGenerateBaseOptions, ExplicitProviderOptions, ProviderKey,
 import type { ImportFile } from '@/types/wordbook';
 
 // 直接复用现有服务的生成实现，保持行为一致
-import { generateAndImportWordbookUnified, generateAndImportWordbook, generateWordbookWithUnifiedLLMFree, generateWordbookViaAI } from '@/services/wordbookAIService';
+import { generateWordbookWithUnifiedLLMFree, generateWordbookViaAI } from '@/services/wordbookAIService';
 
 function normalizeBaseOptions(values: any): WordbookGenerateBaseOptions {
   const { name, topic, targetLanguage, level, wordCount, description } = values || {};
@@ -25,6 +25,23 @@ function normalizeBaseOptions(values: any): WordbookGenerateBaseOptions {
 function buildExplicitOptions(values: any, base: WordbookGenerateBaseOptions): ExplicitProviderOptions {
   const { provider, model, apiKey, baseUrl } = values || {};
   const providerValue = (provider || 'free-priority') as ProviderKey;
+export async function generateWordbookFile(values: any): Promise<ImportFile> {
+  const baseOptions = normalizeBaseOptions(values);
+  const providerValue = (values?.provider || 'free-priority') as ProviderKey;
+
+  if (providerValue === 'free-priority') {
+    const file: ImportFile = await generateWordbookWithUnifiedLLMFree(baseOptions as any);
+    return file;
+  } else {
+    const explicitOptions = buildExplicitOptions(values, baseOptions);
+    if (!explicitOptions.baseUrl && defaultBaseByProvider[explicitOptions.provider]) {
+      explicitOptions.baseUrl = defaultBaseByProvider[explicitOptions.provider];
+    }
+    const file: ImportFile = await generateWordbookViaAI(explicitOptions as any);
+    return file;
+  }
+}
+
   if (providerValue === 'free-priority') {
     throw new Error('Explicit provider options requested but provider is free-priority');
   }
