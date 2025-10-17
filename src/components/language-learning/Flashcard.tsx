@@ -7,9 +7,10 @@ interface FlashcardProps {
   backContent: React.ReactNode;
   isFlipped: boolean;
   onFlip: () => void;
+  translation?: string; // 中文释义（可选）
 }
 
-export const Flashcard: React.FC<FlashcardProps> = memo(({ frontContent, backContent, isFlipped, onFlip }) => {
+export const Flashcard: React.FC<FlashcardProps> = memo(({ frontContent, backContent, isFlipped, onFlip, translation }) => {
   return (
     <div className="flashcard-container" onClick={onFlip}>
       <div className={`flashcard ${isFlipped ? 'is-flipped' : ''}`}>
@@ -21,6 +22,12 @@ export const Flashcard: React.FC<FlashcardProps> = memo(({ frontContent, backCon
         <Card className="flashcard-face flashcard-back">
           <div className="p-6">
             {backContent}
+            {translation ? (
+              <div className="mt-4 text-base text-gray-700">
+                <span className="font-medium">中文释义：</span>
+                <span>{translation}</span>
+              </div>
+            ) : null}
           </div>
         </Card>
       </div>

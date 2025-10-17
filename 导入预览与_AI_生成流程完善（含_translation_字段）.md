@@ -10,6 +10,8 @@
 
 - 页面改造：AI 生成与本地导入均先预览再导入
 
+- 卡片组件支持展示中文释义 translation（可选）
+
 ## Tech Stack
 
 {
@@ -21,7 +23,7 @@
 
 ## Design
 
-三份词书 JSON 已填入准确中文翻译；预览使用 antd Table+Input 单行编辑 translation；确认后导入（含覆盖确认）。
+在 Flashcard 与 LearningFlashcard 背面区域追加可选的中文释义展示，向后兼容不破坏现有调用。
 
 ## Plan
 
@@ -40,5 +42,7 @@ Note:
 [X] 新增导入预览 Modal 组件
 
 [X] 改造页面串联预览流程
+
+[X] 卡片组件支持 translation 展示
 
 [/] 回归验证预览与导入流程

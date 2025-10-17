@@ -12,6 +12,7 @@ interface LearningFlashcardProps {
   className?: string;
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
+  translation?: string; // 中文释义（可选）
 }
 
 export const LearningFlashcard: React.FC<LearningFlashcardProps> = memo(({ 
@@ -23,7 +24,8 @@ export const LearningFlashcard: React.FC<LearningFlashcardProps> = memo(({
   height = 300,
   className = '',
   onSwipeLeft,
-  onSwipeRight
+  onSwipeRight,
+  translation
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
@@ -132,6 +134,12 @@ export const LearningFlashcard: React.FC<LearningFlashcardProps> = memo(({
         <Card className="flashcard-face flashcard-back" bordered={false}>
           <div className="flashcard-content">
             {backContent}
+            {translation ? (
+              <div className="mt-4 text-base text-gray-700">
+                <span className="font-medium">中文释义：</span>
+                <span>{translation}</span>
+              </div>
+            ) : null}
           </div>
         </Card>
       </div>
