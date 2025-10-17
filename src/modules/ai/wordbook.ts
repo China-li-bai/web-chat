@@ -166,19 +166,12 @@ function buildExplicitOptions(values: any, base: WordbookGenerateBaseOptions): E
  */
 export async function generateWordbookFile(values: any): Promise<ImportFile> {
   const baseOptions = normalizeBaseOptions(values);
-  const providerValue = (values?.provider || 'free-priority') as ProviderKey;
-
-  if (providerValue === 'free-priority') {
-    const file: ImportFile = await generateWordbookWithUnifiedLLMFree(baseOptions as any);
-    return file;
-  } else {
-    const explicitOptions = buildExplicitOptions(values, baseOptions);
-    if (!explicitOptions.baseUrl && defaultBaseByProvider[explicitOptions.provider]) {
-      explicitOptions.baseUrl = defaultBaseByProvider[explicitOptions.provider];
-    }
-    const file: ImportFile = await generateWordbookViaAI(explicitOptions as any);
-    return file;
+  const explicitOptions = buildExplicitOptions(values, baseOptions);
+  if (!explicitOptions.baseUrl && defaultBaseByProvider[explicitOptions.provider]) {
+    explicitOptions.baseUrl = defaultBaseByProvider[explicitOptions.provider];
   }
+  const file: ImportFile = await generateWordbookViaAI(explicitOptions as any);
+  return file;
 }
 
 /**
