@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WordbookCard } from '@/components/language-learning/WordbookCard';
-import { seedInitialData, getAllWordbooksWithStats, importWordbook, checkWordbookExists, type WordbookWithStats } from '@/services/wordbookService';
+import { seedInitialData, getAllWordbooksWithStats, importWordbook, checkWordbookExists } from '@/services/wordbookService';
+import { type WordbookWithStats } from '@/types/wordbook';
 import { initializeDatabase } from '@/services/dataInitService';
 import { useAppStore } from '@/store/useAppStore';
 import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal, Form, Input, Select, InputNumber } from 'antd';
@@ -130,84 +131,37 @@ export const WordbookSelectionPage: React.FC = () => {
     event.target.value = '';
   };
 
-  // 提交 AI 生成
+  // 提交 AI 生成（薄包装，调用 ai 模块）
   const handleAiGenerate = async (values: any) => {
-    const { name, topic, targetLanguage, level, wordCount, description, provider, model, apiKey, baseUrl } = values || {};
-    if (!name || !String(name).trim()) {
-      messageApi.error('Please input a valid name');
+    if (!userId) {
+      messageApi.error('User not ready');
       return;
     }
-
-    const providerValue = (provider || 'free-priority') as string;
-    const defaultBaseByProvider: Record<string, string | undefined> = {
-      'zhipu': 'https://open.bigmodel.cn/api/paas/v4',
-      'ernie': undefined, // 需自行提供网关
-      'hunyuan': undefined, // 需自行提供 OpenAI 兼容网关
-      'openrouter': 'https://openrouter.ai/api/v1',
-      'gemini': undefined,
-      'openai': undefined,
-    };
-
-    const baseOptions = {
-      name: String(name).trim(),
-      topic: topic ? String(topic).trim() : undefined,
-      targetLanguage: targetLanguage ? String(targetLanguage).trim() : 'English',
-      level: level || 'intermediate',
-      wordCount: Number(wordCount || 50),
-      description: description ? String(description).trim() : undefined,
-    };
-
-    const proceed = async () => {
-      try {
-        setAiLoading(true);
-        const { generateAndImportWordbookUnified, generateAndImportWordbook } = await import('@/services/wordbookAIService');
-
-        if (providerValue === 'free-priority') {
-          await generateAndImportWordbookUnified(baseOptions as any, userId);
-        } else {
-          const mappedProvider = providerValue; // 直接透传：'zhipu'|'ernie'|'hunyuan'|'openrouter'|'gemini'|'openai'
-          if (!apiKey || !String(apiKey).trim()) {
-            messageApi.error('Please provide API Key for the selected provider');
-            return;
-          }
-          const explicitOptions = {
-            ...baseOptions,
-            provider: mappedProvider,
-            model: model ? String(model).trim() : undefined,
-            apiKey: String(apiKey).trim(),
-            baseUrl: typeof baseUrl === 'string' && baseUrl.trim()
-              ? String(baseUrl).trim()
-              : defaultBaseByProvider[mappedProvider]
-          };
-          await generateAndImportWordbook(explicitOptions as any, userId);
-        }
-
-        messageApi.success(`Wordbook "${baseOptions.name}" generated successfully!`);
-        setAiModalOpen(false);
-        aiForm.resetFields();
-        await loadWordbooks();
-      } catch (e: any) {
-        console.error('AI generate/import failed:', e);
-        messageApi.error(String(e?.message || 'AI generate failed'));
-      } finally {
-        setAiLoading(false);
-      }
-    };
-
+    const confirmOverwrite = (name: string) => new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: 'Confirm Overwrite',
+        content: `A wordbook named "${name}" already exists. Do you want to overwrite it?`,
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
     try {
-      const exists = await checkWordbookExists(baseOptions.name);
-      if (exists) {
-        Modal.confirm({
-          title: 'Confirm Overwrite',
-          content: `A wordbook named "${baseOptions.name}" already exists. Do you want to overwrite it?`,
-          onOk: proceed,
-        });
-      } else {
-        await proceed();
-      }
+      setAiLoading(true);
+      const { handleAiGenerate: aiHandle } = await import('@/modules/ai');
+      const result = await aiHandle(values, userId, confirmOverwrite);
+      messageApi.success(`Wordbook "${result.name}" generated successfully!`);
+      setAiModalOpen(false);
+      aiForm.resetFields();
+      await loadWordbooks();
     } catch (e: any) {
-      console.error('checkWordbookExists failed:', e);
-      messageApi.error(String(e?.message || 'Check wordbook failed'));
+      if (String(e?.message).includes('User cancelled overwrite')) {
+        // 用户取消覆盖，静默处理
+        return;
+      }
+      console.error('AI generate/import failed:', e);
+      messageApi.error(String(e?.message || 'AI generate failed'));
+    } finally {
+      setAiLoading(false);
     }
   };
 
