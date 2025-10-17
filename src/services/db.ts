@@ -19,6 +19,7 @@ const CREATE_TABLE_STATEMENTS = [
     "type" TEXT NOT NULL DEFAULT 'vocabulary',
     "phonetic" TEXT,
     "definition" TEXT NOT NULL,
+    "translation" TEXT,
     "example" TEXT,
     "createdAt" TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY ("wordbookId") REFERENCES "wordbooks" ("id") ON DELETE CASCADE,
@@ -120,6 +121,7 @@ async function deleteIndexedDB(dbName: string): Promise<void> {
 async function migrateDB(db: Database) {
   const migrationStatements = [
     'ALTER TABLE "words" ADD COLUMN "userId" TEXT;',
+    'ALTER TABLE "words" ADD COLUMN "translation" TEXT;',
     'ALTER TABLE "learning_progress" ADD COLUMN "userId" TEXT;',
     'ALTER TABLE "study_logs" ADD COLUMN "userId" TEXT;',
   ];
@@ -173,6 +175,7 @@ async function migrateWordsUniqueConstraint(db: Database) {
         "type" TEXT NOT NULL DEFAULT 'vocabulary',
         "phonetic" TEXT,
         "definition" TEXT NOT NULL,
+        "translation" TEXT,
         "example" TEXT,
         "createdAt" TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY ("wordbookId") REFERENCES "wordbooks" ("id") ON DELETE CASCADE,
@@ -185,9 +188,9 @@ async function migrateWordsUniqueConstraint(db: Database) {
     await db.exec({
       sql: `
       INSERT OR IGNORE INTO "words_new"
-        ("id","wordbookId","userId","word","type","phonetic","definition","example","createdAt")
+        ("id","wordbookId","userId","word","type","phonetic","definition","translation","example","createdAt")
       SELECT
-        "id","wordbookId","userId","word","type","phonetic","definition","example","createdAt"
+        "id","wordbookId","userId","word","type","phonetic","definition","translation","example","createdAt"
       FROM "words";
     `
     });

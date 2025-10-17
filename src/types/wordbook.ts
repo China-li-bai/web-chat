@@ -4,6 +4,7 @@ export interface ImportWord {
   word: string;
   phonetic?: string | null;
   definition: string;
+  translation?: string | null;
   example?: string | null;
   // 与 DB "words"."type" 字段对齐，默认 'vocabulary'
   type?: string | null;
@@ -55,9 +56,10 @@ export function ensureImportFileSchema(input: any): ImportFile {
       throw new Error('Each word must contain "word" and "definition"');
     }
     const phonetic = w?.phonetic != null ? String(w.phonetic) : null;
+    const translation = w?.translation != null ? String(w.translation) : null;
     const example = w?.example != null ? String(w.example) : null;
     const type = w?.type != null && String(w.type).trim() ? String(w.type).trim() : DEFAULT_WORD_TYPE;
-    return { word, phonetic, definition, example, type };
+    return { word, phonetic, definition, translation, example, type };
   });
 
   return { name, description, words };
