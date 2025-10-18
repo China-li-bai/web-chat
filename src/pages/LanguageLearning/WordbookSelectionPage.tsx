@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { WordbookCard } from '@/components/language-learning/WordbookCard';
 import { seedInitialData, getAllWordbooksWithStats, importWordbook, checkWordbookExists } from '@/services/wordbookService';
 import { type WordbookWithStats } from '@/types/wordbook';
-import { initializeDatabase } from '@/services/dataInitService';
 import { useAppStore } from '@/store/useAppStore';
-import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal, Form, Input, Select, InputNumber } from 'antd';
+import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal, Form, Input, Select, InputNumber, Switch } from 'antd';
 import ImportPreviewModal from '@/components/language-learning/import-preview-modal';
 import { UploadOutlined } from '@ant-design/icons';
 import { generateWordbookFile } from '@/modules/ai'
@@ -27,10 +26,6 @@ export const WordbookSelectionPage: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<null | { name: string; description?: string; words: any[] }>(null);
 
-  // 引入 AI 统一生成并导入
-  // 延后导入声明，避免循环依赖风险（实际为静态导入，保持简单）
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  type _Keep = void;
 
   const loadWordbooks = async () => {
     try {
@@ -99,23 +94,8 @@ export const WordbookSelectionPage: React.FC = () => {
       // 改为先预览
       setPreviewFile(data);
       setPreviewOpen(true);
-      const proceedWithImport = async (finalContent: string) => {
-        try {
-          const result = await importWordbook(finalContent, userId);
-          if (result.status === 'created') {
-            messageApi.success('Wordbook "' + bookName + '" imported successfully!');
-          } else {
-            messageApi.success('Wordbook "' + bookName + '" updated successfully!');
-          }
-          await loadWordbooks();
-        } catch (error: any) {
-          console.error('Failed to import wordbook:', error);
-          messageApi.error('Import failed: ' + error.message);
-        }
-      };
 
       try {
-        const exists = await checkWordbookExists(bookName);
         // 覆盖确认移动到预览确认时再处理
         setPreviewFile(data);
         setPreviewOpen(true);
@@ -135,16 +115,10 @@ export const WordbookSelectionPage: React.FC = () => {
       messageApi.error('User not ready');
       return;
     }
-    const confirmOverwrite = (name: string) => new Promise<boolean>((resolve) => {
-      Modal.confirm({
-        title: 'Confirm Overwrite',
-        content: `A wordbook named "${name}" already exists. Do you want to overwrite it?`,
-        onOk: () => resolve(true),
-        onCancel: () => resolve(false),
-      });
-    });
+
     try {
       setAiLoading(true);
+      console.log({ values });
 
       const file = await generateWordbookFile(values);
       setPreviewFile(file as any);
@@ -268,38 +242,25 @@ export const WordbookSelectionPage: React.FC = () => {
         <Form
           form={aiForm}
           layout="vertical"
-          initialValues={{ level: 'intermediate', wordCount: 50, targetLanguage: 'English', provider: 'free-priority' }}
+          initialValues={{ wordCount: 50, targetLanguage: 'English', provider: 'free-priority', goal: true }}
           onFinish={handleAiGenerate}
           onFinishFailed={() => messageApi.error('Please complete required fields')}
         >
           <Form.Item label="Name" name="name" rules={[{ required: true, message: 'Please input name' }]}>
             <Input placeholder="e.g., Travel English Starter" />
           </Form.Item>
-          <Form.Item label="Topic" name="topic">
-            <Input placeholder="e.g., Travel, Business, IT" />
+
+          <Form.Item label="User Goal" name="userGoal" rules={[{ required: true, message: 'Please input your goal' }]}>
+            <TextArea rows={3} placeholder="e.g., Pass frontend engineer English interview; IELTS; CET4" />
           </Form.Item>
           <Form.Item label="Target Language" name="targetLanguage">
             <Input placeholder="e.g., English, Chinese" />
           </Form.Item>
-          <Form.Item label="Level" name="level">
-            <Select
-              options={[
-                { label: 'Beginner', value: 'beginner' },
-                { label: 'Intermediate', value: 'intermediate' },
-                { label: 'Advanced', value: 'advanced' },
-                { label: 'CET4', value: 'cet4' },
-                { label: 'CET6', value: 'cet6' },
-                { label: 'SAT', value: 'sat' },
-                { label: 'GMAT', value: 'gmat' },
-              ]}
-            />
-          </Form.Item>
+
           <Form.Item label="Word Count" name="wordCount" rules={[{ type: 'number', min: 10, max: 200 }]}>
             <InputNumber min={10} max={200} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="Description" name="description">
-            <TextArea rows={3} placeholder="Short description for this wordbook" />
-          </Form.Item>
+
 
           <Form.Item label="Provider" name="provider">
             <Select

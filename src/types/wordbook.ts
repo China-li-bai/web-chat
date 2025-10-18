@@ -75,4 +75,5 @@ export interface GenerateOptions {
   provider?: 'gemini' | 'openai' | 'openrouter'; // 统一前端方案：可选 Provider
   model?: string; // 具体模型 ID（可选）
   apiKey?: string; // 对应 Provider 的 API Key（优先使用此字段）
+  userGoal?: string
 }

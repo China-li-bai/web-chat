@@ -120,6 +120,7 @@ export async function generateTextUnified(options: {
   apiKey?: string;
   modelName?: LLMModel;
   baseUrl?: string;
+  responseFormat?: any
 }): Promise<string> {
   const provider = options.provider || currentSelectedProvider;
   const modelId = options.modelName || defaultModels[provider];
@@ -174,7 +175,8 @@ export async function generateTextUnified(options: {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: modelId,
-        messages:await messages({ role: 'user', content: options.prompt }),
+        messages: await messages({ role: 'user', content: options.prompt }),
+        ...(options.responseFormat ? { response_format: options.responseFormat } : {})
       }),
     });
     const data = await resp.json();

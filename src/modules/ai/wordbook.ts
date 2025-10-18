@@ -58,15 +58,16 @@ export async function generateWordbookViaAI(options: GenerateOptions & { baseUrl
   if (!apiKey) {
     throw new Error('未配置所选 Provider 的 API 密钥');
   }
+  console.log({ options });
+
   const prompt = await (async () => {
     try {
 
+
       const wb = await Prompts.get('wordbook-generate', {
         name: options.name.trim(),
-        description: (options.description || '').trim(),
+        userGoal: String(options.userGoal).trim(),
         targetLanguage: (options.targetLanguage || 'English').trim(),
-        level: options.level || 'intermediate',
-        topic: (options.topic || 'General English Vocabulary').trim(),
         wordCount: Math.max(10, Math.min(options.wordCount || 50, 200))
       });
       return `${wb}`;
@@ -89,7 +90,8 @@ export async function generateWordbookViaAI(options: GenerateOptions & { baseUrl
       prompt,
       apiKey,
       modelName: options.model,
-      baseUrl: options.baseUrl
+      baseUrl: options.baseUrl,
+      responseFormat: { type: 'json_object' }
     });
     text = (t || '').trim();
 
@@ -110,11 +112,6 @@ export async function generateWordbookViaAI(options: GenerateOptions & { baseUrl
   }
 }
 
-export async function generateAndImportWordbook(options: GenerateOptions & { baseUrl?: string }, userId: string) {
-  const file: ImportFile = await generateWordbookViaAI(options);
-  const json = JSON.stringify(file);
-  return importWordbook(json, userId);
-}
 
 function normalizeBaseOptions(values: any): WordbookGenerateBaseOptions {
   const { name, topic, targetLanguage, level, wordCount, description } = values || {};
@@ -129,6 +126,8 @@ function normalizeBaseOptions(values: any): WordbookGenerateBaseOptions {
     level: (level as WordbookGenerateBaseOptions['level']) || 'intermediate',
     wordCount: Number(wordCount || 50),
     description: description ? String(description).trim() : undefined,
+    goal: !!values?.goal,
+    userGoal: values?.userGoal ? String(values.userGoal).trim() : undefined
   };
 }
 
@@ -169,49 +168,8 @@ export async function generateWordbookFile(values: any): Promise<ImportFile> {
   if (!explicitOptions.baseUrl && defaultBaseByProvider[explicitOptions.provider]) {
     explicitOptions.baseUrl = defaultBaseByProvider[explicitOptions.provider];
   }
+
   const file: ImportFile = await generateWordbookViaAI(explicitOptions as any);
   return file;
 }
 
-/**
- * 统一提交入口：页面层提供 confirmOverwrite 回调以决定覆盖。
- * - values: 表单值
- * - userId: 当前用户ID
- * - confirmOverwrite: 弹窗确认函数（由页面实现）
- */
-export async function handleAiGenerate(
-  values: any,
-  userId: string,
-  confirmOverwrite: ConfirmOverwrite
-): Promise<{ ok: boolean; name: string; file?: ImportFile; importResult?: any; error?: string }> {
-  const baseOptions = normalizeBaseOptions(values);
-  const providerValue = (values?.provider || 'free-priority') as ProviderKey;
-
-  // 覆盖确认
-  const exists = await checkWordbookExists(baseOptions.name);
-  if (exists) {
-    const ok = await confirmOverwrite(baseOptions.name);
-    if (!ok) {
-      throw new Error('User cancelled overwrite');
-    }
-  }
-
-  // 执行生成与导入（同时确保结构化 ImportFile）
-  if (providerValue === 'free-priority') {
-    // 先生成结构化文件，再导入，便于返回 file
-    const file: ImportFile = await generateWordbookWithUnifiedLLMFree(baseOptions as any);
-    const json = JSON.stringify(file);
-    const importResult = await importWordbook(json, userId);
-    return { ok: true, name: baseOptions.name, file, importResult };
-  } else {
-    const explicitOptions = buildExplicitOptions(values, baseOptions);
-    if (!explicitOptions.baseUrl && defaultBaseByProvider[explicitOptions.provider]) {
-      explicitOptions.baseUrl = defaultBaseByProvider[explicitOptions.provider];
-    }
-    // 同样先生成结构化文件，再导入
-    const file: ImportFile = await generateWordbookViaAI(explicitOptions as any);
-    const json = JSON.stringify(file);
-    const importResult = await importWordbook(json, userId);
-    return { ok: true, name: baseOptions.name, file, importResult };
-  }
-}
