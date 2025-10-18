@@ -144,7 +144,7 @@ export async function generateTextUnified(options: {
   }
 
   if (provider === LLMProvider.OpenAI) {
-    const result = await generateText({ model: openai(modelId, { apiKey, baseURL: baseUrl }), prompt: options.prompt });
+    const result = await generateText({ model: openai({ apiKey, baseURL: baseUrl })(modelId), prompt: options.prompt });
     const text = (result?.text || '').trim();
     if (!text) throw new Error('OpenAI 返回空内容');
     return text;
@@ -152,14 +152,14 @@ export async function generateTextUnified(options: {
 
   if (provider === LLMProvider.OpenRouter) {
     const result = await generateText({
-      model: openai(modelId, {
+      model: openai({
         apiKey,
         baseURL: 'https://openrouter.ai/api/v1',
         headers: {
           'HTTP-Referer': (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : 'http://localhost',
           'X-Title': 'ai-speech-practice'
         }
-      }),
+      })(modelId),
       prompt: options.prompt
     });
     const text = (result?.text || '').trim();

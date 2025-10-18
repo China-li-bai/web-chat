@@ -28,16 +28,8 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({ open, fi
       dataIndex: 'translation',
       key: 'translation',
       width: 200,
-      render: (_val, _row, index) => (
-        <Input
-          value={data[index]?.translation || ''}
-          onChange={(e) => {
-            const next = [...data];
-            next[index] = { ...next[index], translation: e.target.value };
-            setData(next);
-          }}
-          placeholder="输入中文释义"
-        />
+      render: (_val, row) => (
+        <span>{(row.translation || '').trim()}</span>
       ),
     },
     { title: 'Example', dataIndex: 'example', key: 'example' },
