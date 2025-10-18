@@ -105,7 +105,6 @@ export async function generateWordbookViaAI(options: GenerateOptions & { baseUrl
     const normalized = ensureImportFileSchema(raw);
     return normalized;
   } catch (error: any) {
-    console.error('[WordbookAIService] 生成失败:', error);
     const msg = String(error?.message || error);
     throw new Error(`AI 生成失败(${provider}): ${msg}`);
   }
