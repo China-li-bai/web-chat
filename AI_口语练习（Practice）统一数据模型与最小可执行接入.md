@@ -2,11 +2,11 @@
 
 ## Core Features
 
-- 在 db.ts 中追加 practice_sessions / practice_turns / practice_messages 建表与索引
+- Practice.jsx 数据源切换为本地 DB：useEffect 加载最近会话/回合
 
-- 提供最小 DAO（exec 驱动），替换 Practice.jsx 的 mock
+- changeTopic 改为创建会话/回合并以 DB 最新 turn.referenceText 展示
 
-- 消息格式与 llmService 对齐（system/user/assistant，meta 可扩展）
+- 补充 DAO 导入（getLatestSession/getLatestTurn）
 
 ## Tech Stack
 
@@ -15,13 +15,13 @@
     "arch": "react",
     "component": "antd"
   },
-  "ClientDB": "wa-sqlite (IndexedDB VFS) 通过 BasicDatabase",
-  "AI": "llmService.ts（多 Provider 可插拔）"
+  "ClientDB": "wa-sqlite BasicDatabase",
+  "AI": "llmService Prompts（system 指令）"
 }
 
 ## Design
 
-坚持最小可执行与可维护性：SQL 直接追加、DAO 轻封装、前端逐步替换；确保数据一致性与回溯能力。
+保持 UI 不重构，仅将数据流接到 DB，确保可回溯与一致性。
 
 ## Plan
 
@@ -35,11 +35,11 @@ Note:
 
 [X] 需求确认
 
-[/] 统一数据模型草案
+[X] 统一数据模型草案
 
-[ ] 数据库选择与 Schema 定稿
+[X] 数据库选择与 Schema 定稿
 
-[ ] 前端接入与响应式校验
+[/] 前端接入与响应式校验
 
 [ ] AI provider 接入与评估
 

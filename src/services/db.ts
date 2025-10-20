@@ -87,7 +87,47 @@ const CREATE_TABLE_STATEMENTS = [
     "lastUpdated" TEXT NOT NULL,
     UNIQUE("userId", "date", "wordType")
   );
+  `,
   `
+  CREATE TABLE IF NOT EXISTS "practice_sessions" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "userId" TEXT NOT NULL,
+    "topic" TEXT NOT NULL,
+    "difficulty" TEXT NOT NULL,
+    "createdAt" TEXT DEFAULT CURRENT_TIMESTAMP,
+    "lastUpdated" TEXT
+  );
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS "practice_turns" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "sessionId" INTEGER NOT NULL,
+    "referenceText" TEXT NOT NULL,
+    "transcription" TEXT,
+    "scoresOverall" INTEGER,
+    "scoresPronunciation" INTEGER,
+    "scoresFluency" INTEGER,
+    "scoresCompleteness" INTEGER,
+    "recordingKey" TEXT,
+    "ttsCacheKey" TEXT,
+    "createdAt" TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY ("sessionId") REFERENCES "practice_sessions" ("id") ON DELETE CASCADE
+  );
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS "practice_messages" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "sessionId" INTEGER NOT NULL,
+    "role" TEXT NOT NULL CHECK("role" IN ('system','user','assistant')),
+    "content" TEXT NOT NULL,
+    "lang" TEXT,
+    "meta" TEXT,
+    "createdAt" TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY ("sessionId") REFERENCES "practice_sessions" ("id") ON DELETE CASCADE
+  );
+  `,
+  `CREATE INDEX IF NOT EXISTS idx_practice_turns_session ON "practice_turns"("sessionId");`,
+  `CREATE INDEX IF NOT EXISTS idx_practice_messages_session ON "practice_messages"("sessionId");`
 ];
 
 let dbInstance: Database | null = null;

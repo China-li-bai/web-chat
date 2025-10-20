@@ -13,6 +13,8 @@ import StatisticsPage from './pages/LanguageLearning/StatisticsPage';
 import TodayPlanPage from './pages/TodayPlan/today-plan-page';
 import ReviewPlannerPage from './pages/ReviewPlanner/review-planner-page';
 import './styles/App.css';
+import MarketingCopilot from './pages/MarketingCopilot';
+import AIContentCreator from './components/AIContentCreator';
 
 const { Content } = Layout;
 
@@ -33,6 +35,8 @@ function App() {
             <Route path="/review-planner" element={<ReviewPlannerPage />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/marketing-copilot" element={<MarketingCopilot />} />
+            <Route path="/ai-content-creator" element={<AIContentCreator />} />
           </Routes>
         </Content>
       </Layout>

@@ -21,9 +21,7 @@ The output MUST be ONLY valid JSON. No markdown, no commentary.
 # Requirements
 
 Language: {{targetLanguage}}
-Difficulty: {{level}}
-Topic: {{topic}}
-Entries: {{wordCount}}
+
 
 User Goal: {{userGoal}}
 

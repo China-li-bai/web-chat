@@ -9,13 +9,14 @@ import {
   Divider,
   Row,
   Col,
-  Tag,
+
   Modal,
   Spin,
   Select,
   Switch,
   Tooltip,
-  message
+  message,
+  Input
 } from 'antd';
 import {
   AudioOutlined,
@@ -32,8 +33,11 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import AITutorFeedback from '../components/AITutorFeedback';
 import GeminiSettings from '../components/GeminiSettings';
+import AiGenerateModal from '@/components/AiGenerateModal';
 import { generateTTS, playAudio } from '../utils/apiManager.js';
 import { getOrGenerateTTS, clearAllCache, preInitCache, getCacheInitStatus } from '../services/ttsCacheService.js';
+import { beginPracticeSession, completeTurn, appendMessage, getLatestSession, getLatestTurn } from '@/services/practice-dao';
+import Prompts from '@/modules/ai/prompts/Prompts';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -51,23 +55,27 @@ const Practice = () => {
   const [currentTopic, setCurrentTopic] = useState('日常对话');
   const [practiceText, setPracticeText] = useState('Hello, how are you today? I hope you are having a wonderful day.');
   const [micPermission, setMicPermission] = useState(false);
-  
+  const [sessionId, setSessionId] = useState(null);
+  const [turnId, setTurnId] = useState(null);
+
   // AI導師相關狀態
   const [aiTutorEnabled, setAiTutorEnabled] = useState(true);
   const [showAIFeedback, setShowAIFeedback] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [aiSettings, setAiSettings] = useState(null);
-  const [generatingContent, setGeneratingContent] = useState(false);
+  const [userGoal, setUserGoal] = useState('');
+
+  const [showAiModal, setShowAiModal] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState('intermediate');
-  
+
   // 語音風格選擇
   const [voiceStyle, setVoiceStyle] = useState('professional');
   const [ttsSource, setTtsSource] = useState(null);
-  
+
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const audioRef = useRef(null);
-  
+
   // 请求麦克风权限函数
   const requestMicrophonePermission = async () => {
     try {
@@ -80,7 +88,7 @@ const Practice = () => {
         });
         return false;
       }
-      
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // 获取权限后立即释放资源
       stream.getTracks().forEach(track => track.stop());
@@ -96,27 +104,42 @@ const Practice = () => {
       return false;
     }
   };
-  
-  // 组件加载时请求麦克风权限
+
+  // 组件加载时请求麦克风权限 + 尝试加载最近一次会话
   useEffect(() => {
     requestMicrophonePermission();
+
+    (async () => {
+      const userId = 'local-user';
+      const latestSession = await getLatestSession(userId);
+      if (latestSession) {
+        setSessionId(latestSession.id);
+        const latestTurn = await getLatestTurn(latestSession.id);
+        if (latestTurn?.referenceText) {
+          const rt = latestTurn.referenceText;
+          let textOut = rt;
+          if (typeof rt === 'string') {
+            const s = rt.trim();
+            if (s.startsWith('{') && s.endsWith('}')) {
+              try {
+                const obj = JSON.parse(s);
+                if (obj && typeof obj.referenceText === 'string') {
+                  textOut = obj.referenceText;
+                }
+              } catch (err) {
+                console.warn('Failed to parse latestTurn.referenceText JSON, fallback to raw string:', err);
+              }
+            }
+          }
+          setPracticeText(textOut);
+        }
+      }
+    })();
   }, []);
 
-  // 练习主题
-  const topics = [
-    { key: 'daily', label: '日常对话', color: 'blue' },
-    { key: 'business', label: '商务英语', color: 'green' },
-    { key: 'travel', label: '旅游英语', color: 'orange' },
-    { key: 'academic', label: '学术讨论', color: 'purple' },
-  ];
 
-  // 示例文本
-  const sampleTexts = {
-    daily: 'Hello, how are you today? I hope you are having a wonderful day.',
-    business: 'Good morning, I would like to schedule a meeting to discuss our project timeline.',
-    travel: 'Excuse me, could you please tell me how to get to the nearest subway station?',
-    academic: 'The research methodology we employed in this study follows a quantitative approach.'
-  };
+
+
 
   // 检查是否在Tauri环境中
   const isTauriApp = () => {
@@ -126,7 +149,7 @@ const Practice = () => {
   // 加載AI設置和初始化缓存系统
   useEffect(() => {
     loadAISettings();
-    
+
     // 预初始化缓存系统
     preInitCache().then(success => {
       if (success) {
@@ -151,107 +174,8 @@ const Practice = () => {
     }
   };
 
-  // 生成AI練習內容
-  const generateAIPracticeContent = async () => {
-    setGeneratingContent(true);
-    try {
-      if (isTauriApp()) {
-        // Tauri環境：使用後端API生成內容
-        const topicKey = topics.find(t => t.label === currentTopic)?.key || 'daily';
-        const content = await invoke('generate_practice_content', {
-          topic: topicKey,
-          difficultyLevel,
-          userInterests: aiSettings?.interests || []
-        });
-        
-        setPracticeText(content);
-        restart(); // 清除之前的練習結果
-        
-        Modal.success({
-          title: '內容生成成功！',
-          content: 'AI已為您生成個性化的練習內容，開始練習吧！',
-        });
-      } else {
-        // H5環境：如果有API key則可以調用後端API，否則使用預設內容
-        if (!aiSettings?.apiKey) {
-          // 沒有API key時使用預設的高質量練習內容
-          const topicKey = topics.find(t => t.label === currentTopic)?.key || 'daily';
-          const advancedTexts = {
-            daily: [
-              "Good morning! How did you sleep last night? I hope you had sweet dreams and feel refreshed today.",
-              "What are your plans for this beautiful weekend? I'm thinking of visiting the local farmers market.",
-              "The weather has been quite unpredictable lately, hasn't it? Yesterday was sunny, but today looks cloudy."
-            ],
-            business: [
-              "Let's schedule a meeting to discuss the quarterly sales report and our marketing strategy for next quarter.",
-              "I'd like to present our new product proposal to the board of directors next Tuesday morning.",
-              "Our customer satisfaction ratings have improved significantly since we implemented the new service protocols."
-            ],
-            travel: [
-              "I'm planning a trip to Europe next summer and would love to visit the historic cities of Rome and Paris.",
-              "The flight was delayed for three hours due to bad weather, but the airline provided excellent customer service.",
-              "Have you ever been to a traditional Japanese ryokan? The experience is absolutely unforgettable."
-            ],
-            academic: [
-              "The research methodology we discussed in yesterday's seminar was quite comprehensive and well-structured.",
-              "Climate change continues to be one of the most pressing environmental challenges of our generation.",
-              "The professor's lecture on quantum physics was fascinating, though admittedly quite complex to understand."
-            ]
-          };
-          
-          const texts = advancedTexts[topicKey] || advancedTexts.daily;
-          const randomText = texts[Math.floor(Math.random() * texts.length)];
-          setPracticeText(randomText);
-          restart();
-          
-          Modal.info({
-            title: '使用預設內容',
-            content: '已為您選擇高質量的練習內容。如需AI個性化生成，請在設置中配置Gemini API密鑰。',
-          });
-        } else {
-          // 有API key時可以嘗試調用後端生成（如果後端支持的話）
-          Modal.info({
-            title: '功能開發中',
-            content: 'H5環境下的AI內容生成功能正在開發中，目前為您提供精選的練習內容。',
-          });
-          
-          // 暫時使用預設內容
-          const topicKey = topics.find(t => t.label === currentTopic)?.key || 'daily';
-          const advancedTexts = {
-            daily: [
-              "Good morning! How did you sleep last night? I hope you had sweet dreams and feel refreshed today.",
-              "What are your plans for this beautiful weekend? I'm thinking of visiting the local farmers market."
-            ],
-            business: [
-              "Let's schedule a meeting to discuss the quarterly sales report and our marketing strategy for next quarter.",
-              "I'd like to present our new product proposal to the board of directors next Tuesday morning."
-            ],
-            travel: [
-              "I'm planning a trip to Europe next summer and would love to visit the historic cities of Rome and Paris.",
-              "The flight was delayed for three hours due to bad weather, but the airline provided excellent customer service."
-            ],
-            academic: [
-              "The research methodology we discussed in yesterday's seminar was quite comprehensive and well-structured.",
-              "Climate change continues to be one of the most pressing environmental challenges of our generation."
-            ]
-          };
-          
-          const texts = advancedTexts[topicKey] || advancedTexts.daily;
-          const randomText = texts[Math.floor(Math.random() * texts.length)];
-          setPracticeText(randomText);
-          restart();
-        }
-      }
-    } catch (error) {
-      console.error('Failed to generate content:', error);
-      Modal.error({
-        title: '生成失敗',
-        content: '內容生成失敗，請檢查網絡連接或稍後重試。',
-      });
-    } finally {
-      setGeneratingContent(false);
-    }
-  };
+
+
 
   // 處理AI設置變更
   const handleSettingsChange = (settings) => {
@@ -273,7 +197,7 @@ const Practice = () => {
         });
         return;
       }
-      
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         // 获取权限后立即释放资源
@@ -289,7 +213,7 @@ const Practice = () => {
         return; // 如果无法获取权限，直接返回
       }
     }
-    
+
     try {
       // 在 Tauri v1 中，navigator.mediaDevices 可能为 undefined
       if (!navigator.mediaDevices) {
@@ -300,7 +224,7 @@ const Practice = () => {
         });
         return;
       }
-      
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
@@ -313,7 +237,7 @@ const Practice = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
         const audioUrl = URL.createObjectURL(audioBlob);
         setRecordedAudio(audioUrl);
-        
+
         // 处理录音数据
         processAudio(audioBlob);
       };
@@ -321,7 +245,7 @@ const Practice = () => {
       mediaRecorderRef.current.start();
       setIsRecording(true);
       console.log('录音开始');
-      
+
       // 只在Tauri环境中调用Tauri命令
       if (isTauriApp()) {
         await invoke('start_recording');
@@ -329,7 +253,7 @@ const Practice = () => {
     } catch (error) {
       console.error('录音失败:', error);
       let errorMessage = '无法访问麦克风，请检查权限设置。';
-      
+
       if (error.name === 'NotAllowedError') {
         errorMessage = '麦克风权限被拒绝。请在浏览器地址栏左侧点击锁图标，允许麦克风权限后重试。';
       } else if (error.name === 'NotFoundError') {
@@ -337,7 +261,7 @@ const Practice = () => {
       } else if (error.name === 'NotSupportedError') {
         errorMessage = '当前浏览器不支持录音功能，建议使用Chrome或Firefox浏览器。';
       }
-      
+
       alert(errorMessage);
     }
   };
@@ -348,7 +272,7 @@ const Practice = () => {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       setIsRecording(false);
-      
+
       // 只在Tauri环境中调用Tauri命令
       if (isTauriApp()) {
         await invoke('stop_recording');
@@ -365,19 +289,28 @@ const Practice = () => {
         const reader = new FileReader();
         reader.onloadend = async () => {
           const base64Audio = reader.result.split(',')[1];
-          
-          // 调用语音识别
+
           const text = await invoke('speech_to_text', { audioData: base64Audio });
           setTranscription(text);
-          
-          // 调用发音评分
+
           const scoreResult = await invoke('pronunciation_score', {
             audioData: base64Audio,
             referenceText: practiceText
           });
           setScores(scoreResult);
-          
-          // 如果啟用AI導師，顯示反饋
+
+          // 回写 Turn（本地存储）
+          if (turnId) {
+            await completeTurn({
+              turnId,
+              transcription: text,
+              scoresOverall: scoreResult?.overall,
+              scoresPronunciation: scoreResult?.pronunciation,
+              scoresFluency: scoreResult?.fluency,
+              scoresCompleteness: scoreResult?.completeness,
+            });
+          }
+
           if (aiTutorEnabled && aiSettings?.apiKey) {
             setShowAIFeedback(true);
           }
@@ -385,8 +318,9 @@ const Practice = () => {
         reader.readAsDataURL(audioBlob);
       } else {
         // H5环境：模拟处理结果
-        setTimeout(() => {
-          setTranscription('这是模拟的语音识别结果：' + practiceText.substring(0, 20) + '...');
+        setTimeout(async () => {
+          const mockText = '这是模拟的语音识别结果：' + practiceText.substring(0, 20) + '...';
+          setTranscription(mockText);
           const mockScores = {
             overall: Math.floor(Math.random() * 30) + 70,
             pronunciation: Math.floor(Math.random() * 30) + 70,
@@ -394,12 +328,22 @@ const Practice = () => {
             completeness: Math.floor(Math.random() * 30) + 70
           };
           setScores(mockScores);
-          
-          // 如果啟用AI導師，顯示反饋
+
+          if (turnId) {
+            await completeTurn({
+              turnId,
+              transcription: mockText,
+              scoresOverall: mockScores.overall,
+              scoresPronunciation: mockScores.pronunciation,
+              scoresFluency: mockScores.fluency,
+              scoresCompleteness: mockScores.completeness,
+            });
+          }
+
           if (aiTutorEnabled && aiSettings?.apiKey) {
             setShowAIFeedback(true);
           }
-          
+
           setLoading(false);
         }, 2000);
         return;
@@ -442,29 +386,29 @@ const Practice = () => {
         if ('speechSynthesis' in window) {
           // 停止当前播放的语音
           window.speechSynthesis.cancel();
-          
+
           // 创建语音合成实例
           const utterance = new SpeechSynthesisUtterance(practiceText);
-          
+
           // 设置语音参数
           utterance.lang = 'en-US'; // 根据练习文本语言设置
           utterance.rate = 0.8; // 语速稍慢，便于学习
           utterance.pitch = 1; // 音调
           utterance.volume = 1; // 音量
-          
+
           // 尝试选择合适的语音
           const voices = window.speechSynthesis.getVoices();
-          const preferredVoice = voices.find(voice => 
+          const preferredVoice = voices.find(voice =>
             voice.lang.startsWith('en') && voice.name.includes('Female')
           ) || voices.find(voice => voice.lang.startsWith('en'));
-          
+
           if (preferredVoice) {
             utterance.voice = preferredVoice;
           }
-          
+
           // 播放语音
           window.speechSynthesis.speak(utterance);
-          
+
           // 显示成功提示
           message.success('正在播放示例音频...');
         } else {
@@ -489,34 +433,34 @@ const Practice = () => {
     }
 
     const messageKey = 'gemini-tts';
-    
+
     try {
       message.loading({ content: '🤖 正在查找本地缓存/生成语音...', key: messageKey, duration: 0 });
-      
+
       // 检查缓存系统状态
       const cacheStatus = getCacheInitStatus();
       console.log('[playGeminiExample] 缓存系统状态:', cacheStatus);
-      
+
       // 如果缓存系统未初始化，尝试初始化
       if (!cacheStatus.initialized) {
         console.log('[playGeminiExample] 缓存系统未初始化，尝试初始化...');
         await preInitCache();
       }
-      
+
       const lang = 'en-US';
       const params = { text: practiceText, voiceStyle, lang, provider: 'gemini', version: 'v2.5-flash-preview-tts' };
       console.log('[playGeminiExample] 缓存参数:', params);
-      
+
       const result = await getOrGenerateTTS(params, async () => {
         console.log('[playGeminiExample] 缓存未命中，调用生成器...');
         const r = await generateTTS(practiceText, voiceStyle);
         return { audioBlob: r.audioBlob, mimeType: r.mimeType, voiceName: r.voiceName, style: r.style };
       });
-      
+
       console.log('[playGeminiExample] TTS 结果来源:', result.source);
       setTtsSource(result.source);
       message.destroy(messageKey);
-      
+
       await playAudio(
         result.audioBlob,
         () => {
@@ -538,11 +482,11 @@ const Practice = () => {
           message.error('語音播放失敗');
         }
       );
-      
+
     } catch (error) {
       message.destroy(messageKey);
       console.error('Gemini TTS 错误:', error);
-      
+
       if (error.message.includes('API密鑰') || error.message.includes('401')) {
         message.error('Gemini API 密鑰無效或未配置，請檢查設置中的API密鑰配置');
       } else if (error.message.includes('配額') || error.message.includes('429')) {
@@ -576,13 +520,7 @@ const Practice = () => {
     setShowAIFeedback(false);
   };
 
-  // 切换主题
-  const changeTopic = (topicKey) => {
-    const topic = topics.find(t => t.key === topicKey);
-    setCurrentTopic(topic.label);
-    setPracticeText(sampleTexts[topicKey]);
-    restart();
-  };
+
 
   return (
     <div style={{ padding: '24px' }}>
@@ -601,35 +539,19 @@ const Practice = () => {
                 unCheckedChildren={<RobotOutlined />}
               />
             </Tooltip>
-            <Button 
-              icon={<SettingOutlined />} 
+            <Button
+              icon={<SettingOutlined />}
               onClick={() => setShowSettings(true)}
             >
               AI设置
             </Button>
           </Space>
         </div>
-        
+
         {/* 主题选择和AI控制 */}
         <div style={{ marginBottom: '24px' }}>
           <Row gutter={[16, 16]}>
-            <Col xs={24} md={12}>
-              <Text strong>选择练习主题：</Text>
-              <div style={{ marginTop: '8px' }}>
-                <Space wrap>
-                  {topics.map(topic => (
-                    <Tag
-                      key={topic.key}
-                      color={topic.color}
-                      style={{ cursor: 'pointer', padding: '4px 12px' }}
-                      onClick={() => changeTopic(topic.key)}
-                    >
-                      {topic.label}
-                    </Tag>
-                  ))}
-                </Space>
-              </div>
-            </Col>
+
             <Col xs={24} md={12}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <div>
@@ -645,12 +567,23 @@ const Practice = () => {
                     <Option value="advanced">高級</Option>
                   </Select>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Text strong>目标：</Text>
+                  <Input
+                    value={userGoal}
+                    onChange={(e) => setUserGoal(e.target.value)}
+                    placeholder="请描述你的练习目标（如：电话面试自我介绍）"
+                    style={{ width: 280, marginLeft: '8px' }}
+                    allowClear
+                    size="small"
+                  />
+                </div>
                 <Button
                   type="primary"
                   ghost
                   icon={<BulbOutlined />}
-                  onClick={generateAIPracticeContent}
-                  loading={generatingContent}
+                  onClick={() => setShowAiModal(true)}
+                  loading={false}
                 >
                   AI生成内容
                 </Button>
@@ -690,17 +623,17 @@ const Practice = () => {
                         </Select>
                       </div>
                       <Space>
-                        <Button 
-                          icon={<SoundOutlined />} 
+                        <Button
+                          icon={<SoundOutlined />}
                           onClick={playExample}
                         >
                           播放示例
                         </Button>
                         <Tooltip title={ttsSource ? (ttsSource === 'cache' ? '来源：本地缓存' : '来源：网络生成') : '点击生成/播放AI语音'}>
-                          <Button 
+                          <Button
                             type="primary"
                             ghost
-                            icon={<ThunderboltOutlined />} 
+                            icon={<ThunderboltOutlined />}
                             onClick={playGeminiExample}
                           >
                             🤖 AI語音
@@ -718,7 +651,7 @@ const Practice = () => {
                 type="info"
                 showIcon
               />
-              
+
               <div style={{ textAlign: 'center', marginTop: '24px' }}>
                 <Space direction="vertical" size="large">
                   <Button
@@ -735,10 +668,10 @@ const Practice = () => {
                   <Text>
                     {isRecording ? '点击停止录音' : (micPermission ? '点击开始录音' : '麦克风权限未获取')}
                   </Text>
-                  
+
                   {!micPermission && (
-                    <Button 
-                      type="dashed" 
+                    <Button
+                      type="dashed"
                       onClick={() => requestMicrophonePermission()}
                       icon={<AudioOutlined />}
                     >
@@ -780,9 +713,9 @@ const Practice = () => {
               {transcription && (
                 <div style={{ marginBottom: '24px' }}>
                   <Text strong>识别文本：</Text>
-                  <div style={{ 
-                    background: '#f5f5f5', 
-                    padding: '12px', 
+                  <div style={{
+                    background: '#f5f5f5',
+                    padding: '12px',
                     borderRadius: '6px',
                     marginTop: '8px'
                   }}>
@@ -798,34 +731,34 @@ const Practice = () => {
                     <Space direction="vertical" style={{ width: '100%' }}>
                       <div>
                         <Text>总体得分</Text>
-                        <Progress 
-                          percent={scores.overall} 
+                        <Progress
+                          percent={scores.overall}
                           strokeColor={scores.overall >= 80 ? '#52c41a' : scores.overall >= 60 ? '#faad14' : '#f5222d'}
                         />
                       </div>
                       <div>
                         <Text>发音准确度</Text>
-                        <Progress 
-                          percent={scores.pronunciation} 
+                        <Progress
+                          percent={scores.pronunciation}
                           strokeColor={scores.pronunciation >= 80 ? '#52c41a' : scores.pronunciation >= 60 ? '#faad14' : '#f5222d'}
                         />
                       </div>
                       <div>
                         <Text>流利度</Text>
-                        <Progress 
-                          percent={scores.fluency} 
+                        <Progress
+                          percent={scores.fluency}
                           strokeColor={scores.fluency >= 80 ? '#52c41a' : scores.fluency >= 60 ? '#faad14' : '#f5222d'}
                         />
                       </div>
                       <div>
                         <Text>完整度</Text>
-                        <Progress 
-                          percent={scores.completeness} 
+                        <Progress
+                          percent={scores.completeness}
                           strokeColor={scores.completeness >= 80 ? '#52c41a' : scores.completeness >= 60 ? '#faad14' : '#f5222d'}
                         />
                       </div>
                     </Space>
-                    
+
                     {scores.overall >= 80 && (
                       <Alert
                         message="太棒了！"
@@ -841,7 +774,7 @@ const Practice = () => {
             </Card>
           </Col>
         </Row>
-        
+
         {/* AI導師反饋 */}
         {showAIFeedback && scores && (
           <div style={{ marginTop: '24px' }}>
@@ -849,14 +782,38 @@ const Practice = () => {
               userPerformance={scores}
               practiceContext={practiceText}
               visible={showAIFeedback}
-              onFeedbackReceived={(feedback) => {
+              onFeedbackReceived={async (feedback) => {
                 console.log('AI Feedback received:', feedback);
+                if (sessionId) {
+                  await appendMessage({
+                    sessionId,
+                    role: 'assistant',
+                    content: typeof feedback === 'string' ? feedback : (feedback?.text || JSON.stringify(feedback)),
+                    lang: 'en-US',
+                    meta: { source: 'AITutorFeedback' }
+                  });
+                }
               }}
             />
           </div>
         )}
       </Card>
-      
+
+      {/* AI生成练习弹窗 */}
+      <AiGenerateModal
+        open={showAiModal}
+        mode="practice"
+        goal={userGoal}
+        onCancel={() => setShowAiModal(false)}
+        onSuccess={async ({ sessionId: sid, turnId: tid, referenceText }) => {
+          setSessionId(sid);
+          setTurnId(tid);
+          setPracticeText(referenceText || practiceText);
+          setShowAiModal(false);
+          Modal.success({ title: '內容生成成功！', content: 'AI已為您準備練習內容，開始練習吧！' });
+        }}
+      />
+
       {/* AI設置模態框 */}
       <Modal
         title="AI導師設置"

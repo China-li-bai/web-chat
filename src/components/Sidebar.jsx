@@ -9,7 +9,9 @@ import {
   AudioOutlined,
   BookOutlined,
   LineChartOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  BulbOutlined,
+  EditOutlined
 } from '@ant-design/icons';
 
 const { Sider } = Layout;
@@ -48,6 +50,16 @@ const Sidebar = () => {
       key: '/progress',
       icon: <BarChartOutlined />,
       label: '学习进度',
+    },
+    {
+      key: '/marketing-copilot',
+      icon: <BulbOutlined />,
+      label: '智能文案',
+    },
+    {
+      key: '/ai-content-creator',
+      icon: <EditOutlined />,
+      label: 'AI图文创作',
     },
     {
       key: '/settings',
