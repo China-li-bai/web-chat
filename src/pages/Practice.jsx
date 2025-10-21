@@ -38,6 +38,8 @@ import { generateTTS, playAudio } from '../utils/apiManager.js';
 import { getOrGenerateTTS, clearAllCache, preInitCache, getCacheInitStatus } from '../services/ttsCacheService.js';
 import { beginPracticeSession, completeTurn, appendMessage, getLatestSession, getLatestTurn } from '@/services/practice-dao';
 import { useAppStore } from '@/store/useAppStore';
+import { saveGeneratedPractice, normalizeDialogueRoles } from '@/services/practice-persist';
+import { getDialogue, getTips, getVocabulary, getReferenceText } from '@/services/practice-query';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -55,6 +57,9 @@ const Practice = () => {
   const [micPermission, setMicPermission] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [turnId, setTurnId] = useState(null);
+  const [dialogueList, setDialogueList] = useState([]);
+  const [tipsList, setTipsList] = useState([]);
+  const [vocabList, setVocabList] = useState([]);
 
   // AI導師相關狀態
   const [aiTutorEnabled, setAiTutorEnabled] = useState(true);
@@ -134,6 +139,31 @@ const Practice = () => {
       }
     })();
   }, []);
+  
+  // 当已有 sessionId 时，加载结构化对话、tips、词汇与参考文本
+  useEffect(() => {
+    (async () => {
+      console.log({sessionId});
+      
+      if (!sessionId) return;
+      try {
+        const [dialogue, tips, vocab, refText] = await Promise.all([
+          getDialogue(sessionId),
+          getTips(sessionId),
+          getVocabulary(sessionId),
+          getReferenceText(sessionId)
+        ]);
+        setDialogueList(dialogue || []);
+        setTipsList(tips || []);
+        setVocabList(vocab || []);
+        console.log({refText,dialogue});
+        
+        if (refText && !practiceText) setPracticeText(refText);
+      } catch (err) {
+        console.warn('加载会话内容失败:', err);
+      }
+    })();
+  }, [sessionId]);
 
 
 
@@ -588,6 +618,52 @@ const Practice = () => {
               </div>
             </Col>
           </Row>
+        
+        {/* 对话列表与提示/词汇展示 */}
+        <Divider />
+        <Row gutter={[24, 24]}>
+          <Col xs={24} lg={16}>
+            <Card title="对话列表" size="small">
+              {dialogueList && dialogueList.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {dialogueList.map((m, idx) => (
+                    <div key={idx} style={{ padding: '12px', border: '1px solid #f0f0f0', borderRadius: 8 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: 6 }}>
+                        {m.role === 'user' ? 'Learner' : 'Partner'}{m.originalRole ? ` (${m.originalRole})` : ''}
+                      </div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                      <div style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
+                        {m.createdAt ? new Date(m.createdAt).toLocaleString() : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Alert type="info" message="暂无对话消息" />
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={8}>
+            <Card title="练习提示" size="small" style={{ marginBottom: 16 }}>
+              {tipsList && tipsList.length ? (
+                <ul style={{ paddingLeft: 18, margin: 0 }}>
+                  {tipsList.map((t, i) => (<li key={i}>{t}</li>))}
+                </ul>
+              ) : (
+                <Alert type="info" message="暂无提示" />
+              )}
+            </Card>
+            <Card title="词汇表" size="small">
+              {vocabList && vocabList.length ? (
+                <ul style={{ paddingLeft: 18, margin: 0 }}>
+                  {vocabList.map((v, i) => (<li key={i}><strong>{v.word}</strong> — {v.gloss}</li>))}
+                </ul>
+              ) : (
+                <Alert type="info" message="暂无词汇" />
+              )}
+            </Card>
+          </Col>
+        </Row>
         </div>
 
         <Divider />
@@ -803,12 +879,34 @@ const Practice = () => {
         mode="practice"
         goal={userGoal}
         onCancel={() => setShowAiModal(false)}
-        onSuccess={async ({ sessionId: sid, turnId: tid, referenceText }) => {
-          setSessionId(sid);
-          setTurnId(tid);
-          setPracticeText(referenceText || practiceText);
-          setShowAiModal(false);
-          Modal.success({ title: '內容生成成功！', content: 'AI已為您準備練習內容，開始練習吧！' });
+        onSuccess={async (payload) => {
+          try {
+            // 如果返回的是未持久化的 JSON（没有 sessionId 字段），则立即落库
+            if (payload && !payload.sessionId) {
+              // 角色规范：若仍为 Learner/Partner 等，转换为 user/assistant 并保留 originalRole
+              if (Array.isArray(payload.dialogue)) {
+                payload.dialogue = normalizeDialogueRoles(payload.dialogue);
+              }
+              const { sessionId: sid, turnId: tid } = await saveGeneratedPractice(payload, userId);
+              setSessionId(sid);
+              setTurnId(tid);
+              const refText = typeof payload.referenceText === 'string' ? payload.referenceText : '';
+              setPracticeText(refText || practiceText);
+            } else {
+              // 若已持久化且返回包含 sessionId/turnId
+              const sid = payload?.sessionId || null;
+              const tid = payload?.turnId || null;
+              setSessionId(sid);
+              setTurnId(tid);
+              const refText = payload?.referenceText;
+              if (typeof refText === 'string') setPracticeText(refText || practiceText);
+            }
+            setShowAiModal(false);
+            Modal.success({ title: '內容生成成功！', content: 'AI已為您準備練習內容，開始練習吧！' });
+          } catch (err) {
+            console.error('持久化生成内容失败:', err);
+            Modal.error({ title: '保存失败', content: '寫入本地數據庫失敗，請稍後重試。' });
+          }
         }}
       />
 

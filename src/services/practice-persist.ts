@@ -24,7 +24,7 @@ type GeneratedPractice = {
  * - Map dialogue items to practice_messages (role user/assistant; store originalRole in meta)
  * - Store tips and vocabulary as system messages with meta.type
  */
-export async function saveGeneratedPractice(payload: GeneratedPractice, userId: string): Promise<{ sessionId: number }> {
+export async function saveGeneratedPractice(payload: GeneratedPractice, userId: string): Promise<{ sessionId: number, turnId: number }> {
   const db = await getDB();
 
   // Create session
@@ -56,6 +56,8 @@ export async function saveGeneratedPractice(payload: GeneratedPractice, userId: 
     `,
     args: [sessionId, payload.referenceText || '', createdAt]
   });
+  const turnId: number = await db.exec({ sql: 'SELECT last_insert_rowid() AS id;' })
+    .then((rows: any) => Number(rows?.[0]?.id));
 
   // Helper to insert a practice message
   const insertMessage = async (role: 'system' | 'user' | 'assistant', content: string, metaObj?: any) => {
@@ -95,7 +97,7 @@ export async function saveGeneratedPractice(payload: GeneratedPractice, userId: 
     args: [new Date().toISOString(), sessionId]
   });
 
-  return { sessionId };
+  return { sessionId, turnId };
 }
 
 /**

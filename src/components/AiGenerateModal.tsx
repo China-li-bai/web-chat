@@ -114,16 +114,17 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
       const referenceText: string = (parsed && typeof parsed.referenceText === 'string')
         ? parsed.referenceText
         : s;
-
+      console.log({parsed,referenceText});
+      
       if (!referenceText) {
         message.error('AI returned empty content');
         return;
       }
 
       if (mode === 'practice') {
-        onSuccess && onSuccess({ referenceText });
+        onSuccess && onSuccess(parsed);
       } else {
-        onSuccess && onSuccess({ text: referenceText });
+        onSuccess && onSuccess(parsed);
       }
 
       message.success('生成成功');
