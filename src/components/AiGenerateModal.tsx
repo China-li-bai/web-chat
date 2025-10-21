@@ -76,12 +76,11 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
 
       // Build final prompt from Prompts.get (统一入口)
       const promptFromTemplate = await Prompts.get('practice-goal-driven', {
-        goalText: userGoal || '',
+        userGoal: userGoal || '',
         lang: 'en-US',
         level: difficulty || 'intermediate',
         tone: 'friendly',
-        roles: ['Learner', 'Partner'],
-        constraints: []
+
       });
 
       let text = '';
@@ -115,12 +114,6 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
       const referenceText: string = (parsed && typeof parsed.referenceText === 'string')
         ? parsed.referenceText
         : s;
-      const dialogueItems: Array<{ role: string; content: string }> = (parsed && Array.isArray(parsed.dialogue))
-        ? parsed.dialogue
-        : [];
-      const tips: string[] = (parsed && Array.isArray(parsed.tips)) ? parsed.tips : [];
-      const vocabulary: Array<{ word: string; gloss: string }> = (parsed && Array.isArray(parsed.vocabulary)) ? parsed.vocabulary : [];
-      const metaOut: any = (parsed && parsed.meta) ? parsed.meta : { goal: userGoal, level: difficulty, lang: 'en-US' };
 
       if (!referenceText) {
         message.error('AI returned empty content');

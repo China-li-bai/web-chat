@@ -176,7 +176,8 @@ export async function generateTextUnified(options: {
       body: JSON.stringify({
         model: modelId,
         messages: await messages({ role: 'user', content: options.prompt }),
-        ...(options.responseFormat ? { response_format: options.responseFormat } : {})
+         response_format: {type: "json_object"} ,
+        // ...(options.responseFormat ? { response_format: options.responseFormat } : {})
       }),
     });
     const data = await resp.json();

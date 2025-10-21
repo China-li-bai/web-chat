@@ -37,8 +37,7 @@ import AiGenerateModal from '@/components/AiGenerateModal';
 import { generateTTS, playAudio } from '../utils/apiManager.js';
 import { getOrGenerateTTS, clearAllCache, preInitCache, getCacheInitStatus } from '../services/ttsCacheService.js';
 import { beginPracticeSession, completeTurn, appendMessage, getLatestSession, getLatestTurn } from '@/services/practice-dao';
-import Prompts from '@/modules/ai/prompts/Prompts';
-
+import { useAppStore } from '@/store/useAppStore';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -52,7 +51,6 @@ const Practice = () => {
   const [transcription, setTranscription] = useState('');
   const [scores, setScores] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [currentTopic, setCurrentTopic] = useState('日常对话');
   const [practiceText, setPracticeText] = useState('Hello, how are you today? I hope you are having a wonderful day.');
   const [micPermission, setMicPermission] = useState(false);
   const [sessionId, setSessionId] = useState(null);
@@ -75,7 +73,7 @@ const Practice = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const audioRef = useRef(null);
-
+ const userId = useAppStore((state) => state.userId)
   // 请求麦克风权限函数
   const requestMicrophonePermission = async () => {
     try {
@@ -110,7 +108,7 @@ const Practice = () => {
     requestMicrophonePermission();
 
     (async () => {
-      const userId = 'local-user';
+     
       const latestSession = await getLatestSession(userId);
       if (latestSession) {
         setSessionId(latestSession.id);

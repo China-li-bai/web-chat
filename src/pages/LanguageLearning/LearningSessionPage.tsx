@@ -11,8 +11,8 @@ import { LetterFillSpellingQuestion } from '@/components/language-learning/Lette
 
 // 懒加载组件
 const SessionEndFeedback = lazy(() => import('../../components/LanguageLearning/SessionEndFeedback'));
-import { Button, Space, Spin, Result, Typography, message, Progress, Select, Tag, Tooltip } from 'antd';
-import { ArrowLeftOutlined, TrophyOutlined, ClockCircleOutlined, BookOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { Button, Spin, Result, Typography, message, Progress, Select, Tag, Tooltip } from 'antd';
+import { ArrowLeftOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews, startSessionFromTodayPlan, aggregateDailyStudyAndUpdateProgress } from '@/services/learningService';
 import { evaluateRewardsOnEvent, addDailyFocusProgress } from '@/services/rewardService';
 import { finalizeSessionStatistics } from '@/services/statsService';

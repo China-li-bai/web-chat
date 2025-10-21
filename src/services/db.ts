@@ -249,6 +249,40 @@ async function migrateWordsUniqueConstraint(db: Database) {
   }
 }
 
+/**
+ * Ensure additional indices for common query patterns across learning and practice domains.
+ * Uses IF NOT EXISTS to be idempotent and safe.
+ */
+async function ensureIndices(db: Database) {
+  const indexStatements = [
+    // Learning domain
+    `CREATE INDEX IF NOT EXISTS idx_learning_progress_word ON "learning_progress"("wordId");`,
+    `CREATE INDEX IF NOT EXISTS idx_learning_progress_user ON "learning_progress"("userId");`,
+    `CREATE INDEX IF NOT EXISTS idx_learning_progress_nextReview ON "learning_progress"("nextReview");`,
+
+    `CREATE INDEX IF NOT EXISTS idx_study_logs_item_user_time ON "study_logs"("itemId","userId","timestamp");`,
+    `CREATE INDEX IF NOT EXISTS idx_study_logs_timestamp ON "study_logs"("timestamp");`,
+
+    // Statistics (UNIQUE constraints already create indexes, here we add single-field helpers if needed)
+    `CREATE INDEX IF NOT EXISTS idx_learning_statistics_user ON "learning_statistics"("userId");`,
+    `CREATE INDEX IF NOT EXISTS idx_word_type_statistics_user ON "word_type_statistics"("userId");`,
+
+    // Practice domain
+    `CREATE INDEX IF NOT EXISTS idx_practice_sessions_user_created ON "practice_sessions"("userId","createdAt");`,
+    `CREATE INDEX IF NOT EXISTS idx_practice_turns_created ON "practice_turns"("createdAt");`,
+    `CREATE INDEX IF NOT EXISTS idx_practice_messages_created ON "practice_messages"("createdAt");`
+  ];
+
+  for (const sql of indexStatements) {
+    try {
+      await db.exec({ sql });
+    } catch (e: any) {
+      // Silently ignore errors for idempotency; CREATE INDEX IF NOT EXISTS should rarely throw.
+      console.warn('Index creation warning:', e?.message || e);
+    }
+  }
+}
+
 export async function getDB(): Promise<Database> {
   if (dbInstance) {
     return dbInstance;
@@ -265,6 +299,7 @@ export async function getDB(): Promise<Database> {
 
     await migrateDB(db);
     await migrateWordsUniqueConstraint(db);
+    await ensureIndices(db);
     return db;
   }
 

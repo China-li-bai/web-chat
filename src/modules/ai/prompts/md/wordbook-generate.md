@@ -22,7 +22,6 @@ The output MUST be ONLY valid JSON. No markdown, no commentary.
 
 Language: {{targetLanguage}}
 
-
 User Goal: {{userGoal}}
 
 Target Language: {{targetLanguage}} (default: English)
