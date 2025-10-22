@@ -40,7 +40,7 @@ export async function createSession(input: CreateSessionInput): Promise<number> 
       INSERT INTO "practice_sessions" ("userId","topic","difficulty","lastUpdated")
       VALUES (?, ?, ?, CURRENT_TIMESTAMP);
     `,
-    params: [input.userId, input.topic, input.difficulty],
+    args: [input.userId, input.topic, input.difficulty],
   } as any);
   // wa-sqlite adapter does not expose last_insert_rowid(); fallback by selecting latest for this user/topic/difficulty
   const rows = await db.exec({
@@ -49,7 +49,7 @@ export async function createSession(input: CreateSessionInput): Promise<number> 
       WHERE "userId" = ? AND "topic" = ? AND "difficulty" = ?
       ORDER BY "id" DESC LIMIT 1;
     `,
-    params: [input.userId, input.topic, input.difficulty],
+    args: [input.userId, input.topic, input.difficulty],
   } as any);
   return rows?.[0]?.id as number;
 }
@@ -61,7 +61,7 @@ export async function startTurn(input: StartTurnInput): Promise<number> {
       INSERT INTO "practice_turns" ("sessionId","referenceText")
       VALUES (?, ?);
     `,
-    params: [input.sessionId, input.referenceText],
+    args: [input.sessionId, input.referenceText],
   } as any);
   const rows = await db.exec({
     sql: `
@@ -69,7 +69,7 @@ export async function startTurn(input: StartTurnInput): Promise<number> {
       WHERE "sessionId" = ?
       ORDER BY "id" DESC LIMIT 1;
     `,
-    params: [input.sessionId],
+    args: [input.sessionId],
   } as any);
   return rows?.[0]?.id as number;
 }
@@ -89,7 +89,7 @@ export async function completeTurn(input: CompleteTurnInput): Promise<void> {
         "ttsCacheKey" = COALESCE(?, "ttsCacheKey")
       WHERE "id" = ?;
     `,
-    params: [
+    args: [
       input.transcription ?? null,
       input.scoresOverall ?? null,
       input.scoresPronunciation ?? null,
@@ -110,7 +110,7 @@ export async function appendMessage(input: AppendMessageInput): Promise<number> 
       INSERT INTO "practice_messages" ("sessionId","role","content","lang","meta")
       VALUES (?, ?, ?, ?, ?);
     `,
-    params: [input.sessionId, input.role, input.content, input.lang ?? null, metaStr],
+    args: [input.sessionId, input.role, input.content, input.lang ?? null, metaStr],
   } as any);
   const rows = await db.exec({
     sql: `
@@ -118,7 +118,7 @@ export async function appendMessage(input: AppendMessageInput): Promise<number> 
       WHERE "sessionId" = ?
       ORDER BY "id" DESC LIMIT 1;
     `,
-    params: [input.sessionId],
+    args: [input.sessionId],
   } as any);
   return rows?.[0]?.id as number;
 }
@@ -131,7 +131,7 @@ export async function getLatestTurn(sessionId: number): Promise<any | null> {
       WHERE "sessionId" = ?
       ORDER BY "id" DESC LIMIT 1;
     `,
-    params: [sessionId],
+    args: [sessionId],
   } as any);
   return rows?.[0] ?? null;
 }
@@ -144,7 +144,7 @@ export async function listMessages(sessionId: number): Promise<Array<any>> {
       WHERE "sessionId" = ?
       ORDER BY "id" ASC;
     `,
-    params: [sessionId],
+    args: [sessionId],
   } as any);
   return rows ?? [];
 }
@@ -177,7 +177,7 @@ export async function getLatestSession(userId: string): Promise<any | null> {
       ORDER BY "id" DESC
       LIMIT 1;
     `,
-    params: [userId],
+    args: [userId],
   } as any);
   return rows?.[0] ?? null;
 }
