@@ -13,6 +13,7 @@ export type ProviderKey =
   | 'ernie'
   | 'hunyuan'
   | 'openrouter'
+  | 'groq'
   | 'gemini'
   | 'openai';
 

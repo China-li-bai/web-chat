@@ -7,6 +7,7 @@ function providerKeyToLLM(p: Exclude<ProviderKey, 'free-priority'>): LLMProvider
     case 'gemini': return LLMProvider.Gemini;
     case 'openai': return LLMProvider.OpenAI;
     case 'openrouter': return LLMProvider.OpenRouter;
+    case 'groq': return LLMProvider.Groq;
     case 'zhipu': return LLMProvider.Zhipu;
     case 'ernie': return LLMProvider.Ernie;
     case 'hunyuan': return LLMProvider.Hunyuan;

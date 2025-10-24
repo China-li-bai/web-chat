@@ -3,6 +3,7 @@ import { openai } from '@ai-sdk/openai';
 
 import { GoogleGenAI } from '@google/genai';
 import Prompts from './prompts/Prompts';
+import { getOpenRouterHeaders } from './provider';
 
 // Provider 枚举
 export enum LLMProvider {
@@ -54,6 +55,59 @@ export const defaultBaseUrls: Record<LLMProvider, string | undefined> = {
   // 腾讯混元 OpenAI 兼容网关，默认不提供，要求外部配置 baseUrl
   [LLMProvider.Hunyuan]: undefined,
 };
+
+// 通用 OpenAI 兼容 chat completions 封装
+type OpenAICompatCallOptions = {
+  providerName: string;
+  modelId: string;
+  baseUrl: string;
+  apiKey?: string;
+  prompt: string;
+  responseFormat?: any;
+  includeSystemPrompt?: boolean;
+};
+
+const buildChatCompletionsUrl = (baseUrl: string) => (baseUrl || '').replace(/\/+$/, '') + '/chat/completions';
+
+async function callOpenAICompatibleChatCompletions(opts: OpenAICompatCallOptions): Promise<string> {
+  const { providerName, modelId, baseUrl, apiKey, prompt, responseFormat, includeSystemPrompt = true } = opts;
+  if (!baseUrl) throw new Error(`${providerName} 未配置 baseUrl 或网关，已跳过`);
+
+  const url = buildChatCompletionsUrl(baseUrl);
+  const body: any = {
+    model: modelId,
+    messages: includeSystemPrompt ? await messages({ role: 'user', content: prompt }) : [{ role: 'user', content: prompt }],
+  };
+
+  // Zhipu 默认返回 JSON，需要显式设置 response_format
+  if (responseFormat) {
+    body.response_format = responseFormat;
+  } else if (providerName.toLowerCase() === 'zhipu') {
+    body.response_format = { type: 'json_object' };
+  }
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`${providerName} 请求失败(${resp.status}): ${errText || '未知错误'}`);
+  }
+
+  let data: any;
+  try {
+    data = await resp.json();
+  } catch (e) {
+    throw new Error(`${providerName} 返回非 JSON，解析失败`);
+  }
+
+  const text = data?.choices?.[0]?.message?.content || '';
+  if (!text) throw new Error(`${providerName} 返回空内容`);
+  return text.trim();
+}
 
 // API Key 内存存储（可按需改为持久化）
 const apiKeys: Partial<Record<LLMProvider, string>> = {};
@@ -154,11 +208,8 @@ export async function generateTextUnified(options: {
     const result = await generateText({
       model: openai({
         apiKey,
-        baseURL: 'https://openrouter.ai/api/v1',
-        headers: {
-          'HTTP-Referer': (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : 'http://localhost',
-          'X-Title': 'ai-speech-practice'
-        }
+        baseURL: baseUrl || defaultBaseUrls[LLMProvider.OpenRouter] || 'https://openrouter.ai/api/v1',
+        headers: getOpenRouterHeaders('ai-speech-practice')
       })(modelId),
       prompt: options.prompt
     });
@@ -167,53 +218,54 @@ export async function generateTextUnified(options: {
     return text;
   }
 
+  // Groq（OpenAI 兼容端點）
+  if (provider === LLMProvider.Groq) {
+    const result = await generateText({
+      model: openai({
+        apiKey,
+        baseURL: baseUrl || defaultBaseUrls[LLMProvider.Groq] || 'https://api.groq.com/openai/v1',
+      })(modelId),
+      prompt: options.prompt,
+    });
+    const text = (result?.text || '').trim();
+    if (!text) throw new Error('Groq 返回空内容');
+    return text;
+  }
+
   // Zhipu (GLM-4-Flash) - OpenAI 兼容 chat completions v4
   if (provider === LLMProvider.Zhipu) {
-    const url = (baseUrl || '').replace(/\/+$/, '') + '/chat/completions';
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: modelId,
-        messages: await messages({ role: 'user', content: options.prompt }),
-         response_format: {type: "json_object"} ,
-        // ...(options.responseFormat ? { response_format: options.responseFormat } : {})
-      }),
+    return await callOpenAICompatibleChatCompletions({
+      providerName: 'Zhipu',
+      modelId: modelId,
+      baseUrl: baseUrl || '',
+      apiKey,
+      prompt: options.prompt,
+      responseFormat: options.responseFormat,
     });
-    const data = await resp.json();
-    const text = data?.choices?.[0]?.message?.content || '';
-    if (!text) throw new Error('Hunyuan 返回空内容');
-    return text;
   }
 
   // ERNIE-Speed（需外部提供 baseUrl 或 access_token 网关）
   if (provider === LLMProvider.Ernie) {
-    if (!baseUrl) throw new Error('Ernie 未配置 baseUrl 或网关，已跳过');
-    const url = (baseUrl || '').replace(/\/+$/, '') + '/chat/completions';
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) },
-      body: JSON.stringify({ model: modelId, messages:await messages({ role: 'user', content: options.prompt })}),
+    return await callOpenAICompatibleChatCompletions({
+      providerName: 'Ernie',
+      modelId: modelId,
+      baseUrl: baseUrl || '',
+      apiKey,
+      prompt: options.prompt,
+      responseFormat: options.responseFormat,
     });
-    const data = await resp.json();
-    const text = data?.choices?.[0]?.message?.content || '';
-    if (!text) throw new Error('Hunyuan 返回空内容');
-    return text;
   }
 
   // Hunyuan-Lite（需外部提供 OpenAI 兼容 baseUrl）
   if (provider === LLMProvider.Hunyuan) {
-    if (!baseUrl) throw new Error('Hunyuan 未配置 baseUrl 或网关，已跳过');
-    const url = (baseUrl || '').replace(/\/+$/, '') + '/chat/completions';
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) },
-      body: JSON.stringify({ model: modelId, messages:await  messages({ role: 'user', content: options.prompt })}),
+    return await callOpenAICompatibleChatCompletions({
+      providerName: 'Hunyuan',
+      modelId: modelId,
+      baseUrl: baseUrl || '',
+      apiKey,
+      prompt: options.prompt,
+      responseFormat: options.responseFormat,
     });
-    const data = await resp.json();
-    const text = data?.choices?.[0]?.message?.content || '';
-    if (!text) throw new Error('Hunyuan 返回空内容');
-    return text;
   }
 
   // 其他 Provider 可按需扩展
