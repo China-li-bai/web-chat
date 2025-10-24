@@ -40,6 +40,7 @@ import { beginPracticeSession, completeTurn, appendMessage, getLatestSession, ge
 import { useAppStore } from '@/store/useAppStore';
 import { saveGeneratedPractice, normalizeDialogueRoles } from '@/services/practice-persist';
 import { getDialogue, getTips, getVocabulary, getReferenceText } from '@/services/practice-query';
+import useMicrophone from '@/hooks/useMicrophone';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -47,14 +48,24 @@ const { Option } = Select;
 
 
 const Practice = () => {
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [recordedAudio, setRecordedAudio] = useState(null);
+  // 麥克風控制（抽象為 Hook）
+  const {
+    micPermission,
+    requestMicrophonePermission: requestMicPermission,
+    isRecording,
+    startRecording: micStartRecording,
+    stopRecording: micStopRecording,
+    recordedAudioUrl,
+    isPlaying,
+    togglePlayback: micTogglePlayback,
+    resetRecording: micResetRecording,
+    audioRef,
+  } = useMicrophone();
+
   const [transcription, setTranscription] = useState('');
   const [scores, setScores] = useState(null);
   const [loading, setLoading] = useState(false);
   const [practiceText, setPracticeText] = useState('Hello, how are you today? I hope you are having a wonderful day.');
-  const [micPermission, setMicPermission] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [turnId, setTurnId] = useState(null);
   const [dialogueList, setDialogueList] = useState([]);
@@ -76,37 +87,11 @@ const Practice = () => {
   const [voiceStyle, setVoiceStyle] = useState('professional');
   const [ttsSource, setTtsSource] = useState(null);
 
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const audioRef = useRef(null);
  const userId = useAppStore((state) => state.userId)
   // 请求麦克风权限函数
+  // 使用 Hook 封裝的權限請求，保持原方法名兼容
   const requestMicrophonePermission = async () => {
-    try {
-      // 在 Tauri v1 中，navigator.mediaDevices 可能为 undefined
-      if (!navigator.mediaDevices) {
-        console.error('navigator.mediaDevices 不可用');
-        Modal.error({
-          title: '麦克风权限',
-          content: '在 Tauri 应用中，麦克风权限需要在系统级别授予。请确保您已在系统设置中允许此应用访问麦克风，然后重启应用。',
-        });
-        return false;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // 获取权限后立即释放资源
-      stream.getTracks().forEach(track => track.stop());
-      setMicPermission(true);
-      console.log('麦克风权限已获取');
-      return true;
-    } catch (error) {
-      console.error('无法获取麦克风权限:', error);
-      Modal.error({
-        title: '麦克风权限',
-        content: '无法访问麦克风，请在系统设置中允许此应用访问麦克风，然后重启应用。',
-      });
-      return false;
-    }
+    return await requestMicPermission();
   };
 
   // 组件加载时请求麦克风权限 + 尝试加载最近一次会话
@@ -216,98 +201,36 @@ const Practice = () => {
   };
 
   // 开始录音
+  // 開始錄音：委派給 useMicrophone
   const startRecording = async () => {
-    // 如果之前没有获取到麦克风权限，先尝试获取
-    if (!micPermission) {
-      // 在 Tauri v1 中，navigator.mediaDevices 可能为 undefined
-      if (!navigator.mediaDevices) {
-        console.error('navigator.mediaDevices 不可用');
-        Modal.error({
-          title: '麦克风权限',
-          content: '在 Tauri 应用中，麦克风权限需要在系统级别授予。请确保您已在系统设置中允许此应用访问麦克风，然后重启应用。',
-        });
-        return;
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // 获取权限后立即释放资源
-        stream.getTracks().forEach(track => track.stop());
-        setMicPermission(true);
-        console.log('麦克风权限已获取');
-      } catch (error) {
-        console.error('无法获取麦克风权限:', error);
-        Modal.error({
-          title: '麦克风权限',
-          content: '无法访问麦克风，请在系统设置中允许此应用访问麦克风，然后重启应用。',
-        });
-        return; // 如果无法获取权限，直接返回
-      }
-    }
-
     try {
-      // 在 Tauri v1 中，navigator.mediaDevices 可能为 undefined
-      if (!navigator.mediaDevices) {
-        console.error('navigator.mediaDevices 不可用');
-        Modal.error({
-          title: '麦克风权限',
-          content: '在 Tauri 应用中，麦克风权限需要在系统级别授予。请确保您已在系统设置中允许此应用访问麦克风，然后重启应用。',
-        });
-        return;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        setRecordedAudio(audioUrl);
-
-        // 处理录音数据
-        processAudio(audioBlob);
-      };
-
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
+      await micStartRecording();
       console.log('录音开始');
-
-      // 只在Tauri环境中调用Tauri命令
-      if (isTauriApp()) {
-        await invoke('start_recording');
-      }
     } catch (error) {
       console.error('录音失败:', error);
       let errorMessage = '无法访问麦克风，请检查权限设置。';
-
-      if (error.name === 'NotAllowedError') {
+      if (error && error.name === 'NotAllowedError') {
         errorMessage = '麦克风权限被拒绝。请在浏览器地址栏左侧点击锁图标，允许麦克风权限后重试。';
-      } else if (error.name === 'NotFoundError') {
+      } else if (error && error.name === 'NotFoundError') {
         errorMessage = '未找到麦克风设备，请检查设备连接。';
-      } else if (error.name === 'NotSupportedError') {
+      } else if (error && error.name === 'NotSupportedError') {
         errorMessage = '当前浏览器不支持录音功能，建议使用Chrome或Firefox浏览器。';
       }
-
-      alert(errorMessage);
+      Modal.error({ title: '录音失败', content: errorMessage });
     }
   };
 
   // 停止录音
+  // 停止錄音：委派給 useMicrophone，並在拿到音頻後觸發處理
   const stopRecording = async () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
-
-      // 只在Tauri环境中调用Tauri命令
-      if (isTauriApp()) {
-        await invoke('stop_recording');
+    try {
+      const blob = await micStopRecording();
+      if (blob) {
+        await processAudio(blob);
       }
+    } catch (e) {
+      console.error('停止錄音或處理音頻時發生錯誤:', e);
+      Modal.error({ title: '停止錄音失敗', content: e?.message || '未知錯誤' });
     }
   };
 
@@ -393,15 +316,12 @@ const Practice = () => {
   };
 
   // 播放录音
+  // 播放/暫停錄音：委派給 useMicrophone 的切換邏輯
   const playRecording = () => {
-    if (recordedAudio && audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        audioRef.current.play();
-        setIsPlaying(true);
-      }
+    if (recordedAudioUrl && audioRef.current) {
+      micTogglePlayback();
+    } else {
+      message.warning('暂无录音，请先录制。');
     }
   };
 
@@ -544,10 +464,9 @@ const Practice = () => {
 
   // 重新开始
   const restart = () => {
-    setRecordedAudio(null);
+    micResetRecording();
     setTranscription('');
     setScores(null);
-    setIsPlaying(false);
     setShowAIFeedback(false);
   };
 
@@ -625,61 +544,7 @@ const Practice = () => {
         {/* 对话列表与提示/词汇展示 */}
         <Divider />
         <Row gutter={[24, 24]}>
-          <Col xs={24} lg={16}>
-            <Card title={<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>对话列表</span><span><Switch checked={showChinese} onChange={setShowChinese} size="small" /> <Text type="secondary" style={{ marginLeft: 8 }}>显示中文</Text></span></div>} size="small">
-              {dialogueList && dialogueList.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {dialogueList.map((m, idx) => {
-                    console.log({m});
-                    
-                    return (
-                    <div key={idx} style={{ padding: '12px', border: '1px solid #f0f0f0', borderRadius: 8 }}>
-                      <div style={{ fontWeight: 'bold', marginBottom: 6 }}>
-                        {m.role === 'user' ? 'Learner' : 'Partner'}{m.originalRole ? ` (${m.originalRole})` : ''}
-                      </div>
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                      {showChinese && m.contentZh ? (
-                        <div style={{ whiteSpace: 'pre-wrap', marginTop: 6, color: '#595959' }}>{m.contentZh}</div>
-                      ) : null}
-                      <div style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
-                        {m.createdAt ? new Date(m.createdAt).toLocaleString() : ''}
-                      </div>
-                    </div>
-                  )
-                  })}
-                </div>
-              ) : (
-                <Alert type="info" message="暂无对话消息" />
-              )}
-            </Card>
-          </Col>
-          <Col xs={24} lg={8}>
-            <Card title="练习提示" size="small" style={{ marginBottom: 16 }}>
-              {tipsList && tipsList.length ? (
-                <ul style={{ paddingLeft: 18, margin: 0 }}>
-                  {tipsList.map((t, i) => (<li key={i}>{t}</li>))}
-                </ul>
-              ) : (
-                <Alert type="info" message="暂无提示" />
-              )}
-            </Card>
-            <Card title="词汇表" size="small">
-              {vocabList && vocabList.length ? (
-                <ul style={{ paddingLeft: 18, margin: 0 }}>
-                  {vocabList.map((v, i) => (<li key={i}><strong>{v.word}</strong> — {v.gloss}</li>))}
-                </ul>
-              ) : (
-                <Alert type="info" message="暂无词汇" />
-              )}
-            </Card>
-          </Col>
-        </Row>
-        </div>
-
-        <Divider />
-
-        <Row gutter={[24, 24]}>
-          {/* 练习区域 */}
+                  {/* 练习区域 */}
           <Col xs={24} lg={12}>
             <Card title="练习内容" size="small">
               <Alert
@@ -765,9 +630,9 @@ const Practice = () => {
                 </Space>
               </div>
 
-              {recordedAudio && (
+              {recordedAudioUrl && (
                 <div style={{ marginTop: '24px', textAlign: 'center' }}>
-                  <audio ref={audioRef} src={recordedAudio} onEnded={() => setIsPlaying(false)} />
+                  <audio ref={audioRef} src={recordedAudioUrl} />
                   <Space>
                     <Button
                       icon={isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
@@ -783,6 +648,61 @@ const Practice = () => {
               )}
             </Card>
           </Col>
+          <Col xs={24} lg={16}>
+            <Card title={<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>对话列表</span><span><Switch checked={showChinese} onChange={setShowChinese} size="small" /> <Text type="secondary" style={{ marginLeft: 8 }}>显示中文</Text></span></div>} size="small">
+              {dialogueList && dialogueList.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {dialogueList.map((m, idx) => {
+                    console.log({m});
+                    
+                    return (
+                    <div key={idx} style={{ padding: '12px', border: '1px solid #f0f0f0', borderRadius: 8 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: 6 }}>
+                        {m.role === 'user' ? 'Learner' : 'Partner'}{m.originalRole ? ` (${m.originalRole})` : ''}
+                      </div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                      {showChinese && m.contentZh ? (
+                        <div style={{ whiteSpace: 'pre-wrap', marginTop: 6, color: '#595959' }}>{m.contentZh}</div>
+                      ) : null}
+                      <div style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
+                        {m.createdAt ? new Date(m.createdAt).toLocaleString() : ''}
+                      </div>
+                    </div>
+                  )
+                  })}
+                </div>
+              ) : (
+                <Alert type="info" message="暂无对话消息" />
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={8}>
+            <Card title="练习提示" size="small" style={{ marginBottom: 16 }}>
+              {tipsList && tipsList.length ? (
+                <ul style={{ paddingLeft: 18, margin: 0 }}>
+                  {tipsList.map((t, i) => (<li key={i}>{t}</li>))}
+                </ul>
+              ) : (
+                <Alert type="info" message="暂无提示" />
+              )}
+            </Card>
+            <Card title="词汇表" size="small">
+              {vocabList && vocabList.length ? (
+                <ul style={{ paddingLeft: 18, margin: 0 }}>
+                  {vocabList.map((v, i) => (<li key={i}><strong>{v.word}</strong> — {v.gloss}</li>))}
+                </ul>
+              ) : (
+                <Alert type="info" message="暂无词汇" />
+              )}
+            </Card>
+          </Col>
+        </Row>
+        </div>
+
+        <Divider />
+
+        <Row gutter={[24, 24]}>
+
 
           {/* 结果区域 */}
           <Col xs={24} lg={12}>
