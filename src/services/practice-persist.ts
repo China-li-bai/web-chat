@@ -122,6 +122,7 @@ export function normalizeDialogueRoles(dialogue: Array<{ role: string; content: 
     return 'assistant'; // interviewer, partner, coach, speaker b -> assistant
   };
   return (dialogue || []).map(d => ({
+    ...d,
     role: mapRole(d.role),
     originalRole: d.role,
     content: d.content

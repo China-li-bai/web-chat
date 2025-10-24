@@ -120,6 +120,7 @@ const CREATE_TABLE_STATEMENTS = [
     "sessionId" INTEGER NOT NULL,
     "role" TEXT NOT NULL CHECK("role" IN ('system','user','assistant')),
     "content" TEXT NOT NULL,
+    "contentZh" TEXT,
     "lang" TEXT,
     "meta" TEXT,
     "createdAt" TEXT DEFAULT CURRENT_TIMESTAMP,

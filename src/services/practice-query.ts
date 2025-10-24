@@ -55,23 +55,27 @@ export async function getPracticeSessionJSON(sessionId: number): Promise<Practic
   const messages: Array<{
     role: 'system' | 'user' | 'assistant';
     content: string;
+    contentZh: string | null;
     lang: string | null;
     meta: any | null;
     id: number;
     createdAt: string | null;
   }> = await db.exec({
     sql: `
-      SELECT "id","role","content","lang","meta","createdAt"
+      SELECT "id","role","content","contentZh","lang","meta","createdAt"
       FROM "practice_messages"
       WHERE "sessionId" = ?1
       ORDER BY "id" ASC;
     `,
     args: [sessionId]
   }).then((rows: any) => {
+    console.log({rows});
+    
     return (rows || []).map((r: any) => ({
       id: Number(r.id),
       role: r.role as 'system' | 'user' | 'assistant',
       content: String(r.content || ''),
+      contentZh: r.contentZh ?? null,
       lang: r.lang ?? null,
       meta: safeParseJSON(r.meta),
       createdAt: r.createdAt ? String(r.createdAt) : null
@@ -97,7 +101,7 @@ export async function getPracticeSessionJSON(sessionId: number): Promise<Practic
       role: m.role,
       originalRole: (m.meta && 'originalRole' in m.meta) ? (m.meta.originalRole ?? null) : null,
       content: m.content,
-      contentZh: m.meta?.contentZh ?? m.meta?.translationZh,
+      contentZh: m.contentZh || (m.meta?.contentZh ?? m.meta?.translationZh),
       createdAt: m.createdAt ?? null
     }));
 
@@ -224,20 +228,22 @@ export async function getDialogue(sessionId: number): Promise<DialogueItem[]> {
   const db = await getDB();
   const rows = await db.exec({
     sql: `
-      SELECT "role","content","lang","meta","createdAt"
+      SELECT "role","content","contentZh","lang","meta","createdAt"
       FROM "practice_messages"
       WHERE "sessionId" = ?1 AND "role" IN ('user','assistant')
       ORDER BY "id" ASC;
     `,
     args: [sessionId]
   });
+  console.log({rows});
+  
   return (rows || []).map((r: any) => {
     const meta = safeParseJSON(r.meta);
     return {
       role: r.role,
       originalRole: meta?.originalRole ?? null,
       content: String(r.content || ''),
-      contentZh: meta?.contentZh ?? meta?.translationZh,
+      contentZh: r.contentZh || (meta?.contentZh ?? meta?.translationZh),
       createdAt: r.createdAt ? String(r.createdAt) : null
     } as DialogueItem;
   });

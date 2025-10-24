@@ -27,6 +27,7 @@ export interface AppendMessageInput {
   sessionId: number;
   role: 'system' | 'user' | 'assistant';
   content: string;
+  contentZh?: string;
   lang?: string;
   meta?: any; // will be JSON.stringified
 }
@@ -107,10 +108,10 @@ export async function appendMessage(input: AppendMessageInput): Promise<number> 
   const metaStr = input.meta ? JSON.stringify(input.meta) : null;
   await db.exec({
     sql: `
-      INSERT INTO "practice_messages" ("sessionId","role","content","lang","meta")
-      VALUES (?, ?, ?, ?, ?);
+      INSERT INTO "practice_messages" ("sessionId","role","content","contentZh","lang","meta")
+      VALUES (?, ?, ?, ?, ?, ?);
     `,
-    args: [input.sessionId, input.role, input.content, input.lang ?? null, metaStr],
+    args: [input.sessionId, input.role, input.content, input.contentZh ?? null, input.lang ?? null, metaStr],
   } as any);
   const rows = await db.exec({
     sql: `
