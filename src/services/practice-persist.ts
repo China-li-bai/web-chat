@@ -62,14 +62,14 @@ export async function saveGeneratedPractice(payload: GeneratedPractice, userId: 
     .then((rows: any) => Number(rows?.[0]?.id));
 
   // Helper to insert a practice message
-  const insertMessage = async (role: 'system' | 'user' | 'assistant', content: string, metaObj?: any, langOverride?: string | null) => {
+  const insertMessage = async (role: 'system' | 'user' | 'assistant', content: string, contentZh: string, metaObj?: any, langOverride?: string | null) => {
     const metaStr = metaObj ? JSON.stringify(metaObj) : null;
     await db.exec({
       sql: `
-        INSERT INTO "practice_messages" ("sessionId","role","content","lang","meta","createdAt")
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6);
+        INSERT INTO "practice_messages" ("sessionId","role","content","contentZh","lang","meta","createdAt")
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);
       `,
-      args: [sessionId, role, content, langOverride ?? (payload?.meta?.lang || null), metaStr, new Date().toISOString()]
+      args: [sessionId, role, content, contentZh, langOverride ?? (payload?.meta?.lang || null), metaStr, new Date().toISOString()]
     });
   };
 
@@ -83,7 +83,7 @@ export async function saveGeneratedPractice(payload: GeneratedPractice, userId: 
     if (item.contentZh !== undefined) {
       meta.contentZh = item.contentZh;
     }
-    await insertMessage(item.role, item.content, meta, 'en-US');
+    await insertMessage(item.role, item.content, item.contentZh || '', meta, 'en-US');
   }
 
   // Insert tips as system message

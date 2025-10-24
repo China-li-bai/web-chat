@@ -83,49 +83,35 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
 
       });
 
-      let text = '';
-      if (provider === 'free-priority') {
-        text = await generateTextWithFreePriority(promptFromTemplate);
-      } else {
-        const pEnum = providerToEnum(provider);
-        if (!pEnum) {
-          message.error('Unsupported provider');
-          return;
-        }
-        text = await generateTextUnified({
-          provider: pEnum,
-          prompt: promptFromTemplate,
-          apiKey,
-          modelName: model || defaultModels[pEnum],
-          baseUrl,
-        });
+
+      const pEnum = providerToEnum(provider);
+      if (!pEnum) {
+        message.error('Unsupported provider');
+        return;
       }
+      let text = await generateTextUnified({
+        provider: pEnum,
+        prompt: promptFromTemplate,
+        apiKey,
+        modelName: model || defaultModels[pEnum],
+        baseUrl,
+      });
 
       // Parse LLM JSON output for goal-driven practice
-      let parsed: any = null;
       const s = (text || '').trim();
-      if (s.startsWith('{') && s.endsWith('}')) {
-        try {
-          parsed = JSON.parse(s);
-        } catch (e) {
-          console.error('LLM JSON parse failed:', e);
-        }
-      }
-      const referenceText: string = (parsed && typeof parsed.referenceText === 'string')
-        ? parsed.referenceText
+      let results = JSON.parse(s);
+
+      const referenceText: string = (results && typeof results.referenceText === 'string')
+        ? results.referenceText
         : s;
-      console.log({parsed,referenceText});
-      
+      console.log({ results, text });
+
       if (!referenceText) {
         message.error('AI returned empty content');
         return;
       }
 
-      if (mode === 'practice') {
-        onSuccess && onSuccess(parsed);
-      } else {
-        onSuccess && onSuccess(parsed);
-      }
+      onSuccess && onSuccess(JSON.parse(JSON.stringify(results)));
 
       message.success('生成成功');
       onCancel();

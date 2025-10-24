@@ -113,7 +113,7 @@ export async function generateTextWithFreePriority(prompt: string): Promise<stri
   throw new Error(`所有免费优先候选均不可用，最后错误：${String(lastErr?.message || lastErr || 'unknown')}`);
 }
 
-// 统一文本生成函数（输入 prompt，返回纯文本）
+// 统一文本生成函数（输入 prompt，返回json）
 export async function generateTextUnified(options: {
   provider?: LLMProvider;
   prompt: string;
@@ -181,10 +181,9 @@ export async function generateTextUnified(options: {
       }),
     });
     const data = await resp.json();
-    const text = data?.choices?.[0]?.message?.content || data?.data || '';
-    const t = String(text || '').trim();
-    if (!t) throw new Error('Zhipu 返回空内容');
-    return t;
+    const text = data?.choices?.[0]?.message?.content || '';
+    if (!text) throw new Error('Hunyuan 返回空内容');
+    return text;
   }
 
   // ERNIE-Speed（需外部提供 baseUrl 或 access_token 网关）
@@ -198,9 +197,8 @@ export async function generateTextUnified(options: {
     });
     const data = await resp.json();
     const text = data?.choices?.[0]?.message?.content || '';
-    const t = String(text || '').trim();
-    if (!t) throw new Error('Ernie 返回空内容');
-    return t;
+    if (!text) throw new Error('Hunyuan 返回空内容');
+    return text;
   }
 
   // Hunyuan-Lite（需外部提供 OpenAI 兼容 baseUrl）
@@ -214,9 +212,8 @@ export async function generateTextUnified(options: {
     });
     const data = await resp.json();
     const text = data?.choices?.[0]?.message?.content || '';
-    const t = String(text || '').trim();
-    if (!t) throw new Error('Hunyuan 返回空内容');
-    return t;
+    if (!text) throw new Error('Hunyuan 返回空内容');
+    return text;
   }
 
   // 其他 Provider 可按需扩展
