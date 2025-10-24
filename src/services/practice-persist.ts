@@ -6,9 +6,11 @@ type GeneratedPractice = {
     role: 'user' | 'assistant';
     originalRole?: string;
     content: string;
+    contentZh?: string;
   }>;
   tips: string[];
-  vocabulary: Array<{ word: string; gloss: string }>;
+  tipsZh?: string[];
+  vocabulary: Array<{ word: string; gloss: string; glossZh?: string }>;
   meta: {
     goal: string;
     lang: string;
@@ -60,34 +62,43 @@ export async function saveGeneratedPractice(payload: GeneratedPractice, userId: 
     .then((rows: any) => Number(rows?.[0]?.id));
 
   // Helper to insert a practice message
-  const insertMessage = async (role: 'system' | 'user' | 'assistant', content: string, metaObj?: any) => {
+  const insertMessage = async (role: 'system' | 'user' | 'assistant', content: string, metaObj?: any, langOverride?: string | null) => {
     const metaStr = metaObj ? JSON.stringify(metaObj) : null;
     await db.exec({
       sql: `
         INSERT INTO "practice_messages" ("sessionId","role","content","lang","meta","createdAt")
         VALUES (?1, ?2, ?3, ?4, ?5, ?6);
       `,
-      args: [sessionId, role, content, payload?.meta?.lang || null, metaStr, new Date().toISOString()]
+      args: [sessionId, role, content, langOverride ?? (payload?.meta?.lang || null), metaStr, new Date().toISOString()]
     });
   };
 
   // Insert dialogue messages
   for (const item of payload.dialogue || []) {
     // role already user/assistant per adjusted prompt; keep originalRole in meta
-    const meta = {
+    const meta: any = {
       originalRole: item.originalRole || null
     };
-    await insertMessage(item.role, item.content, meta);
+    if (item.contentZh) {
+      meta.contentZh = item.contentZh;
+    }
+    await insertMessage(item.role, item.content, meta, 'en-US');
   }
 
   // Insert tips as system message
   if (payload.tips?.length) {
-    await insertMessage('system', payload.tips.join('\n'), { type: 'tips' });
+    {
+      const tipsMeta: any = { type: 'tips' };
+      if (Array.isArray(payload.tipsZh) && payload.tipsZh.length) {
+        tipsMeta.tipsZh = payload.tipsZh;
+      }
+      await insertMessage('system', payload.tips.join('\n'), tipsMeta);
+    }
   }
 
   // Insert vocabulary as system message
   if (payload.vocabulary?.length) {
-    const vocabText = payload.vocabulary.map(v => `${v.word} — ${v.gloss}`).join('\n');
+    const vocabText = payload.vocabulary.map(v => `${v.word} — ${v.gloss}${v.glossZh ? ' ｜ ' + v.glossZh : ''}`).join('\n');
     await insertMessage('system', vocabText, { type: 'vocabulary', items: payload.vocabulary });
   }
 

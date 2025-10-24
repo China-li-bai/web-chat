@@ -4,7 +4,7 @@ import { generateTextWithFreePriority } from '../../modules/ai/llmService';
 import './AIContentCreator.css';
 
 const { TextArea } = Input;
-const { Option } = Select;
+
 
 const AIContentCreator = () => {
   const [inputValue, setInputValue] = useState('');

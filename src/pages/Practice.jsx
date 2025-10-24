@@ -60,6 +60,7 @@ const Practice = () => {
   const [dialogueList, setDialogueList] = useState([]);
   const [tipsList, setTipsList] = useState([]);
   const [vocabList, setVocabList] = useState([]);
+  const [showChinese, setShowChinese] = useState(false);
 
   // AI導師相關狀態
   const [aiTutorEnabled, setAiTutorEnabled] = useState(true);
@@ -153,6 +154,8 @@ const Practice = () => {
           getVocabulary(sessionId),
           getReferenceText(sessionId)
         ]);
+        console.log({dialogue});
+        
         setDialogueList(dialogue || []);
         setTipsList(tips || []);
         setVocabList(vocab || []);
@@ -623,20 +626,27 @@ const Practice = () => {
         <Divider />
         <Row gutter={[24, 24]}>
           <Col xs={24} lg={16}>
-            <Card title="对话列表" size="small">
+            <Card title={<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>对话列表</span><span><Switch checked={showChinese} onChange={setShowChinese} size="small" /> <Text type="secondary" style={{ marginLeft: 8 }}>显示中文</Text></span></div>} size="small">
               {dialogueList && dialogueList.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {dialogueList.map((m, idx) => (
+                  {dialogueList.map((m, idx) => {
+                    console.log({m});
+                    
+                    return (
                     <div key={idx} style={{ padding: '12px', border: '1px solid #f0f0f0', borderRadius: 8 }}>
                       <div style={{ fontWeight: 'bold', marginBottom: 6 }}>
                         {m.role === 'user' ? 'Learner' : 'Partner'}{m.originalRole ? ` (${m.originalRole})` : ''}
                       </div>
                       <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                      {showChinese && m.contentZh ? (
+                        <div style={{ whiteSpace: 'pre-wrap', marginTop: 6, color: '#595959' }}>{m.contentZh}</div>
+                      ) : null}
                       <div style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
                         {m.createdAt ? new Date(m.createdAt).toLocaleString() : ''}
                       </div>
                     </div>
-                  ))}
+                  )
+                  })}
                 </div>
               ) : (
                 <Alert type="info" message="暂无对话消息" />

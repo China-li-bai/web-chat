@@ -74,9 +74,10 @@ export async function generatePracticeFromGoal(params: PracticeGenerateParams): 
   }
 
   const referenceText: string = (parsed && typeof parsed.referenceText === 'string') ? parsed.referenceText : s;
-  const dialogueItems: Array<{ role: string; content: string }> = (parsed && Array.isArray(parsed.dialogue)) ? parsed.dialogue : [];
+  const dialogueItems: Array<{ role: string; originalRole?: string; content: string; contentZh?: string }> = (parsed && Array.isArray(parsed.dialogue)) ? parsed.dialogue : [];
   const tips: string[] = (parsed && Array.isArray(parsed.tips)) ? parsed.tips : [];
-  const vocabulary: Array<{ word: string; gloss: string }> = (parsed && Array.isArray(parsed.vocabulary)) ? parsed.vocabulary : [];
+  const tipsZh: string[] = (parsed && Array.isArray(parsed.tipsZh)) ? parsed.tipsZh : [];
+  const vocabulary: Array<{ word: string; gloss: string; glossZh?: string }> = (parsed && Array.isArray(parsed.vocabulary)) ? parsed.vocabulary : [];
   const metaOut: any = (parsed && parsed.meta) ? parsed.meta : { goal: params.goal, level: params.difficulty, lang };
 
   if (!referenceText) {
@@ -99,24 +100,29 @@ export async function generatePracticeFromGoal(params: PracticeGenerateParams): 
   const mapRole = (r: string) => (r === 'Learner' ? 'user' : 'assistant');
   for (const d of dialogueItems) {
     if (d && typeof d.content === 'string' && typeof d.role === 'string') {
+      const meta: any = { origin: 'AiGenerateModal', goal: params.goal };
+      if (d.originalRole) meta.originalRole = d.originalRole;
+      if (d.contentZh) meta.contentZh = d.contentZh;
       await appendMessage({
         sessionId,
         role: mapRole(d.role),
         content: d.content,
         lang,
-        meta: { origin: 'AiGenerateModal', goal: params.goal }
+        meta
       });
     }
   }
 
-  if (tips.length || vocabulary.length) {
-    await appendMessage({
-      sessionId,
-      role: 'system',
-      content: JSON.stringify({ tips, vocabulary, meta: metaOut }),
-      lang,
-      meta: { origin: 'AiGenerateModal', type: 'practice-extra', goal: params.goal }
-    });
+  // Separate system messages for tips and vocabulary to match practice-query readers
+  if (tips.length) {
+    const tMeta: any = { type: 'tips' };
+    if (tipsZh && tipsZh.length) tMeta.tipsZh = tipsZh;
+    await appendMessage({ sessionId, role: 'system', content: tips.join('\n'), lang, meta: tMeta });
+  }
+
+  if (vocabulary.length) {
+    const vocabText = vocabulary.map(v => `${v.word} — ${v.gloss}${v.glossZh ? ' ｜ ' + v.glossZh : ''}`).join('\n');
+    await appendMessage({ sessionId, role: 'system', content: vocabText, lang, meta: { type: 'vocabulary', items: vocabulary } });
   }
 
   const latestTurn = await getLatestTurn(sessionId);

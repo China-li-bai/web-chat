@@ -34,20 +34,24 @@ Target Language: {{targetLanguage}} (default: English)
    - Action-oriented with a coherent, story-like scene: include a clear setting, progression (problem/decision), and a light resolution tied to the goal
    - Make it realistic for the user's goal; for example, if goal is “successfully interview for a remote frontend role”, simulate an actual interview flow:
      greeting → background → project/skills deep-dive (React/TypeScript/perf/accessibility) → system design/architecture trade-offs → remote collaboration/time zones → compensation/next steps → wrap-up
-3) Provide 3 short tips (practical and actionable)
-4) Provide 6–10 vocabulary items (word + short gloss) strongly tied to the scenario
+3) Provide 3 short tips (practical and actionable), and ALSO provide their Chinese equivalents (tipsZh)
+4) Provide 6–10 vocabulary items strongly tied to the scenario, each with:
+   - word
+   - gloss (English short gloss)
+   - glossZh (Chinese short gloss)
 
 # Output Format (JSON only):
 
 {
   "referenceText": "string",
   "dialogue": [
-    { "role": "user", "originalRole": "Learner", "content": "..." },
-    { "role": "assistant", "originalRole": "Partner", "content": "..." }
+    { "role": "user", "originalRole": "Learner", "content": "...", "contentZh": "..." },
+    { "role": "assistant", "originalRole": "Partner", "content": "...", "contentZh": "..." }
   ],
   "tips": ["...", "...", "..."],
+  "tipsZh": ["...", "...", "..."],
   "vocabulary": [
-    { "word": "string", "gloss": "string" }
+    { "word": "string", "gloss": "string", "glossZh": "string" }
   ],
   "meta": {
     "goal": "{userGoal}",
@@ -66,6 +70,8 @@ Target Language: {{targetLanguage}} (default: English)
 - Maintain goal-oriented progression: each turn should move closer to achieving the stated goal.
 - Avoid meaningless chit-chat; avoid overly complex vocabulary according to 'level'.
 - Roles MUST be only 'user' or 'assistant'; include originalRole per dialogue item.
+- For each dialogue turn, provide content (target language) and contentZh (Chinese meaning/translation).
+- Provide tipsZh and vocabulary.glossZh for Chinese equivalents.
 - Do NOT output anything outside the JSON structure above.
 
 Examples (for your understanding; do not hardcode):
