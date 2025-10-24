@@ -76,6 +76,10 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
   }, [open, goal, form]);
 
   const handleOk = useCallback(async () => {
+    if (submitting) { // 防重入：正在提交時禁止再次點擊
+      message.info('請求正在處理，請稍候');
+      return;
+    }
     setSubmitting(true);
     const hide = message.loading('正在生成...', 0);
     try {
@@ -137,7 +141,7 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
       hide?.();
       setSubmitting(false);
     }
-  }, [form, onCancel, onSuccess]);
+  }, [form, onCancel, onSuccess, submitting]);
 
   return (
     <Modal
