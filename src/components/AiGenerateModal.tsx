@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { Modal, Form, Input, Select, Typography, message } from 'antd';
 import { generateTextWithFreePriority, generateTextUnified, LLMProvider, defaultModels } from '@/modules/ai/llmService';
 import Prompts from '@/modules/ai/prompts/Prompts';
@@ -22,6 +22,7 @@ const PROVIDER_OPTIONS = [
   { label: 'Baidu ERNIE', value: 'ernie' },
   { label: 'Tencent Hunyuan', value: 'hunyuan' },
   { label: 'OpenRouter', value: 'openrouter' },
+  { label: 'Groq', value: 'groq' },
   { label: 'Gemini', value: 'gemini' },
   { label: 'OpenAI', value: 'openai' },
 ];
@@ -34,6 +35,7 @@ function providerToEnum(p: string): LLMProvider | null {
     case 'zhipu': return LLMProvider.Zhipu;
     case 'ernie': return LLMProvider.Ernie;
     case 'hunyuan': return LLMProvider.Hunyuan;
+    case 'groq': return LLMProvider.Groq;
     default: return null;
   }
 }
@@ -42,14 +44,26 @@ function providerToEnum(p: string): LLMProvider | null {
 
 const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onCancel, onSuccess }) => {
   const [form] = Form.useForm();
+  const [submitting, setSubmitting] = useState(false);
 
   const initialValues = useMemo(() => ({
     provider: 'free-priority',
     difficulty: 'intermediate',
-    wordCount: 1,
-    targetLanguage: 'English',
     userGoal: 'Improve daily conversation fluency',
   }), []);
+
+  const parseLLMJson = (raw: string): any => {
+    const s = (raw || '').trim();
+    const fenced = s.replace(/^```(json)?\s*/i, '').replace(/```$/,'').trim();
+    try { return JSON.parse(fenced); } catch {}
+    const firstBrace = fenced.indexOf('{');
+    const lastBrace = fenced.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const candidate = fenced.slice(firstBrace, lastBrace + 1);
+      try { return JSON.parse(candidate); } catch {}
+    }
+    return { referenceText: s };
+  };
 
   useEffect(() => {
     if (open && goal) {
@@ -61,7 +75,9 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
     }
   }, [open, goal, form]);
 
-  const handleOk = async () => {
+  const handleOk = useCallback(async () => {
+    setSubmitting(true);
+    const hide = message.loading('正在生成...', 0);
     try {
       const values = await form.validateFields();
       const {
@@ -73,41 +89,40 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
         userGoal,
       } = values;
 
-
       // Build final prompt from Prompts.get (统一入口)
       const promptFromTemplate = await Prompts.get('practice-goal-driven', {
         userGoal: userGoal || '',
         lang: 'en-US',
         level: difficulty || 'intermediate',
         tone: 'friendly',
-
       });
 
-
-      const pEnum = providerToEnum(provider);
-      if (!pEnum) {
-        message.error('Unsupported provider');
-        return;
+      let text: string;
+      if (provider === 'free-priority') {
+        text = await generateTextWithFreePriority(promptFromTemplate);
+      } else {
+        const pEnum = providerToEnum(provider);
+        if (!pEnum) {
+          message.error('Unsupported provider');
+          return;
+        }
+        text = await generateTextUnified({
+          provider: pEnum,
+          prompt: promptFromTemplate,
+          apiKey,
+          modelName: model || defaultModels[pEnum],
+          baseUrl,
+        });
       }
-      let text = await generateTextUnified({
-        provider: pEnum,
-        prompt: promptFromTemplate,
-        apiKey,
-        modelName: model || defaultModels[pEnum],
-        baseUrl,
-      });
 
-      // Parse LLM JSON output for goal-driven practice
-      const s = (text || '').trim();
-      let results = JSON.parse(s);
-
-      const referenceText: string = (results && typeof results.referenceText === 'string')
-        ? results.referenceText
-        : s;
+      const results = parseLLMJson(text || '');
+      const referenceText: string = typeof results.referenceText === 'string'
+        ? results.referenceText.trim()
+        : (text || '').trim();
       console.log({ results, text });
 
       if (!referenceText) {
-        message.error('AI returned empty content');
+        message.error('AI 返回空内容');
         return;
       }
 
@@ -118,8 +133,11 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
     } catch (e: any) {
       console.error('AI generate failed:', e);
       message.error(e?.message || '生成失败，请稍后重试');
+    } finally {
+      hide?.();
+      setSubmitting(false);
     }
-  };
+  }, [form, onCancel, onSuccess]);
 
   return (
     <Modal
@@ -128,6 +146,7 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
       onCancel={onCancel}
       onOk={handleOk}
       okText="Generate"
+      confirmLoading={submitting}
       destroyOnClose
     >
       <Form
@@ -159,24 +178,26 @@ const AiGenerateModal: React.FC<AiGenerateModalProps> = ({ open, mode, goal, onC
             if (p && p !== 'free-priority') {
               const modelPh =
                 p === 'zhipu' ? 'e.g., glm-4-flash' :
-                  p === 'ernie' ? 'e.g., ernie-speed' :
-                    p === 'hunyuan' ? 'e.g., hunyuan-lite' :
-                      p === 'openrouter' ? 'e.g., deepseek/deepseek-r1:free' :
-                        p === 'openai' ? 'e.g., gpt-4o-mini' :
-                          'e.g., gemini-1.5-flash';
+                p === 'ernie' ? 'e.g., ernie-speed' :
+                p === 'hunyuan' ? 'e.g., hunyuan-lite' :
+                p === 'openrouter' ? 'e.g., deepseek/deepseek-r1:free' :
+                p === 'groq' ? 'e.g., llama3.1-8b-instant' :
+                p === 'openai' ? 'e.g., gpt-4o-mini' :
+                'e.g., gemini-1.5-flash';
               const basePh =
                 p === 'zhipu' ? 'https://open.bigmodel.cn/api/paas/v4' :
-                  p === 'openrouter' ? 'https://openrouter.ai/api/v1' :
-                    p === 'ernie' ? 'Your ERNIE-compatible gateway base URL' :
-                      p === 'hunyuan' ? 'Your Hunyuan OpenAI-compatible gateway base URL' :
-                        '';
+                p === 'openrouter' ? 'https://openrouter.ai/api/v1' :
+                p === 'ernie' ? 'Your ERNIE-compatible gateway base URL' :
+                p === 'hunyuan' ? 'Your Hunyuan OpenAI-compatible gateway base URL' :
+                p === 'groq' ? 'https://api.groq.com/openai/v1' :
+                '';
 
               return (
                 <>
                   <Form.Item label="Model (optional)" name="model">
                     <Input placeholder={modelPh} />
                   </Form.Item>
-                  <Form.Item label="API Key" name="apiKey" rules={[{ required: true, message: 'Please input API Key for the selected provider' }]}>
+                  <Form.Item label="API Key" name="apiKey" rules={[{ required: true, message: 'Please input API Key for the selected provider' }]}> 
                     <Input.Password placeholder="Your API Key" />
                   </Form.Item>
                   <Form.Item label="Base URL (optional)" name="baseUrl">
