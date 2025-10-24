@@ -102,7 +102,10 @@ export async function generatePracticeFromGoal(params: PracticeGenerateParams): 
     if (d && typeof d.content === 'string' && typeof d.role === 'string') {
       const meta: any = { origin: 'AiGenerateModal', goal: params.goal };
       if (d.originalRole) meta.originalRole = d.originalRole;
-      if (d.contentZh) meta.contentZh = d.contentZh;
+      // 保存 contentZh，即使是空字符串或 undefined 也要明確處理
+      if (d.contentZh !== undefined) {
+        meta.contentZh = d.contentZh;
+      }
       await appendMessage({
         sessionId,
         role: mapRole(d.role),

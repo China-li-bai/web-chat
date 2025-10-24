@@ -79,7 +79,8 @@ export async function saveGeneratedPractice(payload: GeneratedPractice, userId: 
     const meta: any = {
       originalRole: item.originalRole || null
     };
-    if (item.contentZh) {
+    // 保存 contentZh，即使是空字符串也要保存
+    if (item.contentZh !== undefined) {
       meta.contentZh = item.contentZh;
     }
     await insertMessage(item.role, item.content, meta, 'en-US');
