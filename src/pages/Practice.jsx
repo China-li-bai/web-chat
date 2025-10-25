@@ -133,10 +133,8 @@ const Practice = () => {
   const [showAiModal, setShowAiModal] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState('intermediate');
 
-  // 語音風格選擇
-  const [voiceStyle, setVoiceStyle] = useState('professional');
+  // 语音生成来源提示
   const [ttsSource, setTtsSource] = useState(null);
-  const [expressiveEnabled, setExpressiveEnabled] = useState(true);
 
   // 語音參數控制狀態（抽离为通用Hook）
   const tts = useTTSSettings('tts_settings');
@@ -147,6 +145,9 @@ const Practice = () => {
     voiceVolume, setVoiceVolume,
     voices, setVoices,
     selectedVoiceName, setSelectedVoiceName,
+    voiceStyle, setVoiceStyle,
+    expressiveEnabled, setExpressiveEnabled,
+    segmentPauseMs, expressiveJitter,
   } = tts;
 
   // 播放控制
@@ -443,6 +444,8 @@ const Practice = () => {
         volume: voiceVolume,
         voiceName: selectedVoiceName,
         loop: loopPlayback,
+        segmentPauseMs,
+        jitter: expressiveJitter,
         voiceStyle,
       };
       if (expressiveEnabled) {
@@ -492,6 +495,8 @@ const Practice = () => {
         pitch: voicePitch,
         volume: voiceVolume,
         voiceName: preferName,
+        segmentPauseMs,
+        jitter: expressiveJitter,
         voiceStyle,
       };
       if (expressiveEnabled) {
@@ -533,6 +538,8 @@ const Practice = () => {
           pitch: voicePitch,
           volume: voiceVolume,
           voiceName: preferName,
+          segmentPauseMs,
+          jitter: expressiveJitter,
           voiceStyle,
           onEnd: () => {
             const next = i + 1;
@@ -743,30 +750,7 @@ const Practice = () => {
                       {practiceText}
                     </Paragraph>
                     <div style={{ marginTop: '12px' }}>
-                      <div style={{ marginBottom: '8px' }}>
-                        <Text strong>语音风格：</Text>
-                        <Select
-                          value={voiceStyle}
-                          onChange={setVoiceStyle}
-                          style={{ width: 120, marginLeft: '8px' }}
-                          size="small"
-                        >
-                          <Option value="professional">专业</Option>
-                          <Option value="cheerful">愉快</Option>
-                          <Option value="calm">平静</Option>
-                          <Option value="energetic">活力</Option>
-                          <Option value="friendly">友好</Option>
-                          <Option value="serious">严肃</Option>
-                        </Select>
-                        <Switch
-                          checked={expressiveEnabled}
-                          onChange={setExpressiveEnabled}
-                          style={{ marginLeft: 12 }}
-                          size="small"
-                          checkedChildren="表达增强"
-                          unCheckedChildren="普通"
-                        />
-                      </div>
+                      {/* 语音风格与表达增强已迁移到 VoiceSettingsModal，统一管理 */}
                       {/* 语音设置已迁移到 VoiceSettingsModal，移除页面内的语言与系统语音设置（含循环开关） */}
                       
                       {/* 播放文本选择 */}

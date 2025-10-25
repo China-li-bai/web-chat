@@ -17,6 +17,85 @@ export function getVoices() {
   }
 }
 
+/** Detect the current browser for heuristic voice defaults */
+export function detectBrowser() {
+  try {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    if (/Edg\//.test(ua)) return 'edge';
+    if (/Firefox\//.test(ua)) return 'firefox';
+    // Safari detection: has Safari but not Chrome/Edge/Opera
+    if (/Safari\//.test(ua) && !/Chrome\//.test(ua) && !/Edg\//.test(ua) && !/OPR\//.test(ua)) {
+      return isIOS ? 'ios_safari' : 'safari';
+    }
+    if (/Chrome\//.test(ua) || /CriOS\//.test(ua)) return isIOS ? 'ios_chrome' : 'chrome';
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Pick a default voice based on the current browser for better compatibility
+ * - Chrome: prefer Google voices
+ * - Edge: prefer Microsoft voices
+ * - Safari (including iOS Safari): prefer Apple voices like Samantha/Alex (en), Ting-Ting/Mei-Jia (zh), Kyoko/Otoya (ja)
+ * - Firefox: pick best available (Google/Microsoft if present), otherwise fallback by language
+ */
+export function pickDefaultVoiceByBrowser(opts = {}) {
+  const { lang, voiceStyle } = opts;
+  const list = getVoices();
+  if (!list.length) return null;
+
+  const browser = detectBrowser();
+  const langPrefix = (lang || '').toLowerCase().slice(0, 2);
+  const byLang = list.filter((v) => (v.lang || '').toLowerCase().startsWith(langPrefix));
+
+  const findFirst = (voices, re) => voices.find((v) => re.test(v.name));
+  const preferByNames = (voices, names) => {
+    for (const n of names) {
+      const v = voices.find((v) => v.name.toLowerCase().includes(n.toLowerCase()));
+      if (v) return v;
+    }
+    return null;
+  };
+
+  if (browser === 'chrome' || browser === 'ios_chrome') {
+    const googleByLang = byLang.filter((v) => /google/i.test(v.name));
+    const googleAll = list.filter((v) => /google/i.test(v.name));
+    return googleByLang[0] || googleAll[0] || byLang[0] || list[0] || null;
+  }
+
+  if (browser === 'edge') {
+    const msByLang = byLang.filter((v) => /microsoft/i.test(v.name));
+    const msAll = list.filter((v) => /microsoft/i.test(v.name));
+    return msByLang[0] || msAll[0] || byLang[0] || list[0] || null;
+  }
+
+  if (browser === 'safari' || browser === 'ios_safari') {
+    if (langPrefix === 'en') {
+      const applePref = preferByNames(list, ['Samantha', 'Alex', 'Victoria']);
+      return applePref || byLang[0] || list[0] || null;
+    }
+    if (langPrefix === 'zh') {
+      const appleZh = preferByNames(list, ['Ting-Ting', 'Mei-Jia', 'Sin-ji']);
+      return appleZh || byLang[0] || list[0] || null;
+    }
+    if (langPrefix === 'ja') {
+      const appleJa = preferByNames(list, ['Kyoko', 'Otoya', 'Yoko']);
+      return appleJa || byLang[0] || list[0] || null;
+    }
+    return byLang[0] || list[0] || null;
+  }
+
+  // Firefox or unknown: try Google/Microsoft first, then by language
+  const googlePref = findFirst(byLang, /google/i) || findFirst(list, /google/i);
+  if (googlePref) return googlePref;
+  const msPref = findFirst(byLang, /microsoft/i) || findFirst(list, /microsoft/i);
+  if (msPref) return msPref;
+  return byLang[0] || list[0] || null;
+}
+
 /**
  * Pick a preferred voice based on language prefix or explicit name
  * @param {Object} opts
@@ -40,6 +119,66 @@ export function pickVoice(opts = {}) {
 export function cancelSpeech() {
   if (!isWebSpeechSupported()) return;
   try { window.speechSynthesis.cancel(); } catch {}
+}
+
+/**
+ * Attempt to pick a voice that responds to pitch/rate changes and matches style preference
+ * Falls back to pickVoice if no better match is found
+ * @param {Object} opts
+ * @param {string} [opts.lang]
+ * @param {string} [opts.voiceName]
+ * @param {string} [opts.voiceStyle] one of: cheerful, calm, energetic, friendly, serious, professional
+ * @returns {SpeechSynthesisVoice|null}
+ */
+export function pickVoiceResponsive(opts = {}) {
+  const { lang, voiceName, voiceStyle } = opts;
+  const list = getVoices();
+  if (!list.length) return pickVoice({ lang, voiceName });
+
+  // If an explicit voice is provided, honor it
+  if (voiceName) {
+    const v = list.find((v) => v.name === voiceName);
+    if (v) return v;
+  }
+
+  const langPrefix = (lang || '').toLowerCase().slice(0, 2);
+  const byLang = list.filter((v) => (v.lang || '').toLowerCase().startsWith(langPrefix));
+
+  // Prefer Google voices (tend to support rate/pitch well in Chrome)
+  const googleByLang = byLang.filter((v) => /google/i.test(v.name));
+  const googleAll = list.filter((v) => /google/i.test(v.name));
+
+  // Naive gender guess for style preference
+  const preferFemale = ['cheerful', 'friendly', 'calm'].includes((voiceStyle || '').toLowerCase());
+  const preferMale = ['serious', 'energetic', 'professional'].includes((voiceStyle || '').toLowerCase());
+  const isFemale = (name) => /female|samantha|eva|karen|joanna|clara|amelia|sofia|lucy/i.test(name);
+  const isMale = (name) => /male|daniel|david|mike|john|bruce|alex|henry|liam|noah/i.test(name);
+
+  const pickByGender = (voices) => {
+    if (!voices.length) return null;
+    if (preferFemale) {
+      const f = voices.find((v) => isFemale(v.name));
+      if (f) return f;
+    }
+    if (preferMale) {
+      const m = voices.find((v) => isMale(v.name));
+      if (m) return m;
+    }
+    return voices[0];
+  };
+
+  const gByLangPref = pickByGender(googleByLang);
+  if (gByLangPref) return gByLangPref;
+
+  const gAnyPref = pickByGender(googleAll);
+  if (gAnyPref) return gAnyPref;
+
+  // Fallback: any by language
+  const anyByLangPref = pickByGender(byLang);
+  if (anyByLangPref) return anyByLangPref;
+
+  // Last resort: first available
+  return list[0] || null;
 }
 
 /**

@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
-import { isWebSpeechSupported, getVoices } from '@/lib/speech/webSpeech.js';
+import { isWebSpeechSupported, getVoices, pickDefaultVoiceByBrowser } from '@/lib/speech/webSpeech.js';
 
 /** Clamp helper */
 const clamp = (v, min, max, def) => {
   const num = typeof v === 'number' ? v : def;
   return Math.min(max, Math.max(min, num));
+};
+
+/** Safe boolean */
+const toBool = (v, def = false) => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'string') return v === 'true';
+  return def;
 };
 
 /**
@@ -19,6 +26,12 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
   const [selectedVoiceName, setSelectedVoiceName] = useState('');
   const [voices, setVoices] = useState([]);
 
+  // Expressive + style presets
+  const [voiceStyle, setVoiceStyle] = useState('professional');
+  const [expressiveEnabled, setExpressiveEnabled] = useState(true);
+  const [segmentPauseMs, setSegmentPauseMs] = useState(150);
+  const [expressiveJitter, setExpressiveJitter] = useState(0.06);
+
   // Load persisted settings once
   useEffect(() => {
     try {
@@ -30,6 +43,10 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
         if (typeof s.voicePitch !== 'undefined') setVoicePitch(clamp(s.voicePitch, 0.0, 2.0, 1.0));
         if (typeof s.voiceVolume !== 'undefined') setVoiceVolume(clamp(s.voiceVolume, 0.0, 1.0, 1.0));
         if (s.selectedVoiceName) setSelectedVoiceName(s.selectedVoiceName);
+        if (s.voiceStyle) setVoiceStyle(s.voiceStyle);
+        if (typeof s.expressiveEnabled !== 'undefined') setExpressiveEnabled(toBool(s.expressiveEnabled, true));
+        if (typeof s.segmentPauseMs !== 'undefined') setSegmentPauseMs(clamp(s.segmentPauseMs, 60, 800, 150));
+        if (typeof s.expressiveJitter !== 'undefined') setExpressiveJitter(clamp(s.expressiveJitter, 0.0, 0.5, 0.06));
       }
     } catch (e) {
       console.warn('[useTTSSettings] load failed:', e);
@@ -39,10 +56,13 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
   // Persist on changes
   useEffect(() => {
     try {
-      const payload = { voiceLang, voiceRate, voicePitch, voiceVolume, selectedVoiceName };
+      const payload = {
+        voiceLang, voiceRate, voicePitch, voiceVolume, selectedVoiceName,
+        voiceStyle, expressiveEnabled, segmentPauseMs, expressiveJitter,
+      };
       localStorage.setItem(storageKey, JSON.stringify(payload));
     } catch (e) {}
-  }, [storageKey, voiceLang, voiceRate, voicePitch, voiceVolume, selectedVoiceName]);
+  }, [storageKey, voiceLang, voiceRate, voicePitch, voiceVolume, selectedVoiceName, voiceStyle, expressiveEnabled, segmentPauseMs, expressiveJitter]);
 
   // Load system voices
   useEffect(() => {
@@ -57,12 +77,28 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
     };
   }, []);
 
+  // Auto-select recommended default voice per browser when no selection or invalid saved selection
+  useEffect(() => {
+    if (!voices || voices.length === 0) return;
+    const hasSelected = selectedVoiceName && voices.some(v => v.name === selectedVoiceName);
+    if (!hasSelected) {
+      try {
+        const v = pickDefaultVoiceByBrowser({ lang: voiceLang, voiceStyle });
+        if (v) setSelectedVoiceName(v.name);
+      } catch {}
+    }
+  }, [voices, selectedVoiceName, voiceLang, voiceStyle]);
+
   const resetDefaults = () => {
     setVoiceLang('en-US');
     setVoiceRate(1.0);
     setVoicePitch(1.0);
     setVoiceVolume(1.0);
     setSelectedVoiceName('');
+    setVoiceStyle('professional');
+    setExpressiveEnabled(true);
+    setSegmentPauseMs(150);
+    setExpressiveJitter(0.06);
   };
 
   const clearSaved = () => {
@@ -72,8 +108,10 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
   return {
     // state
     voiceLang, voiceRate, voicePitch, voiceVolume, selectedVoiceName, voices,
+    voiceStyle, expressiveEnabled, segmentPauseMs, expressiveJitter,
     // setters
     setVoiceLang, setVoiceRate, setVoicePitch, setVoiceVolume, setSelectedVoiceName, setVoices,
+    setVoiceStyle, setExpressiveEnabled, setSegmentPauseMs, setExpressiveJitter,
     // helpers
     resetDefaults, clearSaved,
   };
