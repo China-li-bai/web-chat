@@ -44,7 +44,7 @@ import { getDialogue, getTips, getVocabulary, getReferenceText } from '@/service
 import useMicrophone from '@/hooks/useMicrophone';
 import useTTSSettings from '@/hooks/useTTSSettings';
 import VoiceSettingsModal from '@/components/VoiceSettingsModal';
-import { speakText, cancelSpeech, isWebSpeechSupported } from '@/lib/speech';
+import { speakText, speakTextExpressive, cancelSpeech, isWebSpeechSupported } from '@/lib/speech';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -136,6 +136,7 @@ const Practice = () => {
   // 語音風格選擇
   const [voiceStyle, setVoiceStyle] = useState('professional');
   const [ttsSource, setTtsSource] = useState(null);
+  const [expressiveEnabled, setExpressiveEnabled] = useState(true);
 
   // 語音參數控制狀態（抽离为通用Hook）
   const tts = useTTSSettings('tts_settings');
@@ -435,14 +436,20 @@ const Practice = () => {
         message.warning('請先選擇或輸入播放文本');
         return;
       }
-      await speakText(text, {
+      const opts = {
         lang: voiceLang,
         rate: voiceRate,
         pitch: voicePitch,
         volume: voiceVolume,
         voiceName: selectedVoiceName,
         loop: loopPlayback,
-      });
+        voiceStyle,
+      };
+      if (expressiveEnabled) {
+        await speakTextExpressive(text, opts);
+      } else {
+        await speakText(text, opts);
+      }
       message.success(loopPlayback ? '正在循環播放示例...' : '正在播放示例音频...');
     } catch (e) {
       Modal.info({
@@ -479,13 +486,19 @@ const Practice = () => {
         const v = pickVoiceGender(voiceLang, roleHint === 'assistant' ? 'male' : 'female');
         if (v) preferName = v.name;
       }
-      await speakText(text, {
+      const opts = {
         lang: voiceLang,
         rate: voiceRate,
         pitch: voicePitch,
         volume: voiceVolume,
         voiceName: preferName,
-      });
+        voiceStyle,
+      };
+      if (expressiveEnabled) {
+        await speakTextExpressive(text, opts);
+      } else {
+        await speakText(text, opts);
+      }
     } catch (e) {
       Modal.info({ title: '示例音频', content: '当前环境无法播放语音，请使用支持的浏览器或启用Tauri。' });
     }
@@ -514,18 +527,24 @@ const Practice = () => {
         if (v) preferName = v.name;
       }
       try {
-        await speakText(m.content || '', {
+        const opts = {
           lang: voiceLang,
           rate: voiceRate,
           pitch: voicePitch,
           volume: voiceVolume,
           voiceName: preferName,
+          voiceStyle,
           onEnd: () => {
             const next = i + 1;
             setAutoPlayIndex(next);
             if (autoPlayConversation) playIdx(next);
           },
-        });
+        };
+        if (expressiveEnabled) {
+          await speakTextExpressive(m.content || '', opts);
+        } else {
+          await speakText(m.content || '', opts);
+        }
       } catch (e) {
         Modal.info({ title: '自動播放', content: '當前環境無法播放語音，請使用支持的瀏覽器。' });
         setAutoPlayConversation(false);
@@ -739,6 +758,14 @@ const Practice = () => {
                           <Option value="friendly">友好</Option>
                           <Option value="serious">严肃</Option>
                         </Select>
+                        <Switch
+                          checked={expressiveEnabled}
+                          onChange={setExpressiveEnabled}
+                          style={{ marginLeft: 12 }}
+                          size="small"
+                          checkedChildren="表达增强"
+                          unCheckedChildren="普通"
+                        />
                       </div>
                       {/* 语音设置已迁移到 VoiceSettingsModal，移除页面内的语言与系统语音设置（含循环开关） */}
                       
