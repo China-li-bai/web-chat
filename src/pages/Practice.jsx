@@ -16,7 +16,8 @@ import {
   Switch,
   Tooltip,
   message,
-  Input
+  Input,
+  Slider
 } from 'antd';
 import {
   AudioOutlined,
@@ -41,11 +42,57 @@ import { useAppStore } from '@/store/useAppStore';
 import { saveGeneratedPractice, normalizeDialogueRoles } from '@/services/practice-persist';
 import { getDialogue, getTips, getVocabulary, getReferenceText } from '@/services/practice-query';
 import useMicrophone from '@/hooks/useMicrophone';
+import useTTSSettings from '@/hooks/useTTSSettings';
+import VoiceSettingsModal from '@/components/VoiceSettingsModal';
+import { speakText, cancelSpeech, pickVoice as pickVoiceLib, isWebSpeechSupported } from '@/lib/speech';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-
+const WaveformCanvas = ({ blob }) => {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    if (!blob) return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const audioCtx = new AudioCtx();
+    blob.arrayBuffer().then((buf) => {
+      audioCtx.decodeAudioData(buf).then((audioBuf) => {
+        const data = audioBuf.getChannelData(0);
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const width = canvas.width;
+        const height = canvas.height;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, width, height);
+        ctx.strokeStyle = '#1890ff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const step = Math.max(1, Math.floor(data.length / width));
+        for (let i = 0; i < width; i++) {
+          const start = i * step;
+          let min = 1.0, max = -1.0;
+          for (let j = 0; j < step; j++) {
+            const v = data[start + j];
+            if (v < min) min = v;
+            if (v > max) max = v;
+          }
+          const y1 = (1 - (max + 1) / 2) * height;
+          const y2 = (1 - (min + 1) / 2) * height;
+          ctx.moveTo(i, y1);
+          ctx.lineTo(i, y2);
+        }
+        ctx.stroke();
+      }).catch(() => {});
+    }).catch(() => {});
+    return () => {
+      try { audioCtx.close(); } catch {}
+    };
+  }, [blob]);
+  return (
+    <canvas ref={canvasRef} width={500} height={80} style={{ width: '100%', height: 80, background: '#f5f5f5', borderRadius: 6 }} />
+  );
+};
 
 const Practice = () => {
   // 麥克風控制（抽象為 Hook）
@@ -60,6 +107,7 @@ const Practice = () => {
     togglePlayback: micTogglePlayback,
     resetRecording: micResetRecording,
     audioRef,
+    audioBlob,
   } = useMicrophone();
 
   const [transcription, setTranscription] = useState('');
@@ -77,8 +125,10 @@ const Practice = () => {
   const [aiTutorEnabled, setAiTutorEnabled] = useState(true);
   const [showAIFeedback, setShowAIFeedback] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [aiSettings, setAiSettings] = useState(null);
   const [userGoal, setUserGoal] = useState('');
+
 
   const [showAiModal, setShowAiModal] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState('intermediate');
@@ -87,7 +137,26 @@ const Practice = () => {
   const [voiceStyle, setVoiceStyle] = useState('professional');
   const [ttsSource, setTtsSource] = useState(null);
 
+  // 語音參數控制狀態（抽离为通用Hook）
+  const tts = useTTSSettings('tts_settings');
+  const {
+    voiceLang, setVoiceLang,
+    voiceRate, setVoiceRate,
+    voicePitch, setVoicePitch,
+    voiceVolume, setVoiceVolume,
+    voices, setVoices,
+    selectedVoiceName, setSelectedVoiceName,
+  } = tts;
+
+  // 播放控制
+  const [selectedPlaybackText, setSelectedPlaybackText] = useState('');
+  const [loopPlayback, setLoopPlayback] = useState(false);
+  const [autoPlayConversation, setAutoPlayConversation] = useState(false);
+  const [autoPlayIndex, setAutoPlayIndex] = useState(0);
+
  const userId = useAppStore((state) => state.userId)
+  const practiceHistory = useAppStore((state) => state.practiceHistory)
+  const addPracticeRecord = useAppStore((state) => state.addPracticeRecord)
   // 请求麦克风权限函数
   // 使用 Hook 封裝的權限請求，保持原方法名兼容
   const requestMicrophonePermission = async () => {
@@ -161,6 +230,9 @@ const Practice = () => {
   const isTauriApp = () => {
     return typeof window !== 'undefined' && window.__TAURI__;
   };
+
+  // 加載系統語音列表（由 useTTSSettings Hook 管理）
+  // 本地加载逻辑已移除，以避免重复绑定 onvoiceschanged
 
   // 加載AI設置和初始化缓存系统
   useEffect(() => {
@@ -253,6 +325,21 @@ const Practice = () => {
           });
           setScores(scoreResult);
 
+          // 写入练习记录
+          try {
+            const el = audioRef.current;
+            const durationSec = (el && !isNaN(el.duration) && el.duration) ? Math.round(el.duration) : 0;
+            addPracticeRecord({
+              timestamp: new Date().toISOString(),
+              duration: durationSec,
+              score: { overall: scoreResult?.overall ?? 0 },
+              category: 'practice',
+              difficulty: difficultyLevel,
+            });
+          } catch (e) {
+            console.warn('添加练习记录失败（Tauri）:', e);
+          }
+
           // 回写 Turn（本地存储）
           if (turnId) {
             await completeTurn({
@@ -282,6 +369,21 @@ const Practice = () => {
             completeness: Math.floor(Math.random() * 30) + 70
           };
           setScores(mockScores);
+
+          // 写入练习记录
+          try {
+            const el = audioRef.current;
+            const durationSec = (el && !isNaN(el.duration) && el.duration) ? Math.round(el.duration) : 0;
+            addPracticeRecord({
+              timestamp: new Date().toISOString(),
+              duration: durationSec,
+              score: { overall: mockScores?.overall ?? 0 },
+              category: 'practice',
+              difficulty: difficultyLevel,
+            });
+          } catch (e) {
+            console.warn('添加练习记录失败（H5）:', e);
+          }
 
           if (turnId) {
             await completeTurn({
@@ -325,48 +427,38 @@ const Practice = () => {
     }
   };
 
-  // 播放示例音频
+  // 播放示例音频（支持動態參數 + 循環）
   const playExample = async () => {
     try {
+      const text = (selectedPlaybackText && selectedPlaybackText.trim()) ? selectedPlaybackText : practiceText;
+      if (!text) {
+        message.warning('請先選擇或輸入播放文本');
+        return;
+      }
       if (isTauriApp()) {
-        const audioData = await invoke('text_to_speech', { text: practiceText });
-        // 这里应该播放返回的音频数据
-        console.log('播放示例音频:', audioData);
+        try {
+          const audioData = await invoke('text_to_speech', { text, lang: voiceLang, rate: voiceRate, pitch: voicePitch, volume: voiceVolume });
+          console.log('播放示例音频(Tauri):', audioData);
+          message.success('已調用 TTS（Tauri）');
+        } catch (e) {
+          console.warn('Tauri 調用失敗或不支持參數:', e);
+          message.error('Tauri 調用失敗');
+        }
       } else {
-        // H5环境：使用Web Speech API
-        if ('speechSynthesis' in window) {
-          // 停止当前播放的语音
-          window.speechSynthesis.cancel();
-
-          // 创建语音合成实例
-          const utterance = new SpeechSynthesisUtterance(practiceText);
-
-          // 设置语音参数
-          utterance.lang = 'en-US'; // 根据练习文本语言设置
-          utterance.rate = 0.8; // 语速稍慢，便于学习
-          utterance.pitch = 1; // 音调
-          utterance.volume = 1; // 音量
-
-          // 尝试选择合适的语音
-          const voices = window.speechSynthesis.getVoices();
-          const preferredVoice = voices.find(voice =>
-            voice.lang.startsWith('en') && voice.name.includes('Female')
-          ) || voices.find(voice => voice.lang.startsWith('en'));
-
-          if (preferredVoice) {
-            utterance.voice = preferredVoice;
-          }
-
-          // 播放语音
-          window.speechSynthesis.speak(utterance);
-
-          // 显示成功提示
-          message.success('正在播放示例音频...');
-        } else {
-          // 浏览器不支持Web Speech API
+        try {
+          const result = await speakText(text, {
+            lang: voiceLang,
+            rate: voiceRate,
+            pitch: voicePitch,
+            volume: voiceVolume,
+            voiceName: selectedVoiceName,
+            loop: loopPlayback,
+          });
+          message.success(loopPlayback ? '正在循環播放示例...' : '正在播放示例音频...');
+        } catch (e) {
           Modal.info({
             title: '示例音频',
-            content: '您的浏览器不支持语音合成功能，建议使用Chrome、Firefox或Edge浏览器。',
+            content: '当前环境无法播放语音（Tauri/Web Speech不可用），请使用支持的浏览器或启用Tauri。',
           });
         }
       }
@@ -374,6 +466,86 @@ const Practice = () => {
       console.error('播放示例失败:', error);
       message.error('播放示例音频失败，请重试。');
     }
+  };
+
+  // 單條文本播放（對話列表）
+  const pickVoiceGender = (lang, genderHint, namePref) => {
+    const list = Array.isArray(window.speechSynthesis?.getVoices?.()) ? window.speechSynthesis.getVoices() : [];
+    if (namePref) {
+      const v = list.find((v) => v.name === namePref);
+      if (v) return v;
+    }
+    const langPrefix = (lang || '').toLowerCase().slice(0, 2);
+    const byLang = list.filter((v) => (v.lang || '').toLowerCase().startsWith(langPrefix));
+    if (genderHint === 'female') {
+      const vf = byLang.find((v) => /female|woman|girl/i.test(v.name)) || byLang.find((v) => /female|woman|girl/i.test(v.voiceURI));
+      if (vf) return vf;
+    } else if (genderHint === 'male') {
+      const vm = byLang.find((v) => /male|man|boy/i.test(v.name)) || byLang.find((v) => /male|man|boy/i.test(v.voiceURI));
+      if (vm) return vm;
+    }
+    return byLang[0] || list[0] || null;
+  };
+
+  const playTextOnce = (text, roleHint) => {
+    if (!text) return message.warning('文本為空');
+    if (isTauriApp()) {
+      invoke('text_to_speech', { text, lang: voiceLang, rate: voiceRate, pitch: voicePitch, volume: voiceVolume }).catch(() => {
+        message.info('已調用 TTS（Tauri），語音參數可能不支持');
+      });
+      return;
+    }
+    if (!('speechSynthesis' in window)) {
+      return Modal.info({ title: '示例音频', content: '您的浏览器不支持语音合成，请使用 Chrome / Firefox / Edge。' });
+    }
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = voiceLang;
+    utter.rate = voiceRate;
+    utter.pitch = voicePitch;
+    utter.volume = voiceVolume;
+    const v = pickVoiceGender(voiceLang, roleHint === 'assistant' ? 'male' : 'female', selectedVoiceName);
+    if (v) utter.voice = v;
+    window.speechSynthesis.speak(utter);
+  };
+
+  const startAutoPlay = () => {
+    if (!dialogueList || dialogueList.length === 0) {
+      return message.warning('對話列表為空');
+    }
+    if (isTauriApp()) {
+      message.warning('Tauri 環境暫不支持自動播放對話');
+      return;
+    }
+    setAutoPlayConversation(true);
+    setAutoPlayIndex(0);
+    window.speechSynthesis.cancel();
+    const playIdx = (i) => {
+      const m = dialogueList[i];
+      if (!m) {
+        setAutoPlayConversation(false);
+        return;
+      }
+      const utter = new SpeechSynthesisUtterance(m.content || '');
+      utter.lang = voiceLang;
+      utter.rate = voiceRate;
+      utter.pitch = voicePitch;
+      utter.volume = voiceVolume;
+      const v = pickVoiceGender(voiceLang, m.role === 'assistant' ? 'male' : 'female', selectedVoiceName);
+      if (v) utter.voice = v;
+      utter.onend = () => {
+        const next = i + 1;
+        setAutoPlayIndex(next);
+        if (autoPlayConversation) playIdx(next);
+      };
+      window.speechSynthesis.speak(utter);
+    };
+    playIdx(0);
+  };
+
+  const stopAutoPlay = () => {
+    setAutoPlayConversation(false);
+    try { window.speechSynthesis.cancel(); } catch {}
   };
 
   // 播放Gemini示例 - Local-first（优先本地缓存）
@@ -495,6 +667,12 @@ const Practice = () => {
             >
               AI设置
             </Button>
+            <Button
+              icon={<SoundOutlined />}
+              onClick={() => setShowVoiceSettings(true)}
+            >
+              语音设置
+            </Button>
           </Space>
         </div>
 
@@ -571,6 +749,72 @@ const Practice = () => {
                           <Option value="serious">严肃</Option>
                         </Select>
                       </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+                        <div>
+                          <Text strong>语言：</Text>
+                          <Select value={voiceLang} onChange={setVoiceLang} style={{ width: 160, marginLeft: 8 }} size="small">
+                            <Option value="en-US">English (US)</Option>
+                            <Option value="en-GB">English (UK)</Option>
+                            <Option value="zh-CN">中文（大陆）</Option>
+                            <Option value="zh-TW">中文（台湾）</Option>
+                            <Option value="ja-JP">日本語</Option>
+                          </Select>
+                        </div>
+                        <div>
+                          <Text strong>系统语音：</Text>
+                          <Select
+                            value={selectedVoiceName}
+                            onChange={setSelectedVoiceName}
+                            style={{ width: 220, marginLeft: 8 }}
+                            size="small"
+                            placeholder={voices?.length ? '选择系统语音' : '未加载或不支持'}
+                            allowClear
+                          >
+                            {voices && voices.length ? voices.map((v) => (
+                              <Option key={v.name} value={v.name}>{v.name} ({v.lang})</Option>
+                            )) : null}
+                          </Select>
+                        </div>
+                        <div>
+                          <Text strong>语速：</Text>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Slider min={0.5} max={2.0} step={0.1} value={voiceRate} onChange={setVoiceRate} style={{ flex: 1 }} />
+                            <Text type="secondary">{voiceRate.toFixed(1)}</Text>
+                          </div>
+                        </div>
+                        <div>
+                          <Text strong>音调：</Text>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Slider min={0.0} max={2.0} step={0.1} value={voicePitch} onChange={setVoicePitch} style={{ flex: 1 }} />
+                            <Text type="secondary">{voicePitch.toFixed(1)}</Text>
+                          </div>
+                        </div>
+                        <div>
+                          <Text strong>音量：</Text>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Slider min={0.0} max={1.0} step={0.1} value={voiceVolume} onChange={setVoiceVolume} style={{ flex: 1 }} />
+                            <Text type="secondary">{voiceVolume.toFixed(1)}</Text>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Text strong>循环播放：</Text>
+                          <Switch checked={loopPlayback} onChange={setLoopPlayback} />
+                        </div>
+                      </div>
+                      
+                      {/* 播放文本选择 */}
+                      <div style={{ marginTop: 12 }}>
+                        <Text strong>播放文本：</Text>
+                        <Input.TextArea
+                          value={selectedPlaybackText}
+                          onChange={(e) => setSelectedPlaybackText(e.target.value)}
+                          placeholder="从对话列表中选择文本，或手动粘贴。留空时默认使用练习内容。"
+                          autoSize={{ minRows: 2, maxRows: 4 }}
+                          style={{ marginTop: 6 }}
+                        />
+                        <Button size="small" style={{ marginTop: 6 }} onClick={() => setSelectedPlaybackText('')}>清空选择文本</Button>
+                      </div>
+                      
                       <Space>
                         <Button
                           icon={<SoundOutlined />}
@@ -649,7 +893,7 @@ const Practice = () => {
             </Card>
           </Col>
           <Col xs={24} lg={16}>
-            <Card title={<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>对话列表</span><span><Switch checked={showChinese} onChange={setShowChinese} size="small" /> <Text type="secondary" style={{ marginLeft: 8 }}>显示中文</Text></span></div>} size="small">
+            <Card title={<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>对话列表</span><span><Space><Switch checked={showChinese} onChange={setShowChinese} size="small" /><Text type="secondary" style={{ marginLeft: 8 }}>显示中文</Text><Button size="small" onClick={startAutoPlay} disabled={autoPlayConversation}>自动播放</Button><Button size="small" danger onClick={stopAutoPlay} disabled={!autoPlayConversation}>停止</Button></Space></span></div>} size="small">
               {dialogueList && dialogueList.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {dialogueList.map((m, idx) => {
@@ -667,6 +911,11 @@ const Practice = () => {
                       <div style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
                         {m.createdAt ? new Date(m.createdAt).toLocaleString() : ''}
                       </div>
+                      {/* 快速播放與設為播放文本 */}
+                      <Space style={{ marginTop: 8 }}>
+                        <Button size="small" icon={<SoundOutlined />} onClick={() => playTextOnce(m.content, m.role)}>播放</Button>
+                        <Button size="small" onClick={() => setSelectedPlaybackText(m.content)}>设为播放文本</Button>
+                      </Space>
                     </div>
                   )
                   })}
@@ -779,7 +1028,7 @@ const Practice = () => {
           </Col>
         </Row>
 
-        {/* AI導師反饋 */}
+        {/* AI导师反饋 */}
         {showAIFeedback && scores && (
           <div style={{ marginTop: '24px' }}>
             <AITutorFeedback
@@ -801,6 +1050,42 @@ const Practice = () => {
             />
           </div>
         )}
+        {/* 录音管理 */}
+        <Divider />
+        <Card title="录音管理" size="small">
+          {audioBlob ? (
+            <div>
+              <WaveformCanvas blob={audioBlob} />
+              <div style={{ marginTop: 8 }}>
+                <Space>
+                  <Button icon={isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />} onClick={playRecording}>
+                    {isPlaying ? '暂停' : '播放'}
+                  </Button>
+                  <Button onClick={() => setSelectedPlaybackText(transcription || practiceText)}>将识别文本设为播放文本</Button>
+                </Space>
+              </div>
+            </div>
+          ) : (
+            <Alert type="info" message="暂无录音数据" />
+          )}
+
+          {/* 历史记录 */}
+          <div style={{ marginTop: 16 }}>
+            <Text strong>历史记录：</Text>
+            {practiceHistory && practiceHistory.length ? (
+              <ul style={{ paddingLeft: 18 }}>
+                {practiceHistory.slice(0, 10).map((r, i) => (
+                  <li key={i}>
+                    {r.timestamp ? new Date(r.timestamp).toLocaleString() : ''}
+                    ，得分：{r.score?.overall ?? '-'}，时长：{r.duration ?? 0}s，难度：{r.difficulty ?? '-'}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div style={{ color: '#999' }}>暂无历史记录</div>
+            )}
+          </div>
+        </Card>
       </Card>
 
       {/* AI生成练习弹窗 */}
@@ -850,8 +1135,16 @@ const Practice = () => {
       >
         <GeminiSettings onSettingsChange={handleSettingsChange} />
       </Modal>
-    </div>
-  );
+
+      {/* 语音设置弹窗 */}
+      <VoiceSettingsModal
+        open={showVoiceSettings}
+        onCancel={() => setShowVoiceSettings(false)}
+        onSave={() => setShowVoiceSettings(false)}
+        tts={tts}
+      />
+      </div>
+    );
 };
 
 export default Practice;
