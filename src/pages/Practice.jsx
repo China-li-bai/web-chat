@@ -740,58 +740,7 @@ const Practice = () => {
                           <Option value="serious">严肃</Option>
                         </Select>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-                        <div>
-                          <Text strong>语言：</Text>
-                          <Select value={voiceLang} onChange={setVoiceLang} style={{ width: 160, marginLeft: 8 }} size="small">
-                            <Option value="en-US">English (US)</Option>
-                            <Option value="en-GB">English (UK)</Option>
-                            <Option value="zh-CN">中文（大陆）</Option>
-                            <Option value="zh-TW">中文（台湾）</Option>
-                            <Option value="ja-JP">日本語</Option>
-                          </Select>
-                        </div>
-                        <div>
-                          <Text strong>系统语音：</Text>
-                          <Select
-                            value={selectedVoiceName}
-                            onChange={setSelectedVoiceName}
-                            style={{ width: 220, marginLeft: 8 }}
-                            size="small"
-                            placeholder={voices?.length ? '选择系统语音' : '未加载或不支持'}
-                            allowClear
-                          >
-                            {voices && voices.length ? voices.map((v) => (
-                              <Option key={v.name} value={v.name}>{v.name} ({v.lang})</Option>
-                            )) : null}
-                          </Select>
-                        </div>
-                        <div>
-                          <Text strong>语速：</Text>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Slider min={0.5} max={2.0} step={0.1} value={voiceRate} onChange={setVoiceRate} style={{ flex: 1 }} />
-                            <Text type="secondary">{voiceRate.toFixed(1)}</Text>
-                          </div>
-                        </div>
-                        <div>
-                          <Text strong>音调：</Text>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Slider min={0.0} max={2.0} step={0.1} value={voicePitch} onChange={setVoicePitch} style={{ flex: 1 }} />
-                            <Text type="secondary">{voicePitch.toFixed(1)}</Text>
-                          </div>
-                        </div>
-                        <div>
-                          <Text strong>音量：</Text>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Slider min={0.0} max={1.0} step={0.1} value={voiceVolume} onChange={setVoiceVolume} style={{ flex: 1 }} />
-                            <Text type="secondary">{voiceVolume.toFixed(1)}</Text>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Text strong>循环播放：</Text>
-                          <Switch checked={loopPlayback} onChange={setLoopPlayback} />
-                        </div>
-                      </div>
+                      {/* 语音设置已迁移到 VoiceSettingsModal，移除页面内的语言与系统语音设置（含循环开关） */}
                       
                       {/* 播放文本选择 */}
                       <div style={{ marginTop: 12 }}>
