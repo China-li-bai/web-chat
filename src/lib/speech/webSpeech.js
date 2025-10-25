@@ -97,6 +97,67 @@ export function pickDefaultVoiceByBrowser(opts = {}) {
 }
 
 /**
+ * Map a voice style to base rate/pitch presets, adjusted per browser
+ * This sets baseline sliders; expressive.js will layer dynamic variations on top
+ * @param {{style:string, lang?:string, browser?:string}} params
+ * @returns {{rate:number, pitch:number}}
+ */
+export function getStyleParamPreset(params = {}) {
+  const { style = 'professional', lang = 'en-US', browser } = params;
+  const b = browser || detectBrowser();
+  const s = (style || '').toLowerCase();
+
+  // Base tables per browser (moderate for Safari/Firefox)
+  const chromeEdge = {
+    professional: { rate: 1.0, pitch: 1.0 },
+    cheerful:    { rate: 1.20, pitch: 1.15 },
+    calm:        { rate: 0.90, pitch: 0.95 },
+    energetic:   { rate: 1.35, pitch: 1.25 },
+    friendly:    { rate: 1.15, pitch: 1.10 },
+    serious:     { rate: 0.95, pitch: 0.90 },
+  };
+  const safari = {
+    professional: { rate: 1.0, pitch: 1.0 },
+    cheerful:    { rate: 1.10, pitch: 1.08 },
+    calm:        { rate: 0.95, pitch: 0.98 },
+    energetic:   { rate: 1.20, pitch: 1.12 },
+    friendly:    { rate: 1.08, pitch: 1.05 },
+    serious:     { rate: 0.96, pitch: 0.92 },
+  };
+  const firefox = {
+    professional: { rate: 1.0, pitch: 1.0 },
+    cheerful:    { rate: 1.12, pitch: 1.10 },
+    calm:        { rate: 0.92, pitch: 0.98 },
+    energetic:   { rate: 1.25, pitch: 1.15 },
+    friendly:    { rate: 1.10, pitch: 1.08 },
+    serious:     { rate: 0.96, pitch: 0.92 },
+  };
+  const table = (b === 'chrome' || b === 'edge' || b === 'ios_chrome') ? chromeEdge
+              : (b === 'safari' || b === 'ios_safari') ? safari
+              : (b === 'firefox') ? firefox
+              : chromeEdge;
+
+  let preset = table[s] || table.professional;
+
+  // Optional language-based subtle tweaks
+  const langLower = (lang || '').toLowerCase();
+  if (langLower.startsWith('zh')) {
+    // Chinese tends to sound clearer slightly slower
+    preset = { rate: preset.rate * 0.95, pitch: preset.pitch * 0.98 };
+  } else if (langLower.startsWith('ja')) {
+    // Japanese: keep near neutral
+    preset = { rate: preset.rate * 0.98, pitch: preset.pitch * 1.00 };
+  }
+
+  // Clamp to safe ranges
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  return {
+    rate: clamp(preset.rate, 0.5, 2.0),
+    pitch: clamp(preset.pitch, 0.0, 2.0),
+  };
+}
+
+/**
  * Pick a preferred voice based on language prefix or explicit name
  * @param {Object} opts
  * @param {string} [opts.lang] e.g. 'en-US'

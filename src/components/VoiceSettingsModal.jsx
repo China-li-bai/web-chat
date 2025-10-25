@@ -38,6 +38,7 @@ export default function VoiceSettingsModal({ open, onCancel, onSave, tts }) {
     expressiveEnabled, setExpressiveEnabled,
     segmentPauseMs, setSegmentPauseMs,
     expressiveJitter, setExpressiveJitter,
+    linkStyleParams, setLinkStyleParams,
     resetDefaults, clearSaved,
   } = tts;
 
@@ -151,6 +152,17 @@ export default function VoiceSettingsModal({ open, onCancel, onSave, tts }) {
             <Option value="friendly">友好</Option>
             <Option value="serious">严肃</Option>
           </Select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Text type="secondary">风格自动映射语速/音调：</Text>
+          <Switch
+            checked={linkStyleParams}
+            onChange={setLinkStyleParams}
+            style={{ marginLeft: 12 }}
+            size="small"
+            checkedChildren="开启"
+            unCheckedChildren="关闭"
+          />
         </div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <Text strong>表达增强：</Text>

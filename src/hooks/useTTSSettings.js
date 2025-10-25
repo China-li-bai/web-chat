@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { isWebSpeechSupported, getVoices, pickDefaultVoiceByBrowser } from '@/lib/speech/webSpeech.js';
+import { isWebSpeechSupported, getVoices, pickDefaultVoiceByBrowser, getStyleParamPreset } from '@/lib/speech/webSpeech.js';
 
 /** Clamp helper */
 const clamp = (v, min, max, def) => {
@@ -31,6 +31,7 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
   const [expressiveEnabled, setExpressiveEnabled] = useState(true);
   const [segmentPauseMs, setSegmentPauseMs] = useState(150);
   const [expressiveJitter, setExpressiveJitter] = useState(0.06);
+  const [linkStyleParams, setLinkStyleParams] = useState(true);
 
   // Load persisted settings once
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
         if (typeof s.expressiveEnabled !== 'undefined') setExpressiveEnabled(toBool(s.expressiveEnabled, true));
         if (typeof s.segmentPauseMs !== 'undefined') setSegmentPauseMs(clamp(s.segmentPauseMs, 60, 800, 150));
         if (typeof s.expressiveJitter !== 'undefined') setExpressiveJitter(clamp(s.expressiveJitter, 0.0, 0.5, 0.06));
+        if (typeof s.linkStyleParams !== 'undefined') setLinkStyleParams(toBool(s.linkStyleParams, true));
       }
     } catch (e) {
       console.warn('[useTTSSettings] load failed:', e);
@@ -58,11 +60,11 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
     try {
       const payload = {
         voiceLang, voiceRate, voicePitch, voiceVolume, selectedVoiceName,
-        voiceStyle, expressiveEnabled, segmentPauseMs, expressiveJitter,
+        voiceStyle, expressiveEnabled, segmentPauseMs, expressiveJitter, linkStyleParams,
       };
       localStorage.setItem(storageKey, JSON.stringify(payload));
     } catch (e) {}
-  }, [storageKey, voiceLang, voiceRate, voicePitch, voiceVolume, selectedVoiceName, voiceStyle, expressiveEnabled, segmentPauseMs, expressiveJitter]);
+  }, [storageKey, voiceLang, voiceRate, voicePitch, voiceVolume, selectedVoiceName, voiceStyle, expressiveEnabled, segmentPauseMs, expressiveJitter, linkStyleParams]);
 
   // Load system voices
   useEffect(() => {
@@ -89,6 +91,19 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
     }
   }, [voices, selectedVoiceName, voiceLang, voiceStyle]);
 
+  // Map voice style to base rate/pitch presets by browser
+  useEffect(() => {
+    if (!linkStyleParams) return;
+    try {
+      const preset = getStyleParamPreset({ style: voiceStyle, lang: voiceLang });
+      if (preset) {
+        const { rate, pitch } = preset;
+        setVoiceRate(clamp(rate, 0.5, 2.0, 1.0));
+        setVoicePitch(clamp(pitch, 0.0, 2.0, 1.0));
+      }
+    } catch {}
+  }, [voiceStyle, voiceLang, linkStyleParams]);
+
   const resetDefaults = () => {
     setVoiceLang('en-US');
     setVoiceRate(1.0);
@@ -99,6 +114,7 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
     setExpressiveEnabled(true);
     setSegmentPauseMs(150);
     setExpressiveJitter(0.06);
+    setLinkStyleParams(true);
   };
 
   const clearSaved = () => {
@@ -108,10 +124,10 @@ export default function useTTSSettings(storageKey = 'tts_settings') {
   return {
     // state
     voiceLang, voiceRate, voicePitch, voiceVolume, selectedVoiceName, voices,
-    voiceStyle, expressiveEnabled, segmentPauseMs, expressiveJitter,
+    voiceStyle, expressiveEnabled, segmentPauseMs, expressiveJitter, linkStyleParams,
     // setters
     setVoiceLang, setVoiceRate, setVoicePitch, setVoiceVolume, setSelectedVoiceName, setVoices,
-    setVoiceStyle, setExpressiveEnabled, setSegmentPauseMs, setExpressiveJitter,
+    setVoiceStyle, setExpressiveEnabled, setSegmentPauseMs, setExpressiveJitter, setLinkStyleParams,
     // helpers
     resetDefaults, clearSaved,
   };
