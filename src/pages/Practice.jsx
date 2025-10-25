@@ -44,7 +44,7 @@ import { getDialogue, getTips, getVocabulary, getReferenceText } from '@/service
 import useMicrophone from '@/hooks/useMicrophone';
 import useTTSSettings from '@/hooks/useTTSSettings';
 import VoiceSettingsModal from '@/components/VoiceSettingsModal';
-import { speakText, cancelSpeech, pickVoice as pickVoiceLib, isWebSpeechSupported } from '@/lib/speech';
+import { speakText, cancelSpeech, isWebSpeechSupported } from '@/lib/speech';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -435,36 +435,20 @@ const Practice = () => {
         message.warning('請先選擇或輸入播放文本');
         return;
       }
-      if (isTauriApp()) {
-        try {
-          const audioData = await invoke('text_to_speech', { text, lang: voiceLang, rate: voiceRate, pitch: voicePitch, volume: voiceVolume });
-          console.log('播放示例音频(Tauri):', audioData);
-          message.success('已調用 TTS（Tauri）');
-        } catch (e) {
-          console.warn('Tauri 調用失敗或不支持參數:', e);
-          message.error('Tauri 調用失敗');
-        }
-      } else {
-        try {
-          const result = await speakText(text, {
-            lang: voiceLang,
-            rate: voiceRate,
-            pitch: voicePitch,
-            volume: voiceVolume,
-            voiceName: selectedVoiceName,
-            loop: loopPlayback,
-          });
-          message.success(loopPlayback ? '正在循環播放示例...' : '正在播放示例音频...');
-        } catch (e) {
-          Modal.info({
-            title: '示例音频',
-            content: '当前环境无法播放语音（Tauri/Web Speech不可用），请使用支持的浏览器或启用Tauri。',
-          });
-        }
-      }
-    } catch (error) {
-      console.error('播放示例失败:', error);
-      message.error('播放示例音频失败，请重试。');
+      await speakText(text, {
+        lang: voiceLang,
+        rate: voiceRate,
+        pitch: voicePitch,
+        volume: voiceVolume,
+        voiceName: selectedVoiceName,
+        loop: loopPlayback,
+      });
+      message.success(loopPlayback ? '正在循環播放示例...' : '正在播放示例音频...');
+    } catch (e) {
+      Modal.info({
+        title: '示例音频',
+        content: '当前环境无法播放语音（Tauri/Web Speech不可用），请使用支持的浏览器或启用Tauri。',
+      });
     }
   };
 
@@ -487,26 +471,24 @@ const Practice = () => {
     return byLang[0] || list[0] || null;
   };
 
-  const playTextOnce = (text, roleHint) => {
+  const playTextOnce = async (text, roleHint) => {
     if (!text) return message.warning('文本為空');
-    if (isTauriApp()) {
-      invoke('text_to_speech', { text, lang: voiceLang, rate: voiceRate, pitch: voicePitch, volume: voiceVolume }).catch(() => {
-        message.info('已調用 TTS（Tauri），語音參數可能不支持');
+    try {
+      let preferName = selectedVoiceName;
+      if (!preferName && isWebSpeechSupported()) {
+        const v = pickVoiceGender(voiceLang, roleHint === 'assistant' ? 'male' : 'female');
+        if (v) preferName = v.name;
+      }
+      await speakText(text, {
+        lang: voiceLang,
+        rate: voiceRate,
+        pitch: voicePitch,
+        volume: voiceVolume,
+        voiceName: preferName,
       });
-      return;
+    } catch (e) {
+      Modal.info({ title: '示例音频', content: '当前环境无法播放语音，请使用支持的浏览器或启用Tauri。' });
     }
-    if (!('speechSynthesis' in window)) {
-      return Modal.info({ title: '示例音频', content: '您的浏览器不支持语音合成，请使用 Chrome / Firefox / Edge。' });
-    }
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = voiceLang;
-    utter.rate = voiceRate;
-    utter.pitch = voicePitch;
-    utter.volume = voiceVolume;
-    const v = pickVoiceGender(voiceLang, roleHint === 'assistant' ? 'male' : 'female', selectedVoiceName);
-    if (v) utter.voice = v;
-    window.speechSynthesis.speak(utter);
   };
 
   const startAutoPlay = () => {
@@ -519,26 +501,35 @@ const Practice = () => {
     }
     setAutoPlayConversation(true);
     setAutoPlayIndex(0);
-    window.speechSynthesis.cancel();
-    const playIdx = (i) => {
+    cancelSpeech();
+    const playIdx = async (i) => {
       const m = dialogueList[i];
       if (!m) {
         setAutoPlayConversation(false);
         return;
       }
-      const utter = new SpeechSynthesisUtterance(m.content || '');
-      utter.lang = voiceLang;
-      utter.rate = voiceRate;
-      utter.pitch = voicePitch;
-      utter.volume = voiceVolume;
-      const v = pickVoiceGender(voiceLang, m.role === 'assistant' ? 'male' : 'female', selectedVoiceName);
-      if (v) utter.voice = v;
-      utter.onend = () => {
-        const next = i + 1;
-        setAutoPlayIndex(next);
-        if (autoPlayConversation) playIdx(next);
-      };
-      window.speechSynthesis.speak(utter);
+      let preferName = selectedVoiceName;
+      if (!preferName && isWebSpeechSupported()) {
+        const v = pickVoiceGender(voiceLang, m.role === 'assistant' ? 'male' : 'female');
+        if (v) preferName = v.name;
+      }
+      try {
+        await speakText(m.content || '', {
+          lang: voiceLang,
+          rate: voiceRate,
+          pitch: voicePitch,
+          volume: voiceVolume,
+          voiceName: preferName,
+          onEnd: () => {
+            const next = i + 1;
+            setAutoPlayIndex(next);
+            if (autoPlayConversation) playIdx(next);
+          },
+        });
+      } catch (e) {
+        Modal.info({ title: '自動播放', content: '當前環境無法播放語音，請使用支持的瀏覽器。' });
+        setAutoPlayConversation(false);
+      }
     };
     playIdx(0);
   };

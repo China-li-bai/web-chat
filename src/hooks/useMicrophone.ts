@@ -1,30 +1,61 @@
 import { useState, useRef, useEffect } from 'react';
+import type { MutableRefObject, RefObject } from 'react';
 import { Modal } from 'antd';
 import { invoke } from '@tauri-apps/api/core';
 
-// 自定義 Hook：封裝麥克風權限、錄音、播放/暫停、重置等功能
-// 使用方式：
-// const {
-//   micPermission, requestMicrophonePermission,
-//   isRecording, startRecording, stopRecording,
-//   recordedAudioUrl, audioBlob,
-//   isPlaying, playRecording, pauseRecording, togglePlayback,
-//   resetRecording, audioRef,
-// } = useMicrophone();
-export default function useMicrophone() {
-  const [micPermission, setMicPermission] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [recordedAudioUrl, setRecordedAudioUrl] = useState(null);
-  const [audioBlob, setAudioBlob] = useState(null);
+/** Options to configure the microphone hook */
+export interface UseMicrophoneOptions {
+  /** MIME type for the recorded audio blob (default: 'audio/wav') */
+  mimeType?: string;
+}
 
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const audioRef = useRef(null);
+/** Return type of the microphone hook */
+export interface UseMicrophoneReturn {
+  micPermission: boolean;
+  requestMicrophonePermission: () => Promise<boolean>;
+  isRecording: boolean;
+  startRecording: () => Promise<void>;
+  stopRecording: () => Promise<Blob | null>;
+  recordedAudioUrl: string | null;
+  audioBlob: Blob | null;
+  isPlaying: boolean;
+  playRecording: () => void;
+  pauseRecording: () => void;
+  togglePlayback: () => void;
+  resetRecording: () => void;
+  audioRef: RefObject<HTMLAudioElement>;
+}
 
-  const isTauriApp = () => typeof window !== 'undefined' && window.__TAURI__;
+/** Utility: detect Tauri environment */
+function isTauriApp(): boolean {
+  return typeof window !== 'undefined' && (window as any).__TAURI__;
+}
 
-  const requestMicrophonePermission = async () => {
+/**
+ * Microphone hook: encapsulates microphone permission, recording, playback/pause, and reset.
+ * Usage:
+ * const {
+ *   micPermission, requestMicrophonePermission,
+ *   isRecording, startRecording, stopRecording,
+ *   recordedAudioUrl, audioBlob,
+ *   isPlaying, playRecording, pauseRecording, togglePlayback,
+ *   resetRecording, audioRef,
+ * } = useMicrophone();
+ */
+export default function useMicrophone(options: UseMicrophoneOptions = {}): UseMicrophoneReturn {
+  const { mimeType = 'audio/wav' } = options;
+
+  const [micPermission, setMicPermission] = useState<boolean>(false);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+
+  const mediaRecorderRef: MutableRefObject<MediaRecorder | null> = useRef<MediaRecorder | null>(null);
+  const audioChunksRef: MutableRefObject<Blob[]> = useRef<Blob[]>([]);
+  const audioRef: RefObject<HTMLAudioElement> = useRef<HTMLAudioElement>(null);
+
+  const requestMicrophonePermission = async (): Promise<boolean> => {
     try {
       if (!navigator.mediaDevices) {
         console.error('navigator.mediaDevices 不可用');
@@ -50,7 +81,7 @@ export default function useMicrophone() {
     }
   };
 
-  const startRecording = async () => {
+  const startRecording = async (): Promise<void> => {
     // 若尚未授權，先嘗試申請權限
     if (!micPermission) {
       const ok = await requestMicrophonePermission();
@@ -68,21 +99,22 @@ export default function useMicrophone() {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (event) => {
+      recorder.ondataavailable = (event: BlobEvent) => {
         audioChunksRef.current.push(event.data);
       };
 
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setRecordedAudioUrl(url);
       };
 
-      mediaRecorderRef.current.start();
+      recorder.start();
       setIsRecording(true);
       console.log('录音开始');
 
@@ -93,7 +125,7 @@ export default function useMicrophone() {
           console.warn('Tauri start_recording 調用失敗，忽略：', e);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('录音失败:', error);
       let errorMessage = '无法访问麦克风，请检查权限设置。';
 
@@ -109,10 +141,14 @@ export default function useMicrophone() {
     }
   };
 
-  const stopRecording = async () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+  const stopRecording = async (): Promise<Blob | null> => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && isRecording) {
+      recorder.stop();
+      // 停止所有音轨
+      try {
+        recorder.stream.getTracks().forEach((track) => track.stop());
+      } catch {}
       setIsRecording(false);
 
       if (isTauriApp()) {
@@ -124,7 +160,7 @@ export default function useMicrophone() {
       }
 
       // 等待 onstop 生成 blob
-      return new Promise((resolve) => {
+      return new Promise<Blob | null>((resolve) => {
         const check = () => {
           if (audioBlob) {
             resolve(audioBlob);
@@ -138,7 +174,7 @@ export default function useMicrophone() {
     return null;
   };
 
-  const playRecording = () => {
+  const playRecording = (): void => {
     const audioEl = audioRef.current;
     if (recordedAudioUrl && audioEl) {
       audioEl.play();
@@ -146,7 +182,7 @@ export default function useMicrophone() {
     }
   };
 
-  const pauseRecording = () => {
+  const pauseRecording = (): void => {
     const audioEl = audioRef.current;
     if (audioEl) {
       audioEl.pause();
@@ -154,7 +190,7 @@ export default function useMicrophone() {
     }
   };
 
-  const togglePlayback = () => {
+  const togglePlayback = (): void => {
     const audioEl = audioRef.current;
     if (!audioEl) return;
     if (isPlaying) {
@@ -172,13 +208,14 @@ export default function useMicrophone() {
     return () => audioEl.removeEventListener('ended', handler);
   }, [audioRef]);
 
-  const resetRecording = () => {
+  const resetRecording = (): void => {
     try {
-      if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+      const recorder = mediaRecorderRef.current;
+      if (recorder && isRecording) {
+        recorder.stop();
+        try { recorder.stream.getTracks().forEach((track) => track.stop()); } catch {}
       }
-    } catch (e) {
+    } catch {
       // 忽略
     }
     setIsRecording(false);
