@@ -1,30 +1,28 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WordbookCard } from '@/components/language-learning/WordbookCard';
 import { seedInitialData, getAllWordbooksWithStats, importWordbook, checkWordbookExists } from '@/services/wordbookService';
-import { type WordbookWithStats } from '@/types/wordbook';
+import { type WordbookWithStats, type ImportFile } from '@/types/wordbook';
 import { useAppStore } from '@/store/useAppStore';
-import { Button, Row, Col, Typography, Space, Spin, Empty, message, App, Modal, Form, Input, Select, InputNumber, Switch } from 'antd';
+import { Button, Row, Col, Typography, Space, Spin, Empty, message, Modal } from 'antd';
 import ImportPreviewModal from '@/components/language-learning/import-preview-modal';
+import AIGenerateModal from '@/components/language-learning/AIGenerateModal';
+import { useFileImport } from '@/hooks/useFileImport';
 import { UploadOutlined } from '@ant-design/icons';
-import { generateWordbookFile } from '@/modules/ai'
 const { Title, Text } = Typography;
-const { TextArea } = Input;
 
 export const WordbookSelectionPage: React.FC = () => {
   const [wordbooks, setWordbooks] = useState<WordbookWithStats[]>([]);
   const [messageApi, contextHolder] = message.useMessage();
   const [isLoading, setIsLoading] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const userId = useAppStore((state) => state.userId);
 
   // AI 生成相关状态
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiForm] = Form.useForm();
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewFile, setPreviewFile] = useState<null | { name: string; description?: string; words: any[] }>(null);
+  const [previewFile, setPreviewFile] = useState<ImportFile | null>(null);
 
 
   const loadWordbooks = async () => {
@@ -49,12 +47,15 @@ export const WordbookSelectionPage: React.FC = () => {
     })();
   }, [userId]);
 
+  const { handleImportClick, fileInputElement, contextHolder: fileContextHolder } = useFileImport({
+    onFileReady: (file) => {
+      setPreviewFile(file);
+      setPreviewOpen(true);
+    }
+  });
+
   const handleStartLearning = (wordbookId: number) => {
     navigate(`/learning-session/${wordbookId}`);
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
   };
 
   const handleOpenAiModal = () => {
@@ -65,82 +66,17 @@ export const WordbookSelectionPage: React.FC = () => {
     if (!aiLoading) setAiModalOpen(false);
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const content = e.target?.result as string;
-      if (!content) {
-        messageApi.error('Could not read file content.');
-        return;
-      }
-
-      let data;
-      try {
-        data = JSON.parse(content);
-      } catch (error) {
-        messageApi.error('Invalid JSON file.');
-        return;
-      }
-
-      const bookName = data.name;
-      if (!bookName) {
-        messageApi.error('Invalid import file: "name" field is missing.');
-        return;
-      }
-
-      // 改为先预览
-      setPreviewFile(data);
-      setPreviewOpen(true);
-
-      try {
-        // 覆盖确认移动到预览确认时再处理
-        setPreviewFile(data);
-        setPreviewOpen(true);
-        return;
-      } catch (error: any) {
-        console.error('Failed to check wordbook existence:', error);
-        messageApi.error(`Error: ${error.message}`);
-      }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
+  const handleAiSuccess = (file: ImportFile) => {
+    setPreviewFile(file);
+    setPreviewOpen(true);
+    setAiModalOpen(false);
   };
 
-  // 提交 AI 生成（先生成文件，进入预览）
-  const handleAiGenerate = async (values: any) => {
-    if (!userId) {
-      messageApi.error('User not ready');
-      return;
-    }
-
-    try {
-      setAiLoading(true);
-      console.log({ values });
-
-      const file = await generateWordbookFile(values);
-      setPreviewFile(file as any);
-      setPreviewOpen(true);
-      setAiModalOpen(false);
-      aiForm.resetFields();
-      messageApi.success('Generated wordbook file. Please review before import.');
-    } catch (e: any) {
-      if (String(e?.message).includes('User cancelled overwrite')) {
-        // 用户取消覆盖，静默处理
-        return;
-      }
-      console.error('AI generate/import failed:', e);
-      messageApi.error(String(e?.message || 'AI generate failed'));
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   return (
     <>
       {contextHolder}
+      {fileContextHolder}
       <ImportPreviewModal
         open={previewOpen}
         file={previewFile as any}
@@ -156,9 +92,9 @@ export const WordbookSelectionPage: React.FC = () => {
               const json = JSON.stringify(nextFile);
               const res = await importWordbook(json, userId);
               if (res.status === 'created') {
-                messageApi.success('Wordbook "' + name + '" imported successfully!');
+                messageApi.success(`Wordbook "${name}" imported successfully!`);
               } else {
-                messageApi.success('Wordbook "' + name + '" updated successfully!');
+                messageApi.success(`Wordbook "${name}" updated successfully!`);
               }
               setPreviewOpen(false);
               setPreviewFile(null);
@@ -167,7 +103,7 @@ export const WordbookSelectionPage: React.FC = () => {
             if (exists) {
               Modal.confirm({
                 title: 'Confirm Overwrite',
-                content: 'A wordbook named "' + name + '" already exists. Do you want to overwrite it?',
+                content: `A wordbook named "${name}" already exists. Do you want to overwrite it?`,
                 onOk: doImport,
               });
             } else {
@@ -192,13 +128,7 @@ export const WordbookSelectionPage: React.FC = () => {
             <Button onClick={handleOpenAiModal}>
               AI Generate
             </Button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-              accept=".json"
-            />
+            {fileInputElement}
           </Space>
         </div>
         <main>
@@ -229,95 +159,14 @@ export const WordbookSelectionPage: React.FC = () => {
         </main>
       </div>
 
-      {/* AI 生成词书表单 Modal */}
-      <Modal
-        title="AI Generate Wordbook"
+      <AIGenerateModal
         open={aiModalOpen}
+        loading={aiLoading}
         onCancel={handleCloseAiModal}
-        onOk={() => aiForm.submit()}
-        okText={aiLoading ? 'Generating...' : 'Generate'}
-        confirmLoading={aiLoading}
-        destroyOnClose
-      >
-        <Form
-          form={aiForm}
-          layout="vertical"
-          initialValues={{ wordCount: 50, targetLanguage: 'English', provider: 'free-priority', goal: true }}
-          onFinish={handleAiGenerate}
-          onFinishFailed={() => messageApi.error('Please complete required fields')}
-        >
-          <Form.Item label="Name" name="name" rules={[{ required: true, message: 'Please input name' }]}>
-            <Input placeholder="e.g., Travel English Starter" />
-          </Form.Item>
-
-          <Form.Item label="User Goal" name="userGoal" rules={[{ required: true, message: 'Please input your goal' }]}>
-            <TextArea rows={3} placeholder="e.g., Pass frontend engineer English interview; IELTS; CET4" />
-          </Form.Item>
-          <Form.Item label="Target Language" name="targetLanguage">
-            <Input placeholder="e.g., English, Chinese" />
-          </Form.Item>
-
-          <Form.Item label="Word Count" name="wordCount" rules={[{ type: 'number', min: 10, max: 200 }]}>
-            <InputNumber min={10} max={200} style={{ width: '100%' }} />
-          </Form.Item>
-
-
-          <Form.Item label="Provider" name="provider">
-            <Select
-              options={[
-                { label: 'Free Priority (GLM → ERNIE → Hunyuan → OpenRouter:free → Gemini → OpenAI)', value: 'free-priority' },
-                { label: 'Zhipu AI (GLM)', value: 'zhipu' },
-                { label: 'Baidu ERNIE', value: 'ernie' },
-                { label: 'Tencent Hunyuan', value: 'hunyuan' },
-                { label: 'OpenRouter', value: 'openrouter' },
-                { label: 'Gemini', value: 'gemini' },
-                { label: 'OpenAI', value: 'openai' },
-              ]}
-            />
-          </Form.Item>
-
-          <Form.Item noStyle shouldUpdate={(prev, curr) => prev.provider !== curr.provider}>
-            {({ getFieldValue }) => {
-              const p = getFieldValue('provider');
-              if (p && p !== 'free-priority') {
-                const modelPh =
-                  p === 'zhipu' ? 'e.g., glm-4-flash' :
-                    p === 'ernie' ? 'e.g., ernie-speed' :
-                      p === 'hunyuan' ? 'e.g., hunyuan-lite' :
-                        p === 'openrouter' ? 'e.g., deepseek/deepseek-r1:free' :
-                          p === 'openai' ? 'e.g., gpt-4o-mini' :
-                            'e.g., gemini-1.5-flash';
-                const basePh =
-                  p === 'zhipu' ? 'https://open.bigmodel.cn/api/paas/v4' :
-                    p === 'openrouter' ? 'https://openrouter.ai/api/v1' :
-                      p === 'ernie' ? 'Your ERNIE-compatible gateway base URL' :
-                        p === 'hunyuan' ? 'Your Hunyuan OpenAI-compatible gateway base URL' :
-                          '';
-                return (
-                  <>
-                    <Form.Item label="Model (optional)" name="model">
-                      <Input placeholder={modelPh} />
-                    </Form.Item>
-                    <Form.Item label="API Key" name="apiKey" rules={[{ required: true, message: 'Please input API Key for the selected provider' }]}>
-                      <Input.Password placeholder="Your API Key" />
-                    </Form.Item>
-                    <Form.Item label="Base URL (optional)" name="baseUrl">
-                      <Input placeholder={basePh} />
-                    </Form.Item>
-                  </>
-                );
-              }
-              return (
-                <Form.Item>
-                  <Text type="secondary">
-                    Using Free Priority chain by default: GLM-4-Flash → ERNIE-Speed → hunyuan-lite → OpenRouter:free → Gemini → OpenAI
-                  </Text>
-                </Form.Item>
-              );
-            }}
-          </Form.Item>
-        </Form>
-      </Modal>
+        onSuccess={handleAiSuccess}
+        onLoadingChange={setAiLoading}
+        userId={userId}
+      />
     </>
   );
 };
