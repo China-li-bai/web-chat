@@ -1,0 +1,201 @@
+/* 移动优先的响应式设计 - 乔布斯视角：简洁、直观、优雅 */
+
+/* 基础容器 - 移动端默认样式 */
+.container {
+  padding: 16px;
+  background: #f8fafc;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 头部区域 - 移动端垂直布局 */
+.header {
+  background: #fff;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.headerContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  margin: 0 !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  color: #1a1a1a !important;
+  line-height: 1.2 !important;
+}
+
+/* 操作按钮样式 */
+.actionButton {
+  height: 40px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+}
+
+/* 加载状态 */
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 20px;
+  min-height: 300px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 空状态 */
+.emptyState {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  text-align: center;
+}
+
+/* 词书网格 - 移动端单列 */
+.wordbookGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+/* 平板设备 (576px及以上) */
+@media (min-width: 576px) {
+  .container {
+    padding: 20px;
+  }
+  
+  .header {
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .title {
+    font-size: 28px !important;
+  }
+  
+  .actionButton {
+    height: 40px;
+  }
+  
+  .wordbookGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+}
+
+/* 笔记本电脑 (768px及以上) */
+@media (min-width: 768px) {
+  .container {
+    padding: 24px;
+  }
+  
+  .header {
+    padding: 24px 32px;
+  }
+  
+  .actionButton {
+    height: 40px;
+  }
+  
+  .wordbookGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+}
+
+/* 桌面设备 (992px及以上) */
+@media (min-width: 992px) {
+  .container {
+    padding: 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .header {
+    padding: 24px 32px;
+    margin-bottom: 32px;
+  }
+  
+  .wordbookGrid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+}
+
+/* 大屏设备 (1200px及以上) */
+@media (min-width: 1200px) {
+  .wordbookGrid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 24px;
+  }
+}
+
+/* 超大屏设备 (1400px及以上) */
+@media (min-width: 1400px) {
+  .wordbookGrid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 24px;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .container {
+    background: #0f0f0f;
+    color: #e0e0e0;
+  }
+  
+  .header {
+    background: #1a1a1a;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .title {
+    color: #fff !important;
+  }
+  
+  .actionButton {
+    border-color: #303030;
+  }
+  
+  .actionButton:hover {
+    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+  }
+}
+
+/* 减少动画效果 */
+@media (prefers-reduced-motion: reduce) {
+  .container,
+  .header,
+  .wordbookGrid {
+    transition: none;
+  }
+  
+  .actionButton {
+    transition: none;
+  }
+  
+  .actionButton:hover {
+    transform: none;
+  }
+}

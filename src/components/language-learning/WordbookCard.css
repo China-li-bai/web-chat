@@ -42,10 +42,14 @@
 
 .wordbook-stats {
   margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .wordbook-statistic {
   text-align: center;
+  flex: 1;
 }
 
 .wordbook-statistic .ant-statistic-title {

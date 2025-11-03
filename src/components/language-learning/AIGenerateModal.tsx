@@ -11,8 +11,18 @@ export interface AIGenerateModalProps {
   loading: boolean;
   onCancel: () => void;
   onSuccess: (file: ImportFile) => void;
-  onLoadingChange: (loading: boolean) => void;
   userId: string | null;
+}
+
+interface GenerateFormValues {
+  name: string;
+  userGoal: string;
+  targetLanguage: string;
+  wordCount: number;
+  provider: string;
+  model?: string;
+  apiKey?: string;
+  baseUrl?: string;
 }
 
 export const AIGenerateModal: React.FC<AIGenerateModalProps> = ({
@@ -20,20 +30,20 @@ export const AIGenerateModal: React.FC<AIGenerateModalProps> = ({
   loading,
   onCancel,
   onSuccess,
-  onLoadingChange,
   userId,
 }) => {
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
+  const [internalLoading, setInternalLoading] = React.useState(false);
 
-  const handleGenerate = async (values: any) => {
+  const handleGenerate = async (values: GenerateFormValues) => {
     if (!userId) {
       messageApi.error('User not ready');
       return;
     }
 
     try {
-      onLoadingChange(true);
+      setInternalLoading(true);
       const file = await generateWordbookFile(values);
       onSuccess(file as ImportFile);
       form.resetFields();
@@ -45,15 +55,17 @@ export const AIGenerateModal: React.FC<AIGenerateModalProps> = ({
       console.error('AI generate failed:', e);
       messageApi.error(String(e?.message || 'AI generate failed'));
     } finally {
-      onLoadingChange(false);
+      setInternalLoading(false);
     }
   };
 
   const handleCancel = () => {
-    if (!loading) {
+    if (!loading && !internalLoading) {
       onCancel();
     }
   };
+
+  const isLoading = loading || internalLoading;
 
   return (
     <>
@@ -63,8 +75,8 @@ export const AIGenerateModal: React.FC<AIGenerateModalProps> = ({
         open={open}
         onCancel={handleCancel}
         onOk={() => form.submit()}
-        okText={loading ? 'Generating...' : 'Generate'}
-        confirmLoading={loading}
+        okText={isLoading ? 'Generating...' : 'Generate'}
+        confirmLoading={isLoading}
         destroyOnClose
       >
         <Form

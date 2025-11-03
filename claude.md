@@ -1,7 +1,108 @@
+# CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
 
-This file provides guidance to ai when working with code in this repository.
+AI口語練習產品 - 基於Tauri的跨平台應用，支持語音識別、發音評分和間隔重複學習算法。
+
+## Development Commands
+
+```bash
+# Development
+npm run dev                 # Start Vite development server
+npm run tauri:dev          # Start Tauri development mode 
+npm run server:dev         # Start backend server with nodemon
+
+# Build
+npm run build              # Build for production
+npm run tauri:build        # Build Tauri application
+
+# Testing  
+npm run test               # Run tests with Vitest
+npm run test:ui            # Run tests with UI
+npm run test:coverage      # Run tests with coverage
+
+# Backend
+npm run server             # Start backend server
+```
+
+## Technology Stack
+
+- **Frontend**: React 18 + Vite + Tauri
+- **UI Library**: Ant Design 5
+- **State Management**: Zustand with immer middleware
+- **Database**: wa-sqlite (WebAssembly SQLite) for local-first approach
+- **Routing**: React Router DOM 6
+- **AI Services**: Multiple providers (Gemini, Baidu, iFlytek, Tencent)
+- **Learning Algorithm**: FSRS (Free Spaced Repetition Scheduler) + SuperMemo
+
+## Core Architecture
+
+### Database Layer (`src/services/db.ts`)
+- Uses wa-sqlite with IndexedDB VFS for persistence
+- Auto-migration system for schema updates
+- Tables: wordbooks, words, learning_progress, study_logs, learning_statistics
+- Self-healing database corruption recovery
+
+### State Management (`src/store/`)
+- `useAppStore.ts` - Main application state (user, practice sessions, settings)
+- `wordbook-simple.ts` - Wordbook management using existing DB structure
+- `learning.ts` - Learning session state management
+- All stores use Zustand with immer for immutable updates
+
+### Learning System (`src/lib/memo/`)
+- `MemoryLearningManager.ts` - Core FSRS implementation
+- `algorithms/` - Spaced repetition, active retrieval, difficulty adaptation
+- Supports multiple learning modes and progress tracking
+
+### wa-sqlite Integration (`src/packages/wa-sqlite-adapter/`)
+- Custom adapter for wa-sqlite database operations
+- `BasicDatabase` class for connection management
+- Type-safe query execution with error handling
+
+### AI Services (`src/modules/ai/`)
+- Multiple LLM providers (OpenAI, Gemini, etc.)
+- Prompt templates for language learning scenarios
+- Wordbook generation and content creation
+
+### Learning Pages (`src/pages/LanguageLearning/`)
+- `WordbookManagementPageSimple.tsx` - Simplified wordbook management (route: `/wordbooks`)
+- `LearningSessionPageSimplified.tsx` - 3-button learning interface 
+- `StatisticsPage.tsx` - Learning progress visualization
+
+## Database Schema
+
+Key tables and relationships:
+- `wordbooks` - Vocabulary collections (id, name, description, createdAt)
+- `words` - Individual vocabulary items (wordbookId, userId, word, definition, etc.)
+- `learning_progress` - FSRS state tracking (stability, retrievability, difficulty, nextReview)
+- `study_logs` - Learning session records for analytics
+
+## FSRS Learning Flow
+
+1. User selects wordbook → creates learning session
+2. Words fetched based on review schedule (nextReview ≤ current time)
+3. User responds (Again/Hard/Good/Easy) → FSRS updates parameters
+4. Progress saved to learning_progress table
+5. Statistics updated for dashboard display
+
+## Important File Locations
+
+- Database service: `src/services/db.ts`
+- Learning algorithm: `src/lib/memo/MemoryLearningManager.ts`
+- Main routing: `src/app.jsx`
+- Wordbook management: `src/store/wordbook-simple.ts`
+- FSRS config: `src/config/fsrs-config.ts`
+
+## Development Notes
+
+- Use TypeScript strictly - define types before implementation
+- All interfaces stored in `src/types/` directory
+- Database operations use prepared statements for security
+- Learning sessions maintain state consistency with FSRS algorithm
+- Component file size limit: 300 lines (TypeScript/JavaScript)
+- Maximum 8 files per directory - use subdirectories if exceeded
 
 ## Summary instructions
 
@@ -49,13 +150,12 @@ When you are using compact, please focus on test output and code changes
 
 
 ## 开发时前端項目的一些注意事项
-- 项目采用 pnpm 作为包管理工具
+- 项目采用 npm 作为包管理工具
 - 项目采用 TypeScript 作为开发语言
 - 项目采用 React 18 作为前端框架
 - 项目采用 Vite 作为构建工具
-- 项目采用 Capacitor 作为跨平台打包工具
+- 项目采用 Tauri 作为跨平台打包工具
 - 严格控制版本依赖，避免版本冲突
-- 使用@capacitor/cli 和 vite cli 进行项目的初始化和打包
+- 使用@tauri-apps/cli 和 vite cli 进行项目的初始化和打包
 - 项目采用 wa-sqlite 数据库，支持本地存储
-- 项目采用 Liquid Glass UI 作为 UI 系统
 - 开发ts 项目时，先定义好类型，再编写代码，接口类型全部统一存放到项目types文件夹下，避免类型错误
