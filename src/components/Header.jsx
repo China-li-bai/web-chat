@@ -1,12 +1,33 @@
 import React from 'react';
-import { Layout, Avatar, Dropdown, Space, Typography } from 'antd';
-import { UserOutlined, LogoutOutlined, SettingOutlined } from '@ant-design/icons';
+import { Layout, Avatar, Dropdown, Space, Typography, Button } from 'antd';
+import {
+  UserOutlined,
+  LogoutOutlined,
+  SettingOutlined,
+  MenuOutlined
+} from '@ant-design/icons';
+import { useLayoutStore } from '../store/layout-store';
 import ThemeToggle from './ui/theme-toggle';
 
 const { Header: AntHeader } = Layout;
 const { Text } = Typography;
 
+/**
+ * Header - 智能头部组件
+ * 集成布局状态，实现乔布斯式极简交互
+ */
 const Header = () => {
+  // 布局状态 - 单一数据源
+  const {
+    sidebarWidth,
+    headerHeight,
+    isMobile,
+    theme,
+    toggleSidebar,
+    setSidebarVisible
+  } = useLayoutStore();
+
+  // 用户菜单配置
   const userMenuItems = [
     {
       key: 'profile',
@@ -29,18 +50,16 @@ const Header = () => {
     },
   ];
 
+  // 菜单处理
   const handleMenuClick = ({ key }) => {
     switch (key) {
       case 'logout':
-        // 处理退出登录
         console.log('退出登录');
         break;
       case 'profile':
-        // 处理个人资料
         console.log('个人资料');
         break;
       case 'settings':
-        // 处理账户设置
         console.log('账户设置');
         break;
       default:
@@ -48,29 +67,58 @@ const Header = () => {
     }
   };
 
+  // 头部样式 - 数据驱动
+  const headerStyle = {
+    position: 'fixed',
+    top: 0,
+    right: 0,
+    left: isMobile ? 0 : sidebarWidth,
+    height: headerHeight,
+    padding: '0 24px',
+    background: 'var(--background)',
+    borderBottom: '1px solid var(--border)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 100,
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    transition: 'left 0.3s ease',
+  };
+
   return (
-    <AntHeader
-      className="app-header"
-      style={{
-        padding: '0 24px',
-        background: 'var(--background)',
-        borderBottom: '1px solid var(--border)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginLeft: 200, // 为侧边栏留出空间
-      }}
-    >
+    <AntHeader style={headerStyle} className="app-header">
+      {/* 左侧区域 */}
       <div className="header-left">
-        <Text strong style={{ fontSize: '16px' }}>
-          欢迎使用AI口语练习系统
-        </Text>
+        {/* 移动端菜单按钮 */}
+        {isMobile && (
+          <Button
+            type="text"
+            icon={<MenuOutlined />}
+            onClick={() => setSidebarVisible(true)}
+            style={{ fontSize: '16px' }}
+          />
+        )}
+        {!isMobile && (
+          <Text strong style={{ fontSize: '16px' }}>
+            欢迎使用AI口语练习系统
+          </Text>
+        )}
       </div>
-      
+
+      {/* 右侧区域 */}
       <div className="header-right">
         <Space size="middle">
+          {/* 主题切换 */}
           <ThemeToggle />
-          <Text type="secondary">今日练习时间: 25分钟</Text>
+
+          {/* 练习时间 - 桌面端显示 */}
+          {!isMobile && (
+            <Text type="secondary">
+              今日练习时间: 25分钟
+            </Text>
+          )}
+
+          {/* 用户菜单 */}
           <Dropdown
             menu={{
               items: userMenuItems,
@@ -80,8 +128,8 @@ const Header = () => {
             arrow
           >
             <Space style={{ cursor: 'pointer' }}>
-              <Avatar size="small" icon={<UserOutlined />} />
-              <Text>用户名</Text>
+              <Avatar size={isMobile ? 'default' : 'small'} icon={<UserOutlined />} />
+              {!isMobile && <Text>用户名</Text>}
             </Space>
           </Dropdown>
         </Space>

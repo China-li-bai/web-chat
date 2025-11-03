@@ -138,34 +138,58 @@ export const useWordbookPage = (): UseWordbookPageReturn => {
     try {
       const name = file.name;
       const exists = await checkWordbookExists(name);
-      
+
       const doImport = async () => {
-        const json = JSON.stringify(file);
-        const res = await importWordbook(json, userId);
-        
-        if (res.status === 'created') {
-          messageApi.success(`Wordbook "${name}" imported successfully!`);
-        } else {
-          messageApi.success(`Wordbook "${name}" updated successfully!`);
+        try {
+          const json = JSON.stringify(file);
+          const res = await importWordbook(json, userId);
+
+          if (res.status === 'created') {
+            messageApi.success(`Wordbook "${name}" imported successfully!`);
+          } else {
+            messageApi.success(`Wordbook "${name}" updated successfully!`);
+          }
+
+          // 关闭预览模态框
+          updateModal('preview', false);
+          // 清空预览文件
+          updateState({ previewFile: null });
+          // 重新加载词书列表
+          await loadWordbooks();
+        } catch (importError: any) {
+          console.error('Import operation failed:', importError);
+          messageApi.error(importError?.message || 'Failed to import wordbook');
+          throw importError; // 重新抛出错误以便Modal.confirm处理
         }
-        
-        updateModal('preview', false);
-        updateState({ previewFile: null });
-        await loadWordbooks();
       };
 
       if (exists) {
+        // 词书已存在，显示覆盖确认对话框
         Modal.confirm({
           title: 'Confirm Overwrite',
           content: `A wordbook named "${name}" already exists. Do you want to overwrite it?`,
-          onOk: doImport,
+          okText: 'Confirm',
+          cancelText: 'Cancel',
+          // 确保异步onOk正确处理
+          onOk: async () => {
+            await doImport();
+          },
+          // 错误处理
+          onError: (error) => {
+            console.error('Modal confirm error:', error);
+            messageApi.error('Operation cancelled or failed');
+          },
         });
       } else {
+        // 词书不存在，直接导入
         await doImport();
       }
     } catch (err: any) {
       console.error('Import failed:', err);
       messageApi.error(String(err?.message || 'Import failed'));
+      // 确保即使出错也关闭模态框
+      updateModal('preview', false);
+      updateState({ previewFile: null });
     }
   };
 
