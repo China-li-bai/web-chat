@@ -12,12 +12,12 @@ import { processStudyResponse } from '@/services/learningService';
 import { useSessionState } from '@/hooks/useSessionState';
 import { useSessionHandlers } from '@/hooks/useSessionHandlers';
 import { useSessionKeyboardShortcuts } from '@/hooks/useSessionKeyboardShortcuts';
-import './LearningSessionPage.css';
+import './LearningSessionPage.refactor.css';
 
 // 类型定义
 type SetLastWordbookId = (id: string) => void;
 
-const LearningSessionPage: React.FC = () => {
+const LearningSessionPageRefactor: React.FC = () => {
   // 路由和用户状态
   const { wordbookId } = useParams<{ wordbookId: string }>();
   const navigate = useNavigate();
@@ -75,15 +75,14 @@ const LearningSessionPage: React.FC = () => {
     currentItem,
     responseStartTime,
     responseTimesRef,
-    setIsFlipped,
-    onResponse: async (response: 'again' | 'hard' | 'easy') => {
+    onResponse: async (response: 'again' | 'hard' | 'good' | 'easy') => {
       if (!session || !currentItem) {
         message.error('无法处理响应：会话或当前项目未加载');
         return;
       }
 
       const responseTime = Date.now() - responseStartTime.current;
-      const isCorrect = response === 'easy';
+      const isCorrect = response === 'good' || response === 'easy';
 
       // 添加响应时间
       addResponseTime(responseTime);
@@ -173,18 +172,21 @@ const LearningSessionPage: React.FC = () => {
           重新加载
         </button>
       </div>
-    );
+    </div>
+  );
   }
 
   return (
     <ErrorBoundary>
       <div className="learning-session-container">
-        {/* 乔布斯式极简Header */}
+        {/* 头部状态栏 */}
         <SessionHeader 
           wordbookId={wordbookId || ''} 
           onBack={() => navigate('/language-learning')}
+          sessionStats={sessionStats}
           currentItemIndex={currentItemIndex}
           segmentQueueLength={segmentQueue.length}
+          questionMode={questionMode}
         />
 
         {/* 主要内容区域 */}
@@ -215,23 +217,11 @@ const LearningSessionPage: React.FC = () => {
             accuracy={sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0}
             sessionDuration={Math.round((Date.now() - sessionStats.startTime) / 1000 / 60)}
             totalItems={sessionStats.total}
-            summaryCounts={summaryCounts}
+            summaryItems={summaryItems}
             summaryStats={summaryStats}
-            onReviewWeakItems={() => {
-              console.log('Review weak items');
-              // TODO: 实现弱项复习功能
-            }}
-            onScheduleNextReview={() => {
-              console.log('Schedule next review');
-              // TODO: 实现复习安排功能
-            }}
-            onContinueLearning={() => {
+            onContinue={() => {
               setShowSummary(false);
               navigate('/language-learning');
-            }}
-            onViewStatistics={() => {
-              setShowSummary(false);
-              navigate('/statistics');
             }}
           />
         )}
@@ -240,4 +230,4 @@ const LearningSessionPage: React.FC = () => {
   );
 };
 
-export default LearningSessionPage;
+export default LearningSessionPageRefactor;

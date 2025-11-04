@@ -85,251 +85,251 @@
   100% { transform: rotate(360deg); }
 }
 
-/* 乔布斯式Header - 极简主义设计 */
-.session-header-jobs {
+/* 头部设计 - 简洁优雅 */
+.session-header {
   background: var(--bg-primary);
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 600px;
-  margin: 0 auto;
-  position: relative;
+  border-bottom: 1px solid var(--border-light);
+  padding: var(--spacing-md);
+  position: sticky;
+  top: 0;
   z-index: 100;
 }
 
-/* 返回按钮 - 乔布斯式优雅 */
-.back-button-jobs {
+.session-header-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* 返回按钮 - 移动端友好 */
+.session-back-btn {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
   background: none;
   border: none;
-  color: #007AFF;
+  color: var(--text-secondary);
   font-size: var(--font-size-md);
-  font-weight: 400;
   padding: var(--spacing-sm);
-  border-radius: var(--radius-small);
-  cursor: pointer;
+  border-radius: var(--radius-medium);
   transition: all var(--transition-fast);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  cursor: pointer;
+  align-self: flex-start;
 }
 
-.back-button-jobs:hover {
-  background: rgba(0, 122, 255, 0.1);
-  transform: translateX(-1px);
+.session-back-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
-.back-button-jobs:active {
-  transform: translateX(0);
-}
-
-.back-text-jobs {
-  font-size: var(--font-size-md);
+.back-text {
   font-weight: 500;
 }
 
-/* 进度信息 - 极简显示 */
-.progress-jobs {
-  flex: 1;
+/* 进度信息 */
+.session-progress {
+  width: 100%;
+}
+
+.progress-bar-container {
+  margin-bottom: var(--spacing-xs);
+}
+
+.progress-info {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
 }
 
-.progress-text-jobs {
+.progress-text {
+  font-weight: 500;
+}
+
+.mode-tag {
+  font-size: var(--font-size-xs) !important;
+}
+
+/* 统计信息 */
+.session-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+  background: var(--bg-secondary);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-large);
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
   font-size: var(--font-size-lg);
-  font-weight: 300;
-  color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
-  letter-spacing: 0.5px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
-/* 乔布斯式主内容区域 - 纯净优雅 */
+.stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* 模式选择器 */
+.question-mode-selector {
+  align-self: center;
+}
+
+/* 主内容区域 */
 .session-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: var(--spacing-xl) var(--spacing-md);
-  max-width: 500px;
+  padding: var(--spacing-md);
+  max-width: 600px;
   margin: 0 auto;
   width: 100%;
   gap: var(--spacing-xl);
-  min-height: calc(100vh - 120px); /* 确保垂直居中 */
-  position: relative;
 }
 
-/* 深色模式支持 */
-@media (prefers-color-scheme: dark) {
-  .session-main {
-    background: #000000;
-  }
-}
-
-/* 乔布斯式QuestionArea - 极简优雅 */
-.question-area-jobs {
+/* 问题区域 - 核心交互 */
+.question-area {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-xl);
-  max-width: 500px;
-  margin: 0 auto;
+  gap: var(--spacing-lg);
 }
 
-/* 卡片容器 - 3D翻转效果 */
-.card-jobs {
-  perspective: 1200px;
+.question-card-container {
+  perspective: 1000px;
   width: 100%;
   max-width: 400px;
-  height: 350px;
+  height: 300px;
 }
 
-.card-face-jobs {
+.question-card {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform var(--transition-slow);
+  cursor: pointer;
+}
+
+.question-card.flipped {
+  transform: rotateY(180deg);
+}
+
+.question-card.front, .question-card.back {
   position: absolute;
   width: 100%;
   height: 100%;
   backface-visibility: hidden;
-  background: #ffffff;
-  border-radius: 24px;
-  box-shadow: 
-    0 4px 20px rgba(0, 0, 0, 0.08),
-    0 1px 3px rgba(0, 0, 0, 0.1);
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-medium);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
-  transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
-  cursor: pointer;
+  align-items: center;
+  padding: var(--spacing-xl);
+  text-align: center;
 }
 
-.card-face-jobs.flipped {
+.question-card.back {
   transform: rotateY(180deg);
 }
 
-/* 正面：纯净的单词展示 */
-.word-front-jobs {
+/* 卡片内容 */
+.card-content {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  text-align: center;
-  padding: var(--spacing-xl);
-  height: 100%;
+  align-items: center;
+  gap: var(--spacing-md);
 }
 
-.word-main-jobs {
-  font-size: 3rem;
-  font-weight: 300;
-  color: #1d1d1f;
-  margin-bottom: var(--spacing-lg);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+.word-text {
+  color: var(--text-primary);
+  margin: 0 !important;
+  font-weight: 600;
 }
 
-.tap-hint-jobs {
+.phonetic-text {
+  font-size: var(--font-size-md);
+  color: var(--text-secondary);
+}
+
+.translation-hint {
+  background: var(--bg-secondary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-medium);
+}
+
+.hint-text {
   font-size: var(--font-size-sm);
-  color: #8e8e93;
-  font-weight: 400;
-  letter-spacing: 0.5px;
 }
 
-/* 背面：纯净的定义展示 */
-.definition-jobs {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: var(--spacing-xl);
-  height: 100%;
+.definition-text {
+  font-size: var(--font-size-md);
+  line-height: 1.6;
+  margin: 0;
 }
 
-.word-jobs {
-  font-size: 2rem;
-  font-weight: 400;
-  color: #1d1d1f;
-  margin-bottom: var(--spacing-lg);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+.translation-section {
+  background: #f6ffed;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-medium);
+  border-left: 3px solid var(--success-color);
 }
 
-.meaning-jobs {
-  font-size: 1.125rem;
-  font-weight: 400;
-  color: #424245;
+.translation-text {
+  font-weight: 500;
+  color: var(--success-color);
+}
+
+.example-section {
+  margin-top: var(--spacing-sm);
+}
+
+.example-text {
+  font-style: italic;
   line-height: 1.5;
-  max-width: 90%;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
 }
 
-/* 极简提示文字 */
-.hint-jobs {
+.card-footer {
+  padding-top: var(--spacing-md);
+}
+
+.tap-hint {
   font-size: var(--font-size-sm);
-  color: #8e8e93;
-  font-weight: 400;
+}
+
+.swipe-hints {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.swipe-hint {
+  font-size: var(--font-size-xs);
+}
+
+/* 响应指示器 */
+.response-indicators {
   text-align: center;
-  letter-spacing: 0.3px;
-  transition: all var(--transition-normal);
 }
 
-/* 卡片悬浮效果 */
-.card-jobs:hover .card-face-jobs {
-  transform: translateY(-4px);
-  box-shadow: 
-    0 8px 30px rgba(0, 0, 0, 0.12),
-    0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-/* 翻转动画状态 */
-.card-face-jobs.flipping {
-  transform: rotateY(180deg);
-}
-
-/* 深色模式支持 */
-@media (prefers-color-scheme: dark) {
-  .card-face-jobs {
-    background: #1c1c1e;
-    box-shadow: 
-      0 4px 20px rgba(0, 0, 0, 0.3),
-      0 1px 3px rgba(0, 0, 0, 0.2);
-  }
-  
-  .word-main-jobs,
-  .word-jobs {
-    color: #ffffff;
-  }
-  
-  .meaning-jobs {
-    color: #ebebf5;
-  }
-  
-  .tap-hint-jobs,
-  .hint-jobs {
-    color: #8e8e93;
-  }
-}
-
-/* 响应式设计 */
-@media (max-width: 480px) {
-  .card-jobs {
-    max-width: 320px;
-    height: 280px;
-  }
-  
-  .word-main-jobs {
-    font-size: 2.5rem;
-  }
-  
-  .word-jobs {
-    font-size: 1.75rem;
-  }
-  
-  .meaning-jobs {
-    font-size: 1rem;
-  }
+.indicator.active {
+  color: var(--primary-color);
+  font-weight: 500;
 }
 
 /* 翻转控制 */
@@ -429,7 +429,7 @@
 .response-buttons {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-lg);
 }
 
@@ -513,48 +513,57 @@
   margin-bottom: var(--spacing-xs);
 }
 
-/* 乔布斯式响应式设计 - 简洁优雅 */
+/* 响应式设计 - 平板 */
 @media (min-width: 768px) {
-  .session-header-jobs {
-    max-width: 600px;
-    padding: var(--spacing-xl) var(--spacing-lg);
+  .session-header-content {
+    flex-direction: row;
+    align-items: center;
   }
   
-  .session-main {
-    max-width: 600px;
-    padding: var(--spacing-xl);
+  .session-back-btn {
+    align-self: auto;
   }
   
-  .card-jobs {
-    max-width: 450px;
-    height: 380px;
+  .session-progress {
+    flex: 1;
+    margin: 0 var(--spacing-md);
   }
   
-  .word-main-jobs {
-    font-size: 3.5rem;
+  .session-stats {
+    grid-template-columns: repeat(3, 1fr);
   }
   
-  .word-jobs {
-    font-size: 2.25rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .session-header-jobs {
-    max-width: 700px;
+  .response-buttons {
+    grid-template-columns: repeat(2, 1fr);
   }
   
-  .session-main {
-    max-width: 700px;
-  }
-  
-  .card-jobs {
+  .question-card-container {
     max-width: 500px;
     height: 400px;
   }
   
-  .word-main-jobs {
-    font-size: 4rem;
+  .word-text {
+    font-size: var(--font-size-xxl);
+  }
+}
+
+/* 响应式设计 - 桌面 */
+@media (min-width: 1024px) {
+  .session-main {
+    max-width: 800px;
+  }
+  
+  .question-card-container {
+    max-width: 600px;
+    height: 450px;
+  }
+  
+  .response-controls {
+    max-width: 500px;
+  }
+  
+  .response-buttons {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
