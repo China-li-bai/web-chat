@@ -29,9 +29,14 @@ export const QuestionArea: React.FC<QuestionAreaProps> = ({
     [currentItem]
   );
 
-  // 乔布斯式纯净卡片：正面只有单词，背面只有定义
+  // 乔布斯式纯净卡片：正面只有单词，背面显示完整释义
   const definition = useMemo(() => 
     String(details?.definition || ''), 
+    [details]
+  );
+
+  const translation = useMemo(() => 
+    String(details?.translation || ''), 
     [details]
   );
 
@@ -68,29 +73,37 @@ export const QuestionArea: React.FC<QuestionAreaProps> = ({
       onTouchEnd={handleTouchEnd}
     >
       <div className="card-jobs">
-        <div className={`card-face-jobs ${isFlipped ? 'flipped' : ''}`}>
-          {isFlipped ? (
-            // 背面：纯净的定义展示
-            <div className="definition-jobs">
-              <div className="word-jobs">{word}</div>
-              <div className="meaning-jobs">
-                {definition || '暂无定义'}
-              </div>
+        {/* 简化的实现：显示/隐藏切换 */}
+        {!isFlipped ? (
+          // 正面：纯净的单词展示
+          <div className="word-front-jobs">
+            <div className="word-main-jobs">{word}</div>
+            <div className="tap-hint-jobs">轻触翻转</div>
+          </div>
+        ) : (
+          // 背面：完整的释义展示
+          <div className="definition-jobs">
+            <div className="word-jobs">{word}</div>
+            <div className="meaning-content">
+              {definition && (
+                <div className="english-definition">
+                  {definition}
+                </div>
+              )}
+              {translation && (
+                <div className="chinese-translation">
+                  {translation}
+                </div>
+              )}
+              {!definition && !translation && (
+                <div className="no-definition">暂无释义</div>
+              )}
             </div>
-          ) : (
-            // 正面：纯净的单词展示
-            <div className="word-front-jobs">
-              <div className="word-main-jobs">{word}</div>
-              <div className="tap-hint-jobs">轻触翻转</div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       
-      {/* 乔布斯式极简提示 */}
-      <div className="hint-jobs">
-        {isFlipped ? '选择你的理解程度' : '轻触翻转查看释义'}
-      </div>
+      {/* 乔布斯式极简：完全去掉多余提示 */}
     </div>
   );
 };

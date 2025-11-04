@@ -195,32 +195,28 @@
 
 /* 卡片容器 - 移动端紧凑设计 */
 .card-jobs {
-  perspective: 1200px;
   width: 100%;
   max-width: 320px;
-  height: 200px;
+  height: 220px;
   margin: 0 auto;
-}
-
-.card-face-jobs {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  backface-visibility: hidden;
+  position: relative;
   background: #ffffff;
   border-radius: 24px;
   box-shadow: 
     0 4px 20px rgba(0, 0, 0, 0.08),
     0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 卡片内容容器 */
+.card-content {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+  border-radius: 24px;
   cursor: pointer;
-}
-
-.card-face-jobs.flipped {
-  transform: rotateY(180deg);
+  transition: opacity 0.3s ease;
 }
 
 /* 正面：移动端紧凑单词展示 */
@@ -270,10 +266,44 @@
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
 }
 
-.meaning-jobs {
+.meaning-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
+  align-items: center;
+}
+
+.english-definition {
   font-size: 0.9rem;
   font-weight: 400;
   color: #424245;
+  line-height: 1.4;
+  max-width: 95%;
+  font-style: italic;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+}
+
+.chinese-translation {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #1d1d1f;
+  line-height: 1.4;
+  max-width: 95%;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+}
+
+/* 统一的释义样式 - 用于深色模式和响应式设计 */
+.english-definition,
+.chinese-translation,
+.no-definition {
+  margin-bottom: var(--spacing-xs);
+}
+
+.no-definition {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #8e8e93;
   line-height: 1.4;
   max-width: 95%;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
@@ -289,22 +319,16 @@
   transition: all var(--transition-normal);
 }
 
-/* 卡片悬浮效果 */
-.card-jobs:hover .card-face-jobs {
-  transform: translateY(-4px);
+/* 卡片悬浮效果 - 简化版本 */
+.card-jobs:hover {
   box-shadow: 
     0 8px 30px rgba(0, 0, 0, 0.12),
     0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-/* 翻转动画状态 */
-.card-face-jobs.flipping {
-  transform: rotateY(180deg);
-}
-
 /* 深色模式支持 */
 @media (prefers-color-scheme: dark) {
-  .card-face-jobs {
+  .card-jobs {
     background: #1c1c1e;
     box-shadow: 
       0 4px 20px rgba(0, 0, 0, 0.3),
@@ -416,28 +440,11 @@
   margin-top: var(--spacing-sm);
 }
 
-.controls-header {
-  text-align: center;
-  margin-bottom: var(--spacing-sm);
-}
-
-.controls-title {
-  margin: 0 0 var(--spacing-xs) 0;
-  color: var(--text-primary);
-  font-size: var(--font-size-md);
-}
-
-.controls-subtitle {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-xs);
-}
-
 .response-buttons {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
 }
 
 .response-button {
@@ -464,29 +471,18 @@
 
 .button-content {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   width: 100%;
 }
 
-.button-main {
-  flex: 1;
-}
-
 .button-label {
-  font-weight: 600;
-  margin-bottom: 1px;
-  font-size: var(--font-size-sm);
-}
-
-.button-description {
-  font-size: var(--font-size-xs);
-  opacity: 0.8;
-}
-
-.button-keys {
-  display: flex;
-  gap: 2px;
+  font-weight: 500;
+  font-size: 1.1rem;
+  text-align: center;
+  margin: 0;
+  letter-spacing: 0.5px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
 }
 
 .key-hint {

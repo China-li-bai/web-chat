@@ -14,10 +14,10 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
   currentItemIndex,
   segmentQueueLength
 }) => {
-  // 乔布斯式极简：只显示最核心的信息
+  // 乔布斯式极简：显示进度，确保数据显示
   const progress = segmentQueueLength > 0 
     ? `${currentItemIndex + 1} / ${segmentQueueLength}` 
-    : '';
+    : `${currentItemIndex + 1} / --`;
 
   return (
     <header className="session-header-jobs">
