@@ -27,14 +27,15 @@ export const useSessionHandlers = ({
   }, [currentItem, setIsFlipped]);
 
   // 处理响应
-  const handleResponse = useCallback(async (response: 'again' | 'hard' | 'good' | 'easy') => {
+  const handleResponse = useCallback(async (response: 'again' | 'hard' | 'easy') => {
     if (!currentItem) return;
     
     const responseTime = Date.now() - responseStartTime.current;
     
-    // 记录响应时间
+    // 记录响应时间 - 安全处理
+    const currentTimes = Array.isArray(responseTimesRef.current) ? responseTimesRef.current : [];
     responseTimesRef.current = [
-      ...responseTimesRef.current.slice(-49), // 保持最近50次记录
+      ...currentTimes.slice(-49), // 保持最近50次记录
       responseTime
     ];
     

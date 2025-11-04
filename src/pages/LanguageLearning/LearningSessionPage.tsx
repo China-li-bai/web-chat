@@ -40,6 +40,7 @@ const LearningSessionPage: React.FC = () => {
     setQuestionMode,
     advanceToNext,
     showSummary,
+    summaryCounts,
     summaryItems,
     summaryStats,
     isLoading,

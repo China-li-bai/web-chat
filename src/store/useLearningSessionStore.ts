@@ -81,7 +81,7 @@ interface LearningSessionActions {
   updateSegmentPolicy: (accuracy: number) => void;
   
   // 统计更新
-  updateSessionStats: (response: 'again' | 'hard' | 'good' | 'easy') => void;
+  updateSessionStats: (response: 'again' | 'hard' | 'easy') => void;
   updateRolling: (isCorrect: boolean) => void;
   addSummaryItem: (item: SummaryItem) => void;
   setSummaryStats: (stats: SummaryStats | null) => void;
@@ -222,7 +222,7 @@ export const useLearningSessionStore = create<LearningSessionStore>((set, get) =
   
   // 统计更新
   updateSessionStats: (response) => {
-    const isCorrect = response === 'good' || response === 'easy';
+    const isCorrect = response === 'easy';
     set((state) => ({
       sessionStats: {
         ...state.sessionStats,
@@ -237,7 +237,7 @@ export const useLearningSessionStore = create<LearningSessionStore>((set, get) =
     // 更新 summary counts
     set((state) => ({
       summaryCounts: {
-        mastered: state.summaryCounts.mastered + (response === 'good' || response === 'easy' ? 1 : 0),
+        mastered: state.summaryCounts.mastered + (response === 'easy' ? 1 : 0),
         shaky: state.summaryCounts.shaky + (response === 'hard' ? 1 : 0),
         forgotten: state.summaryCounts.forgotten + (response === 'again' ? 1 : 0)
       }
