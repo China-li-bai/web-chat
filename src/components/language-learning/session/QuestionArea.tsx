@@ -8,6 +8,8 @@ interface QuestionAreaProps {
   onFlip: () => void;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
+  currentItemIndex: number;
+  segmentQueueLength: number;
 }
 
 export const QuestionArea: React.FC<QuestionAreaProps> = ({
@@ -16,7 +18,9 @@ export const QuestionArea: React.FC<QuestionAreaProps> = ({
   isFlipped,
   onFlip,
   onSwipeLeft,
-  onSwipeRight
+  onSwipeRight,
+  currentItemIndex,
+  segmentQueueLength
 }) => {
   // 提取单词 - 乔布斯式极简，只取核心
   const word = useMemo(() => 
@@ -65,45 +69,45 @@ export const QuestionArea: React.FC<QuestionAreaProps> = ({
     }
   };
 
+
   return (
-    <div 
-      className="question-area-jobs"
-      onClick={!isFlipped ? onFlip : undefined}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
-      <div className="card-jobs">
-        {/* 简化的实现：显示/隐藏切换 */}
-        {!isFlipped ? (
-          // 正面：纯净的单词展示
-          <div className="word-front-jobs">
-            <div className="word-main-jobs">{word}</div>
-            <div className="tap-hint-jobs">轻触翻转</div>
-          </div>
-        ) : (
-          // 背面：完整的释义展示
-          <div className="definition-jobs">
-            <div className="word-jobs">{word}</div>
-            <div className="meaning-content">
-              {definition && (
-                <div className="english-definition">
-                  {definition}
-                </div>
-              )}
-              {translation && (
-                <div className="chinese-translation">
-                  {translation}
-                </div>
-              )}
-              {!definition && !translation && (
-                <div className="no-definition">暂无释义</div>
-              )}
+    
+      <div 
+        className="question-area-jobs"
+        onClick={!isFlipped ? onFlip : undefined}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div className="card-jobs">
+          {/* 简化的实现：显示/隐藏切换 */}
+          {!isFlipped ? (
+            // 正面：纯净的单词展示
+            <div className="word-front-jobs">
+              <div className="word-main-jobs">{word}</div>
+              <div className="tap-hint-jobs">轻触翻转</div>
             </div>
-          </div>
-        )}
+          ) : (
+            // 背面：完整的释义展示
+            <div className="definition-jobs">
+              <div className="word-jobs">{word}</div>
+              <div className="meaning-content">
+                {definition && (
+                  <div className="english-definition">
+                    {definition}
+                  </div>
+                )}
+                {translation && (
+                  <div className="chinese-translation">
+                    {translation}
+                  </div>
+                )}
+                {!definition && !translation && (
+                  <div className="no-definition">暂无释义</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-      
-      {/* 乔布斯式极简：完全去掉多余提示 */}
-    </div>
   );
 };

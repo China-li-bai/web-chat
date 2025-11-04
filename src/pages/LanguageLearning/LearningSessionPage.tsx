@@ -183,17 +183,16 @@ const LearningSessionPage: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="learning-session-container">
-        {/* 乔布斯式极简Header */}
-        <SessionHeader 
+       
+        {/* 主要内容区域 */}
+        <main className="session-main">
+           {/* 乔布斯式极简Header */}
+          <SessionHeader 
           wordbookId={wordbookId || ''} 
           onBack={() => navigate('/language-learning')}
           currentItemIndex={currentItemIndex}
           segmentQueueLength={segmentQueue.length}
         />
-
-        {/* 主要内容区域 */}
-        <main className="session-main">
           {/* 问题显示区域 */}
           <QuestionArea
             currentItem={currentItem}
@@ -202,6 +201,8 @@ const LearningSessionPage: React.FC = () => {
             onFlip={sessionHandlers.handleFlip}
             onSwipeLeft={() => isFlipped && sessionHandlers.handleResponse('hard')}
             onSwipeRight={() => isFlipped && sessionHandlers.handleResponse('easy')}
+            currentItemIndex={currentItemIndex}
+            segmentQueueLength={segmentQueue.length}
           />
 
           {/* 响应控制区域 */}
@@ -239,7 +240,6 @@ const LearningSessionPage: React.FC = () => {
             }}
           />
         )}
-      </div>
     </ErrorBoundary>
   );
 };
