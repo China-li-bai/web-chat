@@ -87,6 +87,93 @@ Key tables and relationships:
 4. Progress saved to learning_progress table
 5. Statistics updated for dashboard display
 
+## Learning Data Recording System
+
+### Real-time Progress Tracking
+每次学习单词时，系统执行原子事务更新数据库：
+
+```sql
+-- 更新学习进度
+UPDATE learning_progress
+SET 
+  stability = ?,           -- 记忆稳定性
+  retrievability = ?,      -- 可提取性 
+  difficulty = ?,          -- 难度系数
+  nextReview = ?,          -- 下次复习时间
+  lastReview = ?,          -- 最后复习时间
+  state = ?,               -- 学习状态
+  reviewCount = reviewCount + 1
+WHERE wordId = ? AND userId = ?
+
+-- 记录学习日志
+INSERT INTO study_logs
+(itemId, userId, timestamp, response, responseTime, confidence, 
+ previousStability, previousRetrievability, newStability, newRetrievability)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+```
+
+### Progress Evaluation Metrics
+- **即时正确率**: `(正确数/总数) × 100%`
+- **响应时间**: 平均反应速度，反映熟练程度
+- **预计保持率**: 基于正确率和响应时间计算的记忆保持概率
+- **认知负荷**: 反映学习难度的认知压力指数
+- **掌握度分布**: mastered/shaky/forgotten 分类统计
+
+### Learning Session Assessment
+学习段落后自动生成详细报告：
+- 段落实时统计：完成数/总数/正确率
+- 预计保持率：基于FSRS算法的记忆预测
+- 认知负荷：学习压力和难度评估
+- 个性化建议：根据表现调整学习策略
+
+### Long-term Analytics
+数据用于长期趋势分析：
+- **学习热力图**: 显示每日学习量
+- **正确率趋势**: 历史表现变化
+- **响应时间统计**: 熟练度提升轨迹
+- **词书掌握度**: 相对总词汇量的掌握比例
+
+### Database Schema Details
+
+#### learning_progress 表结构
+```sql
+- wordId: 单词ID
+- userId: 用户ID
+- stability: 记忆稳定性 (0-1)
+- retrievability: 可提取性 (0-1)
+- difficulty: 难度系数 (0-1)
+- nextReview: 下次复习时间 (FSRS计算)
+- lastReview: 最后复习时间
+- state: 学习状态 (new/learning/review/relearning)
+- reviewCount: 复习次数
+- lapseCount: 遗忘次数
+```
+
+#### study_logs 表结构
+```sql
+- itemId: 学习项目ID
+- userId: 用户ID
+- timestamp: 学习时间戳
+- response: 学习响应 (again/hard/easy)
+- responseTime: 响应时间(毫秒)
+- confidence: 置信度
+- previousStability: 更新前稳定性
+- previousRetrievability: 更新前可提取性
+- newStability: 更新后稳定性
+- newRetrievability: 更新后可提取性
+```
+
+### Assessment Standards
+- **优秀**: 正确率 > 85%，响应时间 < 3秒
+- **良好**: 正确率 70-85%，响应时间 3-5秒  
+- **需改进**: 正确率 < 70%，响应时间 > 5秒
+
+### Key Learning Services
+- `learningService.ts`: 核心学习逻辑和数据持久化
+- `statsService.ts`: 长期统计数据和分析
+- `SessionSummaryModal.tsx`: 学习后效果展示
+- `StatisticsPage.tsx`: 长期学习趋势分析
+
 ## Important File Locations
 
 - Database service: `src/services/db.ts`
