@@ -36,6 +36,7 @@ const LearningSessionPage: React.FC = () => {
     setIsFlipped,
     setShowSummary,
     updateSessionStats,
+    calculateAndSetSummaryStats,
     addResponseTime,
     setQuestionMode,
     advanceToNext,
@@ -120,6 +121,9 @@ const LearningSessionPage: React.FC = () => {
         const accuracy = localTotal > 0 ? Math.round((localCorrect / localTotal) * 100) : 0;
         
         message.success(`段落完成! ${localCorrect}/${localTotal} 正确 (${accuracy}%)`);
+        
+        // 计算并设置会话统计
+        calculateAndSetSummaryStats();
         setShowSummary(true);
       }
     }

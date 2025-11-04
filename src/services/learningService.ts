@@ -524,24 +524,19 @@ export async function processStudyResponse(
   responseTime: number,
   userId: string
 ) {
-  // Ensure session has a valid startTime
-  if (!session.startTime) {
-    session.startTime = new Date();
-  }
-  
   const manager = (session as any).manager as MemoryLearningManager;
   if (!manager) {
     throw new Error('MemoryLearningManager instance not found in the session.');
   }
 
-  // A simple mapping from response to confidence
+  // 简化置信度映射
   const confidenceMap = { again: 0.2, hard: 0.5, good: 0.8, easy: 0.95 };
   const confidence = confidenceMap[response];
 
   const wordId = Number(itemId);
   const db = await getDB();
 
-  // Get current progress for logging
+  // 获取当前进度（仅用于日志记录）
   const currentProgress = await db.exec({
     sql: 'SELECT stability, retrievability FROM learning_progress WHERE wordId = ? AND userId = ?',
     args: [wordId, userId],
@@ -549,51 +544,63 @@ export async function processStudyResponse(
   const previousStability = (currentProgress[0]?.stability as number) || 0;
   const previousRetrievability = (currentProgress[0]?.retrievability as number) || 1;
 
-  const result = await manager.processStudyResponse(
-    session,
-    itemId,
-    response,
-    responseTime,
-    confidence
-  );
-
+  // 处理学习响应
+  const result = await manager.processStudyResponse(session, itemId, response, responseTime, confidence);
   const ms = result.updatedMemoryStrength as any;
 
-  // 使用 FSRS 返回的标准字段
-  const nextReview: Date | undefined = ms?.nextReview;
-  const stability = ms?.stability ?? 0; // Default to 0 if null/undefined
-  const retrievability = ms?.retrievability ?? 1; // Default to 1 if null/undefined
-  const difficulty = ms?.difficulty ?? 0.5; // Default to 0.5 if null/undefined
-  const state = ms?.state ?? 'new'; // 如果没有状态，保持原有默认
+  // 简化的字段提取
+  const nextReview = ms?.nextReview;
+  const stability = ms?.stability ?? 0;
+  const retrievability = ms?.retrievability ?? 1;
+  const difficulty = ms?.difficulty ?? 0.5;
+  const state = ms?.state ?? 'new';
 
-  // 1. Update the learning_progress table
+  // 批量数据库更新（原子操作）
   await db.exec({
-    sql: `
-      UPDATE learning_progress
-      SET
-        stability = ?,
-        retrievability = ?,
-        difficulty = ?,
-        nextReview = ?,
-        lastReview = ?,
-        state = ?,
-        reviewCount = reviewCount + 1
-      WHERE wordId = ? AND userId = ?
-    `,
-    args: [stability, retrievability, difficulty, nextReview ? nextReview.toISOString() : new Date().toISOString(), new Date().toISOString(), state, wordId, userId],
+    sql: 'BEGIN TRANSACTION',
+    args: []
   });
 
-  // 2. Insert a new record into study_logs
-  await db.exec({
-    sql: `
-      INSERT INTO study_logs
-      (itemId, userId, timestamp, response, responseTime, confidence, previousStability, previousRetrievability, newStability, newRetrievability)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    args: [wordId, userId, new Date().toISOString(), response, responseTime, confidence, previousStability || 0, previousRetrievability || 1, stability, retrievability],
-  });
-  // 3. Update long-term learning statistics
-  await updateLearningStatistics(userId, wordId, response, responseTime, stability, retrievability);
+  try {
+    // 1. 更新学习进度
+    await db.exec({
+      sql: `
+        UPDATE learning_progress
+        SET stability = ?, retrievability = ?, difficulty = ?, nextReview = ?, 
+            lastReview = ?, state = ?, reviewCount = reviewCount + 1
+        WHERE wordId = ? AND userId = ?
+      `,
+      args: [stability, retrievability, difficulty, 
+             nextReview ? nextReview.toISOString() : new Date().toISOString(), 
+             new Date().toISOString(), state, wordId, userId],
+    });
+
+    // 2. 插入学习日志
+    await db.exec({
+      sql: `
+        INSERT INTO study_logs
+        (itemId, userId, timestamp, response, responseTime, confidence, 
+         previousStability, previousRetrievability, newStability, newRetrievability)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      args: [wordId, userId, new Date().toISOString(), response, responseTime, confidence,
+             previousStability || 0, previousRetrievability || 1, stability, retrievability],
+    });
+
+    // 3. 更新统计数据
+    await updateLearningStatistics(userId, wordId, response, responseTime, stability, retrievability);
+
+    await db.exec({
+      sql: 'COMMIT',
+      args: []
+    });
+  } catch (error) {
+    await db.exec({
+      sql: 'ROLLBACK',
+      args: []
+    });
+    throw error;
+  }
 
   return result;
 }

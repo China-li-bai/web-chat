@@ -85,6 +85,7 @@ interface LearningSessionActions {
   updateRolling: (isCorrect: boolean) => void;
   addSummaryItem: (item: SummaryItem) => void;
   setSummaryStats: (stats: SummaryStats | null) => void;
+  calculateAndSetSummaryStats: () => void;
   addResponseTime: (time: number) => void;
   
   // UI控制
@@ -242,6 +243,49 @@ export const useLearningSessionStore = create<LearningSessionStore>((set, get) =
         forgotten: state.summaryCounts.forgotten + (response === 'again' ? 1 : 0)
       }
     }));
+  },
+
+  // 计算并设置会话总结统计
+  setSummaryStats: (stats) => {
+    set({ summaryStats: stats });
+  },
+
+  // 会话结束时的统计计算
+  calculateAndSetSummaryStats: () => {
+    const { sessionStats, summaryCounts, responseTimesRef } = get();
+    
+    // 计算预计保持率：基于正确率和响应时间
+    const accuracy = sessionStats.total > 0 ? sessionStats.correct / sessionStats.total : 0;
+    const avgResponseTime = responseTimesRef.length > 0 
+      ? responseTimesRef.reduce((sum, time) => sum + time, 0) / responseTimesRef.length 
+      : 3000; // 默认3秒
+    
+    // 响应时间影响因子（3秒为基准）
+    const responseTimeFactor = Math.max(0.5, Math.min(1.5, 3000 / avgResponseTime));
+    
+    // 综合保持率估算
+    const estimatedRetention = Math.min(0.95, Math.max(0.1, 
+      accuracy * 0.7 + (accuracy * responseTimeFactor * 0.3)
+    ));
+    
+    // 计算认知负荷：基于错误率和响应时间方差
+    const errorRate = 1 - accuracy;
+    const responseVariance = responseTimesRef.length > 1 
+      ? responseTimesRef.reduce((sum, time) => sum + Math.pow(time - avgResponseTime, 2), 0) / responseTimesRef.length
+      : 0;
+    const responseCoefficient = Math.sqrt(responseVariance) / avgResponseTime;
+    
+    // 认知负荷：0-1之间，0.7为理想值
+    const cognitiveLoad = Math.min(1.0, Math.max(0.1,
+      0.5 + (errorRate * 0.3) + (responseCoefficient * 0.2)
+    ));
+    
+    set({
+      summaryStats: {
+        estimatedRetention,
+        cognitiveLoad
+      }
+    });
   },
   
   updateRolling: (isCorrect) => {
