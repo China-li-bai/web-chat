@@ -6,6 +6,7 @@ import { SessionHeader } from '@/components/language-learning/session/SessionHea
 import { QuestionArea } from '@/components/language-learning/session/QuestionArea';
 import { ResponseControls } from '@/components/language-learning/session/ResponseControls';
 import { SessionSummaryModal } from '@/components/language-learning/SessionSummaryModal';
+import ImmediateFeedback, { useImmediateFeedback } from '@/components/language-learning/ImmediateFeedback';
 import { useLearningSessionStore } from '@/store/useLearningSessionStore';
 import { useAppStore } from '@/store/useAppStore';
 import { processStudyResponse } from '@/services/learningService';
@@ -51,6 +52,9 @@ const LearningSessionPage: React.FC = () => {
   // 初始化会话
   useSessionState({ wordbookId });
 
+  // 沉浸式体验hooks
+  const { feedbackTrigger, triggerFeedback, clearFeedback } = useImmediateFeedback();
+
   // 响应开始时间追踪
   const responseStartTime = useRef<number>(0);
 
@@ -77,7 +81,17 @@ const LearningSessionPage: React.FC = () => {
     currentItem,
     responseStartTime,
     responseTimesRef,
-    setIsFlipped,
+    setIsFlipped: (flipped: boolean) => {
+      setIsFlipped(flipped);
+      if (flipped) {
+        // 翻转时触发反馈
+        triggerFeedback({ 
+          type: 'reveal', 
+          duration: 400, 
+          haptic: true 
+        });
+      }
+    },
     onResponse: async (response: 'again' | 'hard' | 'easy') => {
       if (!session || !currentItem) {
         message.error('无法处理响应：会话或当前项目未加载');
@@ -86,6 +100,15 @@ const LearningSessionPage: React.FC = () => {
 
       const responseTime = Date.now() - responseStartTime.current;
       const isCorrect = response === 'easy';
+
+      // 立即触发反馈
+      triggerFeedback({
+        type: isCorrect ? 'success' : 'retry',
+        duration: isCorrect ? 800 : 600,
+        haptic: true,
+        sound: true,
+        intensity: isCorrect ? 'light' : 'medium'
+      });
 
       // 添加响应时间
       addResponseTime(responseTime);
@@ -115,6 +138,15 @@ const LearningSessionPage: React.FC = () => {
       if (currentItemIndex < segmentQueue.length - 1) {
         advanceToNext();
       } else {
+        // 会话完成 - 触发庆祝动画
+        triggerFeedback({
+          type: 'session-complete',
+          duration: 2000,
+          haptic: true,
+          sound: true,
+          intensity: 'strong'
+        });
+
         // 段落到下一段或结束会话
         const localTotal = sessionStats.total + 1;
         const localCorrect = sessionStats.correct + (isCorrect ? 1 : 0);
@@ -124,7 +156,11 @@ const LearningSessionPage: React.FC = () => {
         
         // 计算并设置会话统计
         calculateAndSetSummaryStats();
-        setShowSummary(true);
+        
+        // 延迟显示总结，让庆祝动画播放完
+        setTimeout(() => {
+          setShowSummary(true);
+        }, 1500);
       }
     }
   });
@@ -183,11 +219,16 @@ const LearningSessionPage: React.FC = () => {
 
   return (
     <ErrorBoundary>
+      {/* 即时反馈层 */}
+      <ImmediateFeedback 
+        trigger={feedbackTrigger}
+        onComplete={clearFeedback}
+      />
        
-        {/* 主要内容区域 */}
-        <main className="session-main">
-           {/* 乔布斯式极简Header */}
-          <SessionHeader 
+      {/* 主要内容区域 */}
+      <main className="session-main">        
+        {/* 乔布斯式极简Header */}
+        <SessionHeader 
           wordbookId={wordbookId || ''} 
           onBack={() => navigate('/language-learning')}
           currentItemIndex={currentItemIndex}

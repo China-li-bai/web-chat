@@ -14,8 +14,7 @@ import LearningSessionPage from './pages/LanguageLearning/LearningSessionPage';
 import StatisticsPage from './pages/LanguageLearning/StatisticsPage';
 import TodayPlanPage from './pages/TodayPlan/today-plan-page';
 import ReviewPlannerPage from './pages/ReviewPlanner/review-planner-page';
-import MarketingCopilot from './pages/MarketingCopilot';
-import AIContentCreator from './components/AIContentCreator';
+import ParticleTest from './pages/ParticleTest';
 
 import './styles/App.css';
 
@@ -142,8 +141,7 @@ const RouterProvider = () => {
       <Route path="/review-planner" element={<ReviewPlannerPage />} />
       <Route path="/progress" element={<Progress />} />
       <Route path="/settings" element={<Settings />} />
-      <Route path="/marketing-copilot" element={<MarketingCopilot />} />
-      <Route path="/ai-content-creator" element={<AIContentCreator />} />
+      <Route path="/particle-test" element={<ParticleTest />} />
     </Routes>
   );
 };
