@@ -50,13 +50,19 @@
   --transition-slow: 0.35s ease;
 }
 
-/* 基础容器 */
+/* 基础容器 - 移动端一屏显示优化 */
 .learning-session-container {
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   background: var(--bg-secondary);
   display: flex;
   flex-direction: column;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  top: 0;
+  left: 0;
 }
 
 /* 加载状态 */
@@ -85,10 +91,10 @@
   100% { transform: rotate(360deg); }
 }
 
-/* 乔布斯式Header - 极简主义设计 */
+/* 乔布斯式Header - 移动端紧凑设计 */
 .session-header-jobs {
   background: var(--bg-primary);
-  padding: var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
   align-items: center;
@@ -97,6 +103,9 @@
   margin: 0 auto;
   position: relative;
   z-index: 100;
+  height: 60px;
+  min-height: 60px;
+  box-sizing: border-box;
 }
 
 /* 返回按钮 - 乔布斯式优雅 */
@@ -146,20 +155,21 @@
   letter-spacing: 0.5px;
 }
 
-/* 乔布斯式主内容区域 - 纯净优雅 */
+/* 乔布斯式主内容区域 - 移动端一屏显示优化 */
 .session-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: var(--spacing-xl) var(--spacing-md);
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-sm);
   max-width: 500px;
   margin: 0 auto;
   width: 100%;
-  gap: var(--spacing-xl);
-  min-height: calc(100vh - 120px); /* 确保垂直居中 */
+  height: calc(100vh - 60px); /* 减去60px Header高度 */
+  overflow: hidden;
   position: relative;
+  box-sizing: border-box;
 }
 
 /* 深色模式支持 */
@@ -169,23 +179,27 @@
   }
 }
 
-/* 乔布斯式QuestionArea - 极简优雅 */
+/* 乔布斯式QuestionArea - 移动端一屏显示优化 */
 .question-area-jobs {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-xl);
+  justify-content: center;
+  gap: var(--spacing-md);
   max-width: 500px;
   margin: 0 auto;
+  flex: 1;
+  max-height: 60vh;
 }
 
-/* 卡片容器 - 3D翻转效果 */
+/* 卡片容器 - 移动端紧凑设计 */
 .card-jobs {
   perspective: 1200px;
   width: 100%;
-  max-width: 400px;
-  height: 350px;
+  max-width: 320px;
+  height: 200px;
+  margin: 0 auto;
 }
 
 .card-face-jobs {
@@ -209,22 +223,22 @@
   transform: rotateY(180deg);
 }
 
-/* 正面：纯净的单词展示 */
+/* 正面：移动端紧凑单词展示 */
 .word-front-jobs {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--spacing-xl);
+  padding: var(--spacing-md);
   height: 100%;
 }
 
 .word-main-jobs {
-  font-size: 3rem;
+  font-size: 1.75rem;
   font-weight: 300;
   color: #1d1d1f;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
   letter-spacing: -0.02em;
   line-height: 1.1;
@@ -237,31 +251,31 @@
   letter-spacing: 0.5px;
 }
 
-/* 背面：纯净的定义展示 */
+/* 背面：移动端紧凑定义展示 */
 .definition-jobs {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--spacing-xl);
+  padding: var(--spacing-md);
   height: 100%;
 }
 
 .word-jobs {
-  font-size: 2rem;
+  font-size: 1.25rem;
   font-weight: 400;
   color: #1d1d1f;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
 }
 
 .meaning-jobs {
-  font-size: 1.125rem;
+  font-size: 0.9rem;
   font-weight: 400;
   color: #424245;
-  line-height: 1.5;
-  max-width: 90%;
+  line-height: 1.4;
+  max-width: 95%;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
 }
 
@@ -332,50 +346,42 @@
   }
 }
 
-/* 翻转控制 */
+/* 翻转控制 - 乔布斯式极简提示 */
 .flip-controls {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   width: 100%;
 }
 
-.flip-button {
+.flip-hint-message {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-sm);
-  background: var(--primary-color);
-  color: white;
-  border: none;
+  padding: var(--spacing-md);
+  background: rgba(24, 144, 255, 0.05);
   border-radius: var(--radius-large);
-  padding: var(--spacing-xl);
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  box-shadow: var(--shadow-medium);
-  width: 100%;
-  max-width: 200px;
+  border: 1px solid rgba(24, 144, 255, 0.1);
 }
 
-.flip-button:hover {
-  background: #40a9ff;
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-large);
+.hint-icon {
+  font-size: 1.5rem;
+  opacity: 0.8;
 }
 
-.flip-icon {
-  font-size: var(--font-size-xxl);
-  font-weight: 300;
-}
-
-.flip-text {
-  font-size: var(--font-size-lg);
-  font-weight: 500;
-}
-
-.flip-hint {
+.hint-text {
   font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.hint-subtext {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  text-align: center;
   opacity: 0.8;
 }
 
@@ -403,34 +409,35 @@
   font-size: var(--font-size-xs);
 }
 
-/* 响应控制 */
+/* 响应控制 - 移动端紧凑设计 */
 .response-controls {
   width: 100%;
   max-width: 400px;
+  margin-top: var(--spacing-sm);
 }
 
 .controls-header {
   text-align: center;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
 }
 
 .controls-title {
   margin: 0 0 var(--spacing-xs) 0;
   color: var(--text-primary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-md);
 }
 
 .controls-subtitle {
   margin: 0;
   color: var(--text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
 }
 
 .response-buttons {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
 }
 
 .response-button {
@@ -439,10 +446,11 @@
   align-items: center;
   border: 2px solid;
   border-radius: var(--radius-large);
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
   cursor: pointer;
   transition: all var(--transition-fast);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-sm);
+  min-height: 48px; /* 移动端最小触摸区域 */
 }
 
 .response-button:hover {
@@ -467,7 +475,8 @@
 
 .button-label {
   font-weight: 600;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
+  font-size: var(--font-size-sm);
 }
 
 .button-description {
@@ -477,40 +486,106 @@
 
 .button-keys {
   display: flex;
-  gap: var(--spacing-xs);
+  gap: 2px;
 }
 
 .key-hint {
-  padding: 2px 6px;
+  padding: 1px 4px;
   border: 1px solid;
   border-radius: var(--radius-small);
   font-family: monospace;
-  font-size: var(--font-size-xs);
+  font-size: 10px;
   background: rgba(255, 255, 255, 0.8);
 }
 
-/* 帮助说明 */
+/* 帮助说明 - 移动端简化 */
 .response-help {
   background: var(--bg-secondary);
   border-radius: var(--radius-large);
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
 }
 
 .help-title {
-  margin: 0 0 var(--spacing-sm) 0;
-  font-size: var(--font-size-md);
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: var(--font-size-sm);
   color: var(--text-primary);
 }
 
 .help-list {
   margin: 0;
-  padding-left: var(--spacing-lg);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+  padding-left: var(--spacing-md);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
 }
 
 .help-list li {
-  margin-bottom: var(--spacing-xs);
+  margin-bottom: 2px;
+}
+
+/* 响应式设计 - 移动端优先 */
+@media (max-width: 480px) {
+  .session-header-jobs {
+    padding: var(--spacing-md) var(--spacing-sm);
+    min-height: 60px;
+  }
+  
+  .back-button-jobs {
+    padding: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+  }
+  
+  .progress-text-jobs {
+    font-size: var(--font-size-md);
+  }
+  
+  .card-jobs {
+    max-width: 280px;
+    height: 180px;
+  }
+  
+  .word-main-jobs {
+    font-size: 1.5rem;
+  }
+  
+  .word-jobs {
+    font-size: 1.1rem;
+  }
+  
+  .meaning-jobs {
+    font-size: 0.85rem;
+  }
+  
+  .response-button {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    min-height: 44px;
+  }
+  
+  .button-label {
+    font-size: var(--font-size-xs);
+  }
+  
+  .button-description {
+    font-size: 10px;
+  }
+  
+  .flip-hint-message {
+    padding: var(--spacing-sm);
+    gap: var(--spacing-xs);
+  }
+  
+  .hint-icon {
+    font-size: 1.25rem;
+  }
+  
+  .hint-text {
+    font-size: var(--font-size-xs);
+  }
+  
+  .hint-subtext {
+    font-size: 10px;
+  }
 }
 
 /* 乔布斯式响应式设计 - 简洁优雅 */

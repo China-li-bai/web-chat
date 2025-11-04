@@ -2,13 +2,11 @@ import React from 'react';
 
 interface ResponseControlsProps {
   isFlipped: boolean;
-  onFlip: () => void;
   onResponse: (response: 'again' | 'hard' | 'easy') => void;
 }
 
 export const ResponseControls: React.FC<ResponseControlsProps> = ({
   isFlipped,
-  onFlip,
   onResponse
 }) => {
   // 响应按钮配置 - 乔布斯式极简设计
@@ -40,28 +38,21 @@ export const ResponseControls: React.FC<ResponseControlsProps> = ({
   ] as const;
 
   if (!isFlipped) {
-    // 显示翻转按钮
+    // 乔布斯式极简：显示提示而不是冗余按钮
     return (
       <div className="flip-controls">
-        <button 
-          className="flip-button"
-          onClick={onFlip}
-          aria-label="翻转卡片查看答案"
-        >
-          <div className="flip-icon">↻</div>
-          <div className="flip-text">点击翻转</div>
-          <div className="flip-hint">或按空格键</div>
-        </button>
+        {/* 极简提示信息 */}
+        <div className="flip-hint-message">
+          <div className="hint-icon">👆</div>
+          <div className="hint-text">轻触上方卡片翻转</div>
+          <div className="hint-subtext">或按空格键翻转</div>
+        </div>
         
         {/* 键盘快捷键提示 */}
         <div className="keyboard-hints">
           <div className="hint-row">
-            <span className="hint-key">空格</span>
-            <span className="hint-action">翻转</span>
-          </div>
-          <div className="hint-row">
             <span className="hint-keys">1 2 3</span>
-            <span className="hint-action">直接响应</span>
+            <span className="hint-action">翻转后可快速响应</span>
           </div>
         </div>
       </div>

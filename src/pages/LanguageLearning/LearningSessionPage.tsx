@@ -207,7 +207,6 @@ const LearningSessionPage: React.FC = () => {
           {/* 响应控制区域 */}
           <ResponseControls
             isFlipped={isFlipped}
-            onFlip={sessionHandlers.handleFlip}
             onResponse={sessionHandlers.handleResponse}
           />
         </main>
