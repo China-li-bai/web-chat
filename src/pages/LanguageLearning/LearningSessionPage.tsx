@@ -11,7 +11,6 @@ import ImmediateFeedback, {
 } from "@/components/language-learning/ImmediateFeedback";
 import { useLearningSessionStore } from "@/store/useLearningSessionStore";
 import { useAppStore } from "@/store/useAppStore";
-import { processStudyResponse } from "@/services/learningService";
 import { useSessionState } from "@/hooks/useSessionState";
 import { useSessionHandlers } from "@/hooks/useSessionHandlers";
 import { useSessionKeyboardShortcuts } from "@/hooks/useSessionKeyboardShortcuts";

@@ -233,34 +233,60 @@ const ImmediateFeedback: React.FC<ImmediateFeedbackProps> = ({
 
     switch (type) {
       case 'success':
-        // 金色星星爆炸效果
-        for (let i = 0; i < 20; i++) {
+        // 金色星星爆炸效果 - 增加粒子数量
+        for (let i = 0; i < 35; i++) {
           particlesRef.current.push(new StarParticle(centerX, centerY, {
-            spread: 8,
-            upward: 3,
+            spread: 12,
+            upward: 4,
             life: 80 + Math.random() * 40,
-            size: Math.random() * 3 + 2
+            size: Math.random() * 4 + 3
           }));
         }
+        // 添加额外的星星效果
+        setTimeout(() => {
+          for (let i = 0; i < 15; i++) {
+            particlesRef.current.push(new StarParticle(centerX + (Math.random() - 0.5) * 200, centerY + (Math.random() - 0.5) * 200, {
+              spread: 8,
+              upward: 3,
+              life: 60 + Math.random() * 30,
+              size: Math.random() * 3 + 2
+            }));
+          }
+        }, 200);
         break;
 
       case 'retry':
-        // 橙色粒子旋转效果
-        for (let i = 0; i < 15; i++) {
-          const angle = (i / 15) * Math.PI * 2;
-          const distance = 30 + Math.random() * 20;
+        // 橙色粒子旋转效果 - 增加粒子数量
+        for (let i = 0; i < 25; i++) {
+          const angle = (i / 25) * Math.PI * 2;
+          const distance = 20 + Math.random() * 40;
           particlesRef.current.push(new Particle(
             centerX + Math.cos(angle) * distance,
             centerY + Math.sin(angle) * distance,
             {
-              spread: 4,
-              upward: 1,
-              life: 60,
-              size: Math.random() * 3 + 1,
+              spread: 6,
+              upward: 2,
+              life: 80,
+              size: Math.random() * 4 + 2,
               color: '#FF8C00',
-              gravity: 0.05
+              gravity: 0.08
             }
           ));
+        }
+        // 添加旋转效果粒子
+        for (let i = 0; i < 15; i++) {
+          particlesRef.current.push(new Particle(centerX, centerY, {
+            spread: 0,
+            upward: 0,
+            life: 60,
+            size: Math.random() * 3 + 1,
+            color: '#FFA500',
+            gravity: 0.1
+          }));
+          const particle = particlesRef.current[particlesRef.current.length - 1];
+          const angle = (i / 15) * Math.PI * 2;
+          particle.vx = Math.cos(angle) * 4;
+          particle.vy = Math.sin(angle) * 4;
         }
         break;
 
@@ -421,7 +447,7 @@ const ImmediateFeedback: React.FC<ImmediateFeedbackProps> = ({
           width: '100vw',
           height: '100vh',
           pointerEvents: 'none',
-          zIndex: 9999,
+          zIndex: 10002,
           display: isActive ? 'block' : 'none'
         }}
       />

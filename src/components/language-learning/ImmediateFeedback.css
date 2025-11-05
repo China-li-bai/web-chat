@@ -8,13 +8,15 @@
   right: 0;
   bottom: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 10000;
   overflow: hidden;
 }
 
 .particle-canvas {
   display: block;
   background: transparent;
+  z-index: 10001;
+  position: relative;
 }
 
 /* 高性能优化 */
