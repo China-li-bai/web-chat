@@ -15,6 +15,9 @@ import StatisticsPage from './pages/LanguageLearning/StatisticsPage';
 import TodayPlanPage from './pages/TodayPlan/today-plan-page';
 import ReviewPlannerPage from './pages/ReviewPlanner/review-planner-page';
 import ParticleTest from './pages/ParticleTest';
+// 游戏化学习路由
+import GameHomePage from './pages/LanguageLearning/GameHomePage';
+import GamePlayPage from './pages/LanguageLearning/GamePlayPage';
 
 import './styles/App.css';
 
@@ -142,6 +145,9 @@ const RouterProvider = () => {
       <Route path="/progress" element={<Progress />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/particle-test" element={<ParticleTest />} />
+      {/* 游戏化学习路由 */}
+      <Route path="/game" element={<GameHomePage />} />
+      <Route path="/game/play" element={<GamePlayPage />} />
     </Routes>
   );
 };
