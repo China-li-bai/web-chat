@@ -6,6 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AI口語練習產品 - 基於Tauri的跨平台應用，支持語音識別、發音評分和間隔重複學習算法。
 
+### 🎮 Game-Based Learning System (最新集成)
+- **GamePlayPage.tsx**: 遊戲化單詞學習頁面 (route: `/game/play`)
+  - 單詞選擇題遊戲 (英單 → 中翻)
+  - 即時Canvas粒子反饋系統
+  - 多難度級別：easy/medium/hard/expert
+  - 計時挑戰與得分系統
+  - FSRS學習數據實時同步
+- **Canvas Particle Effects**: 即時視覺反饋系統，增強學習體驗
+  - ✅ 成功答題：金色星星爆炸效果 (35粒子 + 15二次爆發)
+  - ✅ 答錯重試：橙色旋轉粒子效果 (25粒子 + 15中心粒子)
+  - 觸覺反饋 (Device Vibration) 整合
+  - Web Audio API 音效系統
+  - 1500ms最佳用戶體驗持續時間
+- **Unified Learning Architecture**: 遊戲與學習系統完全整合，統一使用learningService.ts
+- **Real-time Learning Analytics**: 即時學習數據記錄與FSRS算法同步
+
 ## Development Commands
 
 ```bash
@@ -23,6 +39,10 @@ npm run test               # Run tests with Vitest
 npm run test:ui            # Run tests with UI
 npm run test:coverage      # Run tests with coverage
 
+# Single test execution
+npm test -- --run src/components/language-learning/ImmediateFeedback.test.tsx  # Run specific test file
+npm test -- --run --reporter=verbose  # Run tests with detailed output
+
 # Backend
 npm run server             # Start backend server
 ```
@@ -34,8 +54,39 @@ npm run server             # Start backend server
 - **State Management**: Zustand with immer middleware
 - **Database**: wa-sqlite (WebAssembly SQLite) for local-first approach
 - **Routing**: React Router DOM 6
+- **🎮 Game System**: Canvas Particle Effects + Game Mechanics
+- **✨ Visual Feedback**: Canvas 2D API + Web Audio API + Device Vibration API
 - **AI Services**: Multiple providers (Gemini, Baidu, iFlytek, Tencent)
 - **Learning Algorithm**: FSRS (Free Spaced Repetition Scheduler) + SuperMemo
+
+## Entry Points & Key Files
+
+- **Main App**: `src/app.jsx` - React app entry point with routing
+- **Game Learning**: `src/pages/LanguageLearning/GamePlayPage.tsx` - 遊戲化學習主入口
+- **Canvas Feedback**: `src/components/language-learning/ImmediateFeedback.tsx` - 粒子反饋系統
+- **Learning Service**: `src/services/learningService.ts` - 統一學習邏輯服務層
+- **Database Service**: `src/services/db.ts` - wa-sqlite數據庫操作
+
+## Common Development Workflows
+
+### Adding New Learning Features
+1. Define types in `src/types/` directory first
+2. Update `learningService.ts` for data operations
+3. Create components in appropriate `src/pages/` or `src/components/` directories
+4. Integrate with FSRS algorithm via `MemoryLearningManager.ts`
+5. Add Canvas feedback if visual response needed
+
+### Adding Game Mechanics
+1. Extend `GamePlayPage.tsx` game state management
+2. Update `useImmediateFeedback` hook for new visual effects
+3. Ensure FSRS data sync via `learningService.ts`
+4. Test on multiple difficulty levels
+
+### Database Schema Changes
+1. Update schema in `db.ts` with migration logic
+2. Generate TypeScript types from schema
+3. Update all related service layer functions
+4. Test with both new and existing data
 
 ## Core Architecture
 
@@ -70,6 +121,15 @@ npm run server             # Start backend server
 - `WordbookManagementPageSimple.tsx` - Simplified wordbook management (route: `/wordbooks`)
 - `LearningSessionPageSimplified.tsx` - 3-button learning interface 
 - `StatisticsPage.tsx` - Learning progress visualization
+- `GamePlayPage.tsx` - 🎮 遊戲化單詞學習頁面 (route: `/game/play`)
+
+### Canvas Particle Feedback System (`src/components/language-learning/`)
+- `ImmediateFeedback.tsx` - 即時視覺反饋系統
+  - 基於Canvas的粒子動效引擎 (StarParticle, FireworkParticle, Particle)
+  - 支援多種反饋類型：success(成功), retry(重試), reveal(翻轉), progress(進度), milestone(里程碑), session-complete(完成)
+  - 觸覺反饋 (Haptic) 和音效反饋 (Audio) 整合
+  - 響應式設計，自動適配設備屏幕尺寸
+- `useImmediateFeedback` Hook - 簡化反饋系統使用
 
 ## Database Schema
 
@@ -178,9 +238,15 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
 - Database service: `src/services/db.ts`
 - Learning algorithm: `src/lib/memo/MemoryLearningManager.ts`
+- **🎮 Game Learning**: `src/pages/LanguageLearning/GamePlayPage.tsx`
+- **✨ Canvas Feedback**: `src/components/language-learning/ImmediateFeedback.tsx`
+- **🔧 Unified Learning Service**: `src/services/learningService.ts` - 遊戲與學習系統統一服務層
 - Main routing: `src/app.jsx`
 - Wordbook management: `src/store/wordbook-simple.ts`
 - FSRS config: `src/config/fsrs-config.ts`
+
+### 🚫 已移除的服務層 (架構優化)
+- ~~`wordbookService.ts`~~ - 已合併至 `learningService.ts`，避免重複功能
 
 ## Development Notes
 
@@ -269,10 +335,38 @@ DEV Community
 
 ## Run & Debug
 
-- 必须首先在项目的 scripts/ 目录下，维护好 Run & Debug 需要用到的全部 .sh 脚本
-- 对于所有 Run & Debug 操作，一律使用 scripts/ 目录下的 .sh 脚本进行启停。永远不要直接使用 npm、pnpm、uv、python 等等命令
-- 如果 .sh 脚本执行失败，无论是 .sh 本身的问题还是其他代码问题，需要先紧急修复。然后仍然坚持用 .sh 脚本进行启停
-- Run & Debug 之前，为所有项目配置 Logger with File Output，并统一输出到 logs/ 目录下
+- **⚠️ REQUIRED**: Maintain all Run & Debug scripts in `scripts/` directory
+- **⚠️ REQUIRED**: Always use `.sh` scripts for all start/stop operations, never run npm/pnpm directly
+- **⚠️ REQUIRED**: Fix any script failures immediately, then continue using .sh scripts
+- **⚠️ REQUIRED**: Configure Logger with File Output to `logs/` directory before debugging
+
+### Development Scripts Setup
+```bash
+# Ensure scripts directory exists with necessary .sh files
+mkdir -p scripts
+# Development server startup
+scripts/dev-start.sh
+# Production build
+scripts/build.sh  
+# Testing execution
+scripts/test.sh
+```
+
+## Quick Reference
+
+### Common Tasks
+- **Start development**: `npm run dev` + `npm run tauri:dev`
+- **Run single test**: `npm test -- --run src/file.test.tsx`
+- **Check TypeScript**: `npm run build` (includes type checking)
+- **View learning data**: Access wa-sqlite database via browser dev tools
+- **Debug Canvas effects**: Check browser console for particle system logs
+
+### Key Dependencies
+- **Tauri**: Cross-platform desktop app framework
+- **wa-sqlite**: WebAssembly SQLite for local-first storage
+- **FSRS**: Free Spaced Repetition Scheduler algorithm
+- **Zustand**: Lightweight state management
+- **Ant Design**: UI component library
 
 
 
@@ -286,3 +380,52 @@ DEV Community
 - 使用@tauri-apps/cli 和 vite cli 进行项目的初始化和打包
 - 项目采用 wa-sqlite 数据库，支持本地存储
 - 开发ts 项目时，先定义好类型，再编写代码，接口类型全部统一存放到项目types文件夹下，避免类型错误
+
+---
+
+## 📝 Recent Updates & Integration Log
+
+### 🎯 Canvas Particle Effects System Integration (最新完成)
+
+**Date**: 2025-11-05  
+**Status**: ✅ COMPLETED
+
+**Key Achievements**:
+1. **GamePlayPage.tsx Canvas Integration**:
+   - ✅ 完整集成 `useImmediateFeedback` hook
+   - ✅ 成功和重試反饋系統全面實現
+   - ✅ 所有狀態頁面統一添加反饋層 (加載、錯誤、遊戲開始、遊戲結束)
+
+2. **Enhanced Visual Effects**:
+   - ✅ 成功答題：35金色星星粒子 + 15二次爆發粒子
+   - ✅ 答錯重試：25橙色旋轉粒子 + 15中心爆炸粒子  
+   - ✅ Canvas z-index 10002確保層級正確
+   - ✅ 1500ms優化用戶體驗持續時間
+
+3. **Architecture Unification**:
+   - ✅ 移除 `wordbookService.ts` 重複功能
+   - ✅ 統一使用 `learningService.ts` 作為唯一服務層
+   - ✅ 遊戲與學習系統數據完全同步
+   - ✅ FSRS學習算法實時記錄
+
+4. **Multi-modal Feedback**:
+   - ✅ 觸覺反饋 (Device Vibration API)
+   - ✅ 音效反饋 (Web Audio API)
+   - ✅ 視覺粒子動效 (Canvas 2D API)
+
+**Technical Verification**:
+- ✅ TypeScript編譯無錯誤
+- ✅ Vite開發服務器啟動成功
+- ✅ 所有導入依賴解析正確
+- ✅ 無破壞性變更向後兼容
+
+**File Structure Updates**:
+- `GamePlayPage.tsx` - 遊戲化學習主頁面 + Canvas反饋系統
+- `ImmediateFeedback.tsx` - 增強型粒子動效引擎
+- `ImmediateFeedback.css` - Z-index衝突修復
+- ~~`wordbookService.ts`~~ - 已移除，合併至 learningService.ts
+
+**Next Steps**:
+- 🎯 測試不同設備上的Canvas粒子性能
+- 🎯 優化低端設備的粒子數量
+- 🎯 添加更多反饋類型的視覺效果
