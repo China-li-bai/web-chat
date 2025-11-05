@@ -2,7 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, Typography, Button, Space, message, Progress } from 'antd';
 import { ArrowLeftOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import type { GameQuestion, GameDifficulty } from '@/types/game';
+import type { GameDifficulty } from '@/types/game';
+import { useAppStore } from '@/store/useAppStore';
+import { createLearningSessionForWordbook, processStudyResponse } from '@/services/learningService';
+import { initializeDatabase, isDatabaseInitialized } from '@/services/dataInitService';
 
 const { Title, Text } = Typography;
 
@@ -20,6 +23,15 @@ interface WordData {
   word: string;
   translation: string;
   definition: string;
+  phonetic?: string;
+  example?: string;
+  learningProgress?: {
+    stability: number;
+    retrievability: number;
+    difficulty: number;
+    state: string;
+    reviewCount: number;
+  };
   options: string[]; // 固定的选项数组
   correctIndex: number; // 正确答案的索引
 }
@@ -27,12 +39,14 @@ interface WordData {
 export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { userId } = useAppStore();
   
   // 接收来自 GameHomePage 的参数
   const gameParams: GameParams = location.state;
   const [loading, setLoading] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // 游戏状态
   const [words, setWords] = useState<WordData[]>([]);
@@ -44,6 +58,7 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
+  const [answerStartTime, setAnswerStartTime] = useState<number | null>(null); // 记录答题开始时间
 
   // 获取难度配置
   const getDifficultyConfig = (difficulty: GameDifficulty) => {
@@ -88,64 +103,133 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
     return options.sort(() => Math.random() - 0.5);
   };
 
+  // 学习会话状态
+  const [learningSession, setLearningSession] = useState<any>(null);
+
   // 加载单词数据
   useEffect(() => {
     const loadWords = async () => {
       if (!gameParams?.wordbookId) {
-        message.error('缺少词书参数');
+        setError('缺少词书参数');
+        navigate('/game');
+        return;
+      }
+
+      if (!userId) {
+        setError('用户未登录');
         navigate('/game');
         return;
       }
 
       try {
         setLoading(true);
-        // 模拟从数据库加载单词数据（实际应该调用 API）
-        const mockWords: WordData[] = [
-          { id: 1, word: 'apple', translation: '苹果', definition: '一种水果' },
-          { id: 2, word: 'book', translation: '书', definition: '阅读材料' },
-          { id: 3, word: 'computer', translation: '计算机', definition: '电子设备' },
-          { id: 4, word: 'water', translation: '水', definition: '生命之源' },
-          { id: 5, word: 'house', translation: '房子', definition: '居住建筑' },
-          { id: 6, word: 'car', translation: '汽车', definition: '交通工具' },
-          { id: 7, word: 'phone', translation: '电话', definition: '通讯设备' },
-          { id: 8, word: 'music', translation: '音乐', definition: '艺术形式' },
-          { id: 9, word: 'food', translation: '食物', definition: '营养来源' },
-          { id: 10, word: 'school', translation: '学校', definition: '教育机构' }
-        ];
-
-        // 随机选择5个单词
-        const shuffled = mockWords.sort(() => Math.random() - 0.5);
+        setError(null);
+        
+        console.log('=== GamePlayPage: 开始加载词书单词 ===');
+        console.log('加载参数:', { 
+          wordbookId: gameParams.wordbookId, 
+          userId, 
+          questionCount: gameParams.questionCount 
+        });
+        
+        // 检查数据库是否已初始化
+        console.log('检查数据库初始化状态...');
+        const dbInitialized = await isDatabaseInitialized();
+        
+        if (!dbInitialized) {
+          console.log('数据库未初始化，开始初始化...');
+          message.loading({ content: '正在初始化数据库...', key: 'init' });
+          try {
+            await initializeDatabase(userId);
+            console.log('数据库初始化成功');
+            message.success({ content: '数据库初始化成功', key: 'init' });
+          } catch (initError) {
+            console.error('数据库初始化失败:', initError);
+            message.error({ content: '数据库初始化失败', key: 'init' });
+            throw initError;
+          }
+        } else {
+          console.log('数据库已初始化');
+        }
+        
+        // 从数据库获取真实单词数据
+        const session = await createLearningSessionForWordbook(gameParams.wordbookId, userId);
+        setLearningSession(session);
+        
+        console.log('学习会话创建成功:', { 
+          totalItems: session.items.length,
+          sampleItems: session.items.slice(0, 3) 
+        });
+        
+        if (session.items.length === 0) {
+          setError('该词书中没有需要复习的单词');
+          setLoading(false);
+          return;
+        }
+        
+        // 随机选择指定数量的单词
+        const shuffled = [...session.items].sort(() => Math.random() - 0.5);
         const selectedWords = shuffled.slice(0, gameParams.questionCount || 5);
         
+        console.log('选择的单词:', selectedWords.map((w: any) => ({ 
+          id: w.item.id, 
+          word: w.item.content, 
+          translation: w.item.details?.translation || w.item.details?.definition
+        })));
+        
         // 为每个单词生成固定的选项
-        const wordsWithOptions = selectedWords.map(word => {
-          const allTranslations = selectedWords.map(w => w.translation);
-          const options = generateFixedOptions(word.translation, allTranslations);
-          const correctIndex = options.indexOf(word.translation);
+        const wordsWithOptions = selectedWords.map((sessionItem: any) => {
+          const wordData = sessionItem.item;
+          const translation = wordData.details?.translation || wordData.details?.definition;
+          const allTranslations = selectedWords.map((w: any) => w.item.details?.translation || w.item.details?.definition);
+          const options = generateFixedOptions(translation, allTranslations);
+          const correctIndex = options.indexOf(translation);
           
           return {
-            ...word,
+            id: Number(wordData.id),
+            word: wordData.content,
+            translation: translation,
+            definition: wordData.details?.definition,
+            phonetic: wordData.details?.phonetic,
+            example: wordData.details?.example,
+            learningProgress: {
+              stability: wordData.details?.stability || 0,
+              retrievability: wordData.details?.retrievability || 1,
+              difficulty: wordData.difficulty || 0.3,
+              state: wordData.details?.state || 'new',
+              reviewCount: 0
+            },
             options,
             correctIndex
           };
         });
         
+        console.log('=== GamePlayPage: 单词数据加载完成 ===');
+        console.log('最终题目数据:', wordsWithOptions.map(w => ({
+          word: w.word,
+          translation: w.translation,
+          options: w.options.map((opt, idx) => `${idx}:${opt}${idx === w.correctIndex ? ' ✓' : ''}`)
+        })));
+        
         setWords(wordsWithOptions);
         setLoading(false);
       } catch (error) {
         console.error('加载单词失败:', error);
-        message.error('加载单词失败');
-        navigate('/game');
+        const errorMessage = error instanceof Error ? error.message : '加载单词失败';
+        setError(errorMessage);
+        message.error(errorMessage);
+        setLoading(false);
       }
     };
 
     loadWords();
-  }, [gameParams, navigate]);
+  }, [gameParams, userId, navigate]);
 
   // 开始游戏
   const startGame = () => {
     setGameStarted(true);
     setGameStartTime(new Date());
+    setAnswerStartTime(Date.now());
     const config = getDifficultyConfig(gameParams.difficulty);
     setTimeRemaining(config.timeLimit);
     
@@ -160,15 +244,38 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   };
 
   // 处理答案
-  const handleAnswer = (answerIndex: number) => {
+  const handleAnswer = async (answerIndex: number) => {
     if (showFeedback || !gameStarted) return;
     
     const currentWord = words[currentQuestionIndex];
     const isAnswerCorrect = answerIndex === currentWord.correctIndex;
+    const responseTime = answerStartTime ? Date.now() - answerStartTime : 0;
     
     setSelectedAnswer(currentWord.options[answerIndex]);
     setIsCorrect(isAnswerCorrect);
     setShowFeedback(true);
+    
+    // 记录学习结果
+    try {
+      const response = isAnswerCorrect ? 'good' : 'again';
+      await processStudyResponse(
+        learningSession,
+        String(currentWord.id),
+        response as 'again' | 'hard' | 'good' | 'easy',
+        responseTime,
+        userId!
+      );
+      console.log('学习结果记录成功:', {
+        wordId: currentWord.id,
+        word: currentWord.word,
+        isCorrect: isAnswerCorrect,
+        responseTime,
+        response
+      });
+    } catch (error) {
+      console.error('记录学习结果失败:', error);
+      // 不阻塞游戏流程，只记录错误
+    }
     
     if (isAnswerCorrect) {
       setScore(prev => prev + getDifficultyConfig(gameParams.difficulty).points);
@@ -186,6 +293,7 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
         setTimeRemaining(getDifficultyConfig(gameParams.difficulty).timeLimit);
         setSelectedAnswer(null);
         setShowFeedback(false);
+        setAnswerStartTime(Date.now()); // 重置答题开始时间
       } else {
         // 游戏结束
         setGameEnded(true);
@@ -236,6 +344,39 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
       }}>
         <Title level={3}>加载中...</Title>
         <Text type="secondary">正在准备游戏题目</Text>
+      </div>
+    );
+  }
+
+  // 错误处理
+  if (error) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        flexDirection: 'column',
+        padding: '20px'
+      }}>
+        <Card style={{ maxWidth: '500px', textAlign: 'center' }}>
+          <Title level={3} style={{ color: '#ff4d4f' }}>⚠️ 加载失败</Title>
+          <Text type="secondary" style={{ display: 'block', marginBottom: '20px' }}>
+            {error}
+          </Text>
+          <Space>
+            <Button onClick={() => navigate('/game')}>
+              返回游戏首页
+            </Button>
+            <Button type="primary" onClick={() => {
+              setError(null);
+              setLoading(true);
+              window.location.reload();
+            }}>
+              重试
+            </Button>
+          </Space>
+        </Card>
       </div>
     );
   }

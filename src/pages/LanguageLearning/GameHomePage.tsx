@@ -17,7 +17,7 @@ import {
 } from '@ant-design/icons';
 import { useGameStore } from '@/store/game';
 import { useAppStore } from '@/store/useAppStore';
-import { getAllWordbooksWithStats } from '@/services/wordbookService';
+import { getDB } from '@/services/db';
 import type { GameType, GameDifficulty } from '@/types/game';
 import type { WordbookWithStats } from '@/types/wordbook';
 
@@ -47,12 +47,44 @@ export const GameHomePage: React.FC = () => {
     
     try {
       setLoading(true);
-      const books = await getAllWordbooksWithStats(user.id);
-      setWordbooks(books);
+      const db = await getDB();
+      
+      // 直接查询词书列表和统计信息
+      const books = await db.exec({
+        sql: `
+          SELECT 
+            w.id,
+            w.name,
+            w.description,
+            w.createdAt,
+            COUNT(DISTINCT words.id) as wordCount,
+            COUNT(CASE WHEN lp.state = 'review' THEN 1 END) as masteredCount,
+            COUNT(CASE WHEN lp.nextReview <= ? THEN 1 END) as dueCount
+          FROM wordbooks w
+          LEFT JOIN words ON words.wordbookId = w.id AND words.userId = ?
+          LEFT JOIN learning_progress lp ON lp.wordId = words.id AND lp.userId = ?
+          GROUP BY w.id, w.name, w.description, w.createdAt
+          ORDER BY w.createdAt DESC
+        `,
+        args: [new Date().toISOString(), user.id, user.id]
+      }) as any[];
+      
+      const formattedBooks: WordbookWithStats[] = books.map(book => ({
+        id: book.id,
+        name: book.name,
+        description: book.description,
+        createdAt: book.createdAt,
+        wordCount: Number(book.wordCount || 0),
+        masteredCount: Number(book.masteredCount || 0),
+        dueCount: Number(book.dueCount || 0),
+        progress: book.wordCount > 0 ? (Number(book.masteredCount || 0) / Number(book.wordCount)) * 100 : 0
+      }));
+      
+      setWordbooks(formattedBooks);
       
       // 自动选择第一个有单词的词书
-      if (books.length > 0) {
-        const firstBookWithWords = books.find(book => book.wordCount > 0);
+      if (formattedBooks.length > 0) {
+        const firstBookWithWords = formattedBooks.find(book => book.wordCount > 0);
         if (firstBookWithWords && !selectedWordbook) {
           setSelectedWordbook(firstBookWithWords.id);
         }

@@ -1,6 +1,6 @@
 import { getDB } from './db';
 import { MemoryLearningManager } from '@/lib/memo/MemoryLearningManager';
-import type { LearningItem, LearningItemType, StudyRecord, MemoryStrength } from '@/lib/memo/types';
+import type { LearningItem, LearningItemType, StudyRecord } from '@/lib/memo/types';
 import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
 
 interface WordWithProgress {

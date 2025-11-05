@@ -1,0 +1,214 @@
+{
+  "words": [
+    {
+      "word": "apple",
+      "phonetic": "/ˈæpl/",
+      "definition": "a round fruit with red, green, or yellow skin and crisp flesh",
+      "translation": "苹果",
+      "example": "I eat an apple every day."
+    },
+    {
+      "word": "book",
+      "phonetic": "/bʊk/",
+      "definition": "a written or printed work consisting of pages glued or sewn together",
+      "translation": "书",
+      "example": "She is reading a interesting book."
+    },
+    {
+      "word": "computer",
+      "phonetic": "/kəmˈpjuːtər/",
+      "definition": "an electronic device that can store, retrieve, and process data",
+      "translation": "计算机",
+      "example": "I use my computer for work and entertainment."
+    },
+    {
+      "word": "water",
+      "phonetic": "/ˈwɔːtər/",
+      "definition": "a colorless, transparent, odorless liquid that forms seas, lakes, rivers, and rain",
+      "translation": "水",
+      "example": "Water is essential for life."
+    },
+    {
+      "word": "house",
+      "phonetic": "/haʊs/",
+      "definition": "a building for human habitation",
+      "translation": "房子",
+      "example": "They live in a beautiful house near the park."
+    },
+    {
+      "word": "car",
+      "phonetic": "/kɑːr/",
+      "definition": "a road vehicle powered by an internal combustion engine or electric motor",
+      "translation": "汽车",
+      "example": "My car is blue and very fast."
+    },
+    {
+      "word": "phone",
+      "phonetic": "/foʊn/",
+      "definition": "a system that converts acoustic signals to electrical signals",
+      "translation": "电话",
+      "example": "I called my friend on the phone yesterday."
+    },
+    {
+      "word": "music",
+      "phonetic": "/ˈmjuːzɪk/",
+      "definition": "vocal or instrumental sounds combined in such a way as to produce beauty of form",
+      "translation": "音乐",
+      "example": "She loves listening to classical music."
+    },
+    {
+      "word": "food",
+      "phonetic": "/fuːd/",
+      "definition": "any nutritious substance that people or animals eat or drink",
+      "translation": "食物",
+      "example": "Healthy food is important for a good life."
+    },
+    {
+      "word": "school",
+      "phonetic": "/skuːl/",
+      "definition": "an institution for educating children or students",
+      "translation": "学校",
+      "example": "He goes to school every day to learn new things."
+    }
+  ],
+  "learningProgress": [
+    {
+      "itemId": 1,
+      "nextReview": "2025-01-06T10:00:00.000Z",
+      "state": "new",
+      "stability": 0,
+      "difficulty": 0.3,
+      "retrievability": 1,
+      "reviewCount": 0,
+      "lapseCount": 0
+    },
+    {
+      "itemId": 2,
+      "nextReview": "2025-01-06T10:30:00.000Z",
+      "state": "new",
+      "stability": 0.1,
+      "difficulty": 0.3,
+      "retrievability": 0.9,
+      "reviewCount": 1,
+      "lapseCount": 0
+    },
+    {
+      "itemId": 3,
+      "nextReview": "2025-01-07T10:00:00.000Z",
+      "state": "learning",
+      "stability": 0.2,
+      "difficulty": 0.4,
+      "retrievability": 0.8,
+      "reviewCount": 2,
+      "lapseCount": 0
+    },
+    {
+      "itemId": 4,
+      "nextReview": "2025-01-05T15:00:00.000Z",
+      "state": "review",
+      "stability": 0.8,
+      "difficulty": 0.2,
+      "retrievability": 0.7,
+      "reviewCount": 5,
+      "lapseCount": 1
+    },
+    {
+      "itemId": 5,
+      "nextReview": "2025-01-10T10:00:00.000Z",
+      "state": "review",
+      "stability": 1.2,
+      "difficulty": 0.1,
+      "retrievability": 0.9,
+      "reviewCount": 8,
+      "lapseCount": 0
+    },
+    {
+      "itemId": 6,
+      "nextReview": "2025-01-06T12:00:00.000Z",
+      "state": "learning",
+      "stability": 0.15,
+      "difficulty": 0.35,
+      "retrievability": 0.85,
+      "reviewCount": 3,
+      "lapseCount": 1
+    },
+    {
+      "itemId": 7,
+      "nextReview": "2025-01-08T14:00:00.000Z",
+      "state": "learning",
+      "stability": 0.3,
+      "difficulty": 0.3,
+      "retrievability": 0.8,
+      "reviewCount": 4,
+      "lapseCount": 0
+    },
+    {
+      "itemId": 8,
+      "nextReview": "2025-01-11T16:00:00.000Z",
+      "state": "review",
+      "stability": 0.9,
+      "difficulty": 0.25,
+      "retrievability": 0.85,
+      "reviewCount": 6,
+      "lapseCount": 0
+    },
+    {
+      "itemId": 9,
+      "nextReview": "2025-01-07T09:00:00.000Z",
+      "state": "learning",
+      "stability": 0.25,
+      "difficulty": 0.4,
+      "retrievability": 0.75,
+      "reviewCount": 3,
+      "lapseCount": 1
+    },
+    {
+      "itemId": 10,
+      "nextReview": "2025-01-12T11:00:00.000Z",
+      "state": "review",
+      "stability": 1.0,
+      "difficulty": 0.2,
+      "retrievability": 0.9,
+      "reviewCount": 7,
+      "lapseCount": 0
+    }
+  ],
+  "studyLogs": [
+    {
+      "itemId": 1,
+      "userId": "user-1",
+      "timestamp": "2025-01-01T10:00:00.000Z",
+      "response": "again",
+      "responseTime": 8000,
+      "confidence": 0.2,
+      "previousStability": 0,
+      "previousRetrievability": 1,
+      "newStability": 0.1,
+      "newRetrievability": 0.7
+    },
+    {
+      "itemId": 2,
+      "userId": "user-1",
+      "timestamp": "2025-01-02T14:30:00.000Z",
+      "response": "good",
+      "responseTime": 3000,
+      "confidence": 0.8,
+      "previousStability": 0,
+      "previousRetrievability": 1,
+      "newStability": 0.15,
+      "newRetrievability": 0.9
+    },
+    {
+      "itemId": 3,
+      "userId": "user-1",
+      "timestamp": "2025-01-03T09:15:00.000Z",
+      "response": "good",
+      "responseTime": 4500,
+      "confidence": 0.7,
+      "previousStability": 0.1,
+      "previousRetrievability": 0.8,
+      "newStability": 0.2,
+      "newRetrievability": 0.85
+    }
+  ]
+}
