@@ -94,6 +94,27 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
     return difficulty === 'easy' && config.gameMode === 'memory';
   };
 
+  // 获取响应式断点
+  const getBreakpoint = () => {
+    if (typeof window === 'undefined') return 'desktop';
+    const width = window.innerWidth;
+    if (width < 768) return 'mobile';
+    if (width < 1024) return 'tablet';
+    return 'desktop';
+  };
+
+  const [breakpoint, setBreakpoint] = useState(getBreakpoint());
+
+  // 监听窗口大小变化
+  useEffect(() => {
+    const handleResize = () => {
+      setBreakpoint(getBreakpoint());
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // 倒计时器
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -727,8 +748,11 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
     );
   }
 
-  // 记忆阶段界面
+  // 记忆阶段界面 - 响应式优化
   if (gamePhase === 'memory') {
+    const isMobile = breakpoint === 'mobile';
+    const isTablet = breakpoint === 'tablet';
+
     return (
       <>
         {/* 即时反馈层 */}
@@ -737,63 +761,159 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
         <div style={{ 
           minHeight: '100vh', 
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: '20px',
+          padding: isMobile ? '12px' : isTablet ? '16px' : '20px',
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center'
+          flexDirection: 'column'
         }}>
-          <Card style={{ maxWidth: '600px', width: '100%', textAlign: 'center' }}>
-            <Title level={2}>🧠 记忆阶段</Title>
-            <Text type="secondary" style={{ display: 'block', marginBottom: '20px' }}>
+          {/* 顶部标题和计时器 */}
+          <div style={{ 
+            textAlign: 'center',
+            marginBottom: isMobile ? '12px' : '16px',
+            flexShrink: 0
+          }}>
+            <Title level={isMobile ? 3 : 2} style={{ 
+              margin: '0 0 8px 0', 
+              color: '#fff',
+              fontSize: isMobile ? '20px' : '24px'
+            }}>
+              🧠 记忆阶段
+            </Title>
+            
+            <Text type="secondary" style={{ 
+              display: 'block', 
+              marginBottom: isMobile ? '8px' : '12px',
+              fontSize: isMobile ? '12px' : '14px',
+              color: '#e0e0e0'
+            }}>
               请记住以下5个单词及其中文意思
             </Text>
             
-            <div style={{ marginBottom: '30px' }}>
-              <Text strong style={{ fontSize: '20px', color: memoryTimeRemaining <= 5 ? '#ff4d4f' : '#52c41a' }}>
-                剩余时间: {memoryTimeRemaining}s
+            <Text strong style={{ 
+              fontSize: isMobile ? '18px' : '20px', 
+              color: memoryTimeRemaining <= 5 ? '#ff4d4f' : '#52c41a',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              display: 'inline-block'
+            }}>
+              ⏰ 剩余时间: {memoryTimeRemaining}s
+            </Text>
+          </div>
+
+          {/* 单词卡片容器 - 响应式布局 */}
+          <div style={{ 
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            maxWidth: isMobile ? '100%' : isTablet ? '600px' : '700px',
+            margin: '0 auto',
+            width: '100%'
+          }}>
+            <div style={{ 
+              flex: 1,
+              overflowY: 'auto',
+              padding: isMobile ? '4px' : '8px'
+            }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(1, 1fr)', 
+                gap: isMobile ? '8px' : '12px'
+              }}>
+                {memoryWords.map((word, index) => (
+                  <Card 
+                    key={word.id} 
+                    style={{ 
+                      backgroundColor: isMobile ? '#ffffff' : '#f8f9fa',
+                      border: `2px solid ${isMobile ? '#e0e0e0' : '#d9d9d9'}`,
+                      borderRadius: isMobile ? '6px' : '8px',
+                      padding: isMobile ? '12px' : '16px',
+                      boxShadow: isMobile ? '0 1px 3px rgba(0,0,0,0.1)' : '0 2px 6px rgba(0,0,0,0.1)'
+                    }}
+                    bodyStyle={{ 
+                      padding: 0,
+                      ...(isMobile && { padding: '0 !important' })
+                    }}
+                  >
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: isMobile ? '8px' : '12px'
+                    }}>
+                      {/* 左侧：英文单词 */}
+                      <div style={{ 
+                        textAlign: 'left',
+                        flex: isMobile ? '1 1 auto' : '1',
+                        minWidth: isMobile ? '120px' : 'auto'
+                      }}>
+                        <Text strong style={{ 
+                          fontSize: isMobile ? '14px' : '16px', 
+                          color: '#1890ff',
+                          fontWeight: 'bold'
+                        }}>
+                          {word.word}
+                        </Text>
+                        {/* 移动端隐藏音标 */}
+                        {!isMobile && word.phonetic && (
+                          <Text type="secondary" style={{ 
+                            display: 'block', 
+                            fontSize: '12px',
+                            marginTop: '2px'
+                          }}>
+                            {word.phonetic}
+                          </Text>
+                        )}
+                      </div>
+                      
+                      {/* 右侧：中文翻译 */}
+                      <Text strong style={{ 
+                        fontSize: isMobile ? '14px' : '16px', 
+                        color: '#52c41a',
+                        fontWeight: 'bold',
+                        flexShrink: 0
+                      }}>
+                        {word.translation}
+                      </Text>
+                    </div>
+                    
+                    {/* 移动端隐藏例句 */}
+                    {!isMobile && word.example && (
+                      <Text type="secondary" style={{ 
+                        display: 'block', 
+                        marginTop: '8px', 
+                        fontSize: '11px',
+                        fontStyle: 'italic',
+                        color: '#666',
+                        borderTop: '1px solid #eee',
+                        paddingTop: '6px'
+                      }}>
+                        💡 {word.example}
+                      </Text>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* 底部提示 */}
+            <div style={{ 
+              textAlign: 'center',
+              marginTop: isMobile ? '12px' : '16px',
+              flexShrink: 0
+            }}>
+              <Text type="secondary" style={{ 
+                fontSize: isMobile ? '11px' : '12px',
+                color: '#e0e0e0',
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                padding: '8px 16px',
+                borderRadius: '16px',
+                display: 'inline-block'
+              }}>
+                🎯 时间结束后将进入匹配阶段，请准备好！
               </Text>
             </div>
-
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(1, 1fr)', 
-              gap: '15px',
-              marginBottom: '30px'
-            }}>
-              {memoryWords.map((word, index) => (
-                <Card key={word.id} style={{ 
-                  backgroundColor: '#f0f2f5',
-                  border: '2px solid #d9d9d9'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ textAlign: 'left' }}>
-                      <Text strong style={{ fontSize: '18px', color: '#1890ff' }}>
-                        {word.word}
-                      </Text>
-                      {word.phonetic && (
-                        <Text type="secondary" style={{ display: 'block', fontSize: '14px' }}>
-                          {word.phonetic}
-                        </Text>
-                      )}
-                    </div>
-                    <Text strong style={{ fontSize: '18px', color: '#52c41a' }}>
-                      {word.translation}
-                    </Text>
-                  </div>
-                  {word.example && (
-                    <Text type="secondary" style={{ display: 'block', marginTop: '8px', fontStyle: 'italic' }}>
-                      例句: {word.example}
-                    </Text>
-                  )}
-                </Card>
-              ))}
-            </div>
-
-            <Text type="secondary">
-              时间结束后将进入匹配阶段，请准备好！
-            </Text>
-          </Card>
+          </div>
         </div>
       </>
     );
