@@ -63,6 +63,16 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
   const [answerStartTime, setAnswerStartTime] = useState<number | null>(null); // 记录答题开始时间
 
+  // 简易难度记忆匹配游戏状态
+  const [gamePhase, setGamePhase] = useState<'waiting' | 'memory' | 'matching' | 'playing' | 'finished'>('waiting');
+  const [memoryWords, setMemoryWords] = useState<WordData[]>([]);
+  const [shuffledTranslations, setShuffledTranslations] = useState<string[]>([]);
+  const [matchedPairs, setMatchedPairs] = useState<Set<string>>(new Set());
+  const [selectedWord, setSelectedWord] = useState<WordData | null>(null);
+  const [selectedTranslation, setSelectedTranslation] = useState<string | null>(null);
+  const [matchingAttempts, setMatchingAttempts] = useState(0);
+  const [memoryTimeRemaining, setMemoryTimeRemaining] = useState(30); // 记忆阶段30秒
+
   // 沉浸式体验hooks
   const { feedbackTrigger, triggerFeedback, clearFeedback } =
     useImmediateFeedback();
@@ -70,27 +80,47 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   // 获取难度配置
   const getDifficultyConfig = (difficulty: GameDifficulty) => {
     const configs = {
-      easy: { timeLimit: 45, points: 10 },
-      medium: { timeLimit: 30, points: 15 },
-      hard: { timeLimit: 20, points: 25 },
-      expert: { timeLimit: 15, points: 40 }
+      easy: { timeLimit: 45, points: 10, gameMode: 'memory' }, // choice: 选择题, memory: 记忆匹配
+      medium: { timeLimit: 30, points: 15, gameMode: 'choice' },
+      hard: { timeLimit: 20, points: 25, gameMode: 'choice' },
+      expert: { timeLimit: 15, points: 40, gameMode: 'choice' }
     };
     return configs[difficulty] || configs.medium;
+  };
+
+  // 检查是否为记忆匹配模式
+  const isMemoryMatchMode = (difficulty: GameDifficulty) => {
+    const config = getDifficultyConfig(difficulty);
+    return difficulty === 'easy' && config.gameMode === 'memory';
   };
 
   // 倒计时器
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (gameStarted && !gameEnded && timeRemaining > 0 && !showFeedback) {
+    
+    // 记忆阶段倒计时
+    if (gamePhase === 'memory' && memoryTimeRemaining > 0) {
+      timer = setTimeout(() => {
+        setMemoryTimeRemaining(prev => prev - 1);
+      }, 1000);
+    } else if (gamePhase === 'memory' && memoryTimeRemaining === 0) {
+      // 记忆时间结束，开始匹配阶段
+      startMatchingPhase();
+      return;
+    }
+    
+    // 选择题阶段倒计时
+    if (gamePhase === 'playing' && gameStarted && !gameEnded && timeRemaining > 0 && !showFeedback) {
       timer = setTimeout(() => {
         setTimeRemaining(prev => prev - 1);
       }, 1000);
-    } else if (timeRemaining === 0 && !showFeedback) {
+    } else if (gamePhase === 'playing' && timeRemaining === 0 && !showFeedback) {
       // 时间到，自动提交（错误答案）
       handleAnswer('');
     }
+    
     return () => clearTimeout(timer);
-  }, [gameStarted, gameEnded, timeRemaining, showFeedback]);
+  }, [gameStarted, gameEnded, timeRemaining, showFeedback, gamePhase, memoryTimeRemaining]);
 
   // 生成固定选项的函数
   const generateFixedOptions = (correctTranslation: string, allTranslations: string[]) => {
@@ -234,20 +264,140 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
 
   // 开始游戏
   const startGame = () => {
-    setGameStarted(true);
     setGameStartTime(new Date());
-    setAnswerStartTime(Date.now());
-    const config = getDifficultyConfig(gameParams.difficulty);
-    setTimeRemaining(config.timeLimit);
     
-    // 调试：记录每个题目的选项位置
-    console.log('=== 游戏开始 - 题目选项位置 ===');
-    words.forEach((word, index) => {
-      console.log(`题目 ${index + 1}: ${word.word} -> ${word.translation}`);
-      console.log(`选项位置: ${word.options.map((option, i) => 
-        `${i}:${option}${i === word.correctIndex ? ' ✓' : ''}`
-      ).join(', ')}`);
-    });
+    if (isMemoryMatchMode(gameParams.difficulty)) {
+      // 简易难度记忆匹配模式
+      const memoryWordList = words.slice(0, 5); // 取前5个单词
+      setMemoryWords(memoryWordList);
+      setGamePhase('memory');
+      setMemoryTimeRemaining(30);
+      
+      console.log('=== 记忆匹配模式开始 ===');
+      console.log('记忆单词:', memoryWordList.map(w => `${w.word} -> ${w.translation}`));
+    } else {
+      // 普通选择题模式
+      setGameStarted(true);
+      setGamePhase('playing');
+      setAnswerStartTime(Date.now());
+      const config = getDifficultyConfig(gameParams.difficulty);
+      setTimeRemaining(config.timeLimit);
+      
+      // 调试：记录每个题目的选项位置
+      console.log('=== 游戏开始 - 题目选项位置 ===');
+      words.forEach((word, index) => {
+        console.log(`题目 ${index + 1}: ${word.word} -> ${word.translation}`);
+        console.log(`选项位置: ${word.options.map((option, i) => 
+          `${i}:${option}${i === word.correctIndex ? ' ✓' : ''}`
+        ).join(', ')}`);
+      });
+    }
+  };
+
+  // 开始匹配阶段
+  const startMatchingPhase = () => {
+    const translations = memoryWords.map(w => w.translation);
+    const shuffled = [...translations].sort(() => Math.random() - 0.5);
+    
+    setShuffledTranslations(shuffled);
+    setGamePhase('matching');
+    setSelectedWord(null);
+    setSelectedTranslation(null);
+    setMatchedPairs(new Set());
+    setMatchingAttempts(0);
+    
+    console.log('=== 匹配阶段开始 ===');
+    console.log('打乱后的翻译:', shuffled);
+  };
+
+  // 处理记忆匹配选择
+  const handleMemoryMatchSelect = (type: 'word' | 'translation', item: WordData | string) => {
+    if (gamePhase !== 'matching') return;
+    
+    if (type === 'word') {
+      setSelectedWord(item as WordData);
+    } else {
+      setSelectedTranslation(item as string);
+    }
+    
+    // 检查是否两个都选中了
+    if ((type === 'word' && selectedTranslation) || (type === 'translation' && selectedWord)) {
+      checkMatch(type === 'word' ? item as WordData : selectedWord, type === 'word' ? selectedTranslation : item as string);
+    }
+  };
+
+  // 检查匹配
+  const checkMatch = async (word: WordData, translation: string) => {
+    setMatchingAttempts(prev => prev + 1);
+    
+    const isMatch = word.translation === translation;
+    
+    if (isMatch) {
+      // 匹配成功
+      const newMatchedPairs = new Set(matchedPairs);
+      newMatchedPairs.add(word.id.toString());
+      setMatchedPairs(newMatchedPairs);
+      
+      message.success(`✅ 正确匹配: ${word.word} -> ${translation}`);
+      
+      // 触发成功反馈
+      triggerFeedback({
+        type: 'success',
+        duration: 1000,
+        intensity: 'medium',
+        haptic: true,
+        sound: true,
+      });
+      
+      // 记录学习结果
+      try {
+        await processStudyResponse(
+          learningSession,
+          String(word.id),
+          'good' as 'again' | 'hard' | 'good' | 'easy',
+          0,
+          userId!
+        );
+        console.log('学习结果记录成功:', {
+          wordId: word.id,
+          word: word.word,
+          isCorrect: true,
+          response: 'good'
+        });
+      } catch (error) {
+        console.error('记录学习结果失败:', error);
+      }
+      
+      setScore(prev => prev + 15); // 匹配成功得分
+      setCorrectAnswers(prev => prev + 1);
+      
+    } else {
+      // 匹配失败
+      message.error(`❌ 匹配错误，请重新选择`);
+      
+      // 触发重试反馈
+      triggerFeedback({
+        type: 'retry',
+        duration: 1000,
+        intensity: 'light',
+        haptic: true,
+        sound: false,
+      });
+    }
+    
+    // 清除选择
+    setTimeout(() => {
+      setSelectedWord(null);
+      setSelectedTranslation(null);
+      
+      // 检查是否完成所有匹配
+      if (isMatch && matchedPairs.size + 1 === memoryWords.length) {
+        // 完成所有匹配
+        setTimeout(() => {
+          setGamePhase('finished');
+        }, 1000);
+      }
+    }, 1000);
   };
 
   // 处理答案
@@ -329,13 +479,15 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
 
   // 计算游戏统计
   const getGameStats = () => {
-    const accuracy = words.length > 0 ? (correctAnswers / words.length) * 100 : 0;
+    const totalItems = isMemoryMatchMode(gameParams.difficulty) ? memoryWords.length : words.length;
+    const accuracy = totalItems > 0 ? (correctAnswers / totalItems) * 100 : 0;
     const gameTime = gameStartTime ? (new Date().getTime() - gameStartTime.getTime()) / 1000 : 0;
     
     return {
       accuracy: Math.round(accuracy),
       totalTime: Math.round(gameTime),
-      score
+      score,
+      attempts: isMemoryMatchMode(gameParams.difficulty) ? matchingAttempts : 0
     };
   };
 
@@ -419,8 +571,9 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   }
 
   // 游戏结束页面
-  if (gameEnded) {
+  if (gameEnded || gamePhase === 'finished') {
     const stats = getGameStats();
+    const isMemoryMode = isMemoryMatchMode(gameParams.difficulty);
     return (
       <>
         {/* 即时反馈层 */}
@@ -443,8 +596,10 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
             
             <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '20px' }}>
               <div>
-                <Title level={4} style={{ margin: 0 }}>{correctAnswers}/{words.length}</Title>
-                <Text type="secondary">正确题数</Text>
+                <Title level={4} style={{ margin: 0 }}>
+                  {isMemoryMode ? `${correctAnswers}/${memoryWords.length}` : `${correctAnswers}/${words.length}`}
+                </Title>
+                <Text type="secondary">{isMemoryMode ? '匹配对数' : '正确题数'}</Text>
               </div>
               <div>
                 <Title level={4} style={{ margin: 0 }}>{stats.accuracy}%</Title>
@@ -454,6 +609,12 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
                 <Title level={4} style={{ margin: 0 }}>{stats.totalTime}s</Title>
                 <Text type="secondary">游戏时间</Text>
               </div>
+              {isMemoryMode && (
+                <div>
+                  <Title level={4} style={{ margin: 0 }}>{stats.attempts}</Title>
+                  <Text type="secondary">尝试次数</Text>
+                </div>
+              )}
             </div>
 
             <Progress 
@@ -481,7 +642,7 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   }
 
   // 游戏开始前
-  if (!gameStarted) {
+  if (!gameStarted && gamePhase === 'waiting') {
     return (
       <>
         {/* 即时反馈层 */}
@@ -497,9 +658,15 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
         <Card style={{ maxWidth: '500px', width: '100%', textAlign: 'center' }}>
           <div style={{ marginBottom: '30px' }}>
             <Title level={2}>🎮 单词游戏</Title>
-            <Text type="secondary">
-              游戏模式: 英文单词 → 中文意思
-            </Text>
+            {isMemoryMatchMode(gameParams.difficulty) ? (
+              <Text type="secondary">
+                游戏模式: 记忆匹配 (先记忆30秒，然后匹配英文和中文)
+              </Text>
+            ) : (
+              <Text type="secondary">
+                游戏模式: 英文单词 → 中文意思 (选择题)
+              </Text>
+            )}
           </div>
 
           <div style={{ marginBottom: '30px' }}>
@@ -508,18 +675,41 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
                 <Text strong>难度级别: </Text>
                 <Text>{gameParams.difficulty}</Text>
               </div>
-              <div>
-                <Text strong>题目数量: </Text>
-                <Text>{gameParams.questionCount} 题</Text>
-              </div>
-              <div>
-                <Text strong>时间限制: </Text>
-                <Text>{getDifficultyConfig(gameParams.difficulty).timeLimit} 秒/题</Text>
-              </div>
-              <div>
-                <Text strong>基础得分: </Text>
-                <Text>{getDifficultyConfig(gameParams.difficulty).points} 分/题</Text>
-              </div>
+              {isMemoryMatchMode(gameParams.difficulty) ? (
+                <>
+                  <div>
+                    <Text strong>游戏模式: </Text>
+                    <Text>记忆匹配</Text>
+                  </div>
+                  <div>
+                    <Text strong>记忆单词数: </Text>
+                    <Text>5 个单词</Text>
+                  </div>
+                  <div>
+                    <Text strong>记忆时间: </Text>
+                    <Text>30 秒</Text>
+                  </div>
+                  <div>
+                    <Text strong>匹配得分: </Text>
+                    <Text>15 分/对</Text>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <Text strong>题目数量: </Text>
+                    <Text>{gameParams.questionCount} 题</Text>
+                  </div>
+                  <div>
+                    <Text strong>时间限制: </Text>
+                    <Text>{getDifficultyConfig(gameParams.difficulty).timeLimit} 秒/题</Text>
+                  </div>
+                  <div>
+                    <Text strong>基础得分: </Text>
+                    <Text>{getDifficultyConfig(gameParams.difficulty).points} 分/题</Text>
+                  </div>
+                </>
+              )}
             </Space>
           </div>
 
@@ -532,6 +722,212 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
             </Button>
           </Space>
         </Card>
+      </div>
+      </>
+    );
+  }
+
+  // 记忆阶段界面
+  if (gamePhase === 'memory') {
+    return (
+      <>
+        {/* 即时反馈层 */}
+        <ImmediateFeedback trigger={feedbackTrigger} onComplete={clearFeedback} />
+
+        <div style={{ 
+          minHeight: '100vh', 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Card style={{ maxWidth: '600px', width: '100%', textAlign: 'center' }}>
+            <Title level={2}>🧠 记忆阶段</Title>
+            <Text type="secondary" style={{ display: 'block', marginBottom: '20px' }}>
+              请记住以下5个单词及其中文意思
+            </Text>
+            
+            <div style={{ marginBottom: '30px' }}>
+              <Text strong style={{ fontSize: '20px', color: memoryTimeRemaining <= 5 ? '#ff4d4f' : '#52c41a' }}>
+                剩余时间: {memoryTimeRemaining}s
+              </Text>
+            </div>
+
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(1, 1fr)', 
+              gap: '15px',
+              marginBottom: '30px'
+            }}>
+              {memoryWords.map((word, index) => (
+                <Card key={word.id} style={{ 
+                  backgroundColor: '#f0f2f5',
+                  border: '2px solid #d9d9d9'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ textAlign: 'left' }}>
+                      <Text strong style={{ fontSize: '18px', color: '#1890ff' }}>
+                        {word.word}
+                      </Text>
+                      {word.phonetic && (
+                        <Text type="secondary" style={{ display: 'block', fontSize: '14px' }}>
+                          {word.phonetic}
+                        </Text>
+                      )}
+                    </div>
+                    <Text strong style={{ fontSize: '18px', color: '#52c41a' }}>
+                      {word.translation}
+                    </Text>
+                  </div>
+                  {word.example && (
+                    <Text type="secondary" style={{ display: 'block', marginTop: '8px', fontStyle: 'italic' }}>
+                      例句: {word.example}
+                    </Text>
+                  )}
+                </Card>
+              ))}
+            </div>
+
+            <Text type="secondary">
+              时间结束后将进入匹配阶段，请准备好！
+            </Text>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  // 匹配阶段界面
+  if (gamePhase === 'matching') {
+    const isCompleted = matchedPairs.size === memoryWords.length;
+    
+    return (
+      <>
+        {/* 即时反馈层 */}
+        <ImmediateFeedback trigger={feedbackTrigger} onComplete={clearFeedback} />
+
+        <div style={{ 
+          minHeight: '100vh', 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          padding: '20px'
+        }}>
+          <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          
+          {/* 顶部状态栏 */}
+          <Card style={{ marginBottom: '20px' }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '15px'
+            }}>
+              <Text strong>
+                匹配进度: {matchedPairs.size} / {memoryWords.length}
+              </Text>
+              <Text strong>
+                得分: {score}
+              </Text>
+            </div>
+            
+            <Progress percent={(matchedPairs.size / memoryWords.length) * 100} />
+            
+            <div style={{ marginTop: '15px' }}>
+              <Text type="secondary">尝试次数: {matchingAttempts}</Text>
+            </div>
+          </Card>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', minHeight: '400px' }}>
+            {/* 英文单词列 */}
+            <Card title="英文单词" style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {memoryWords.map((word) => {
+                  const isMatched = matchedPairs.has(word.id.toString());
+                  const isSelected = selectedWord?.id === word.id;
+                  
+                  return (
+                    <Button
+                      key={word.id}
+                      style={{
+                        padding: '15px',
+                        height: 'auto',
+                        minHeight: '50px',
+                        backgroundColor: isMatched ? '#f6ffed' : isSelected ? '#e6f7ff' : '#ffffff',
+                        borderColor: isMatched ? '#52c41a' : isSelected ? '#1890ff' : '#d9d9d9',
+                        color: isMatched ? '#52c41a' : '#000000',
+                        fontSize: '16px',
+                        fontWeight: 'bold'
+                      }}
+                      onClick={() => !isMatched && handleMemoryMatchSelect('word', word)}
+                      disabled={isMatched}
+                    >
+                      {word.word}
+                      {isMatched && <CheckOutlined style={{ marginLeft: '8px', color: '#52c41a' }} />}
+                    </Button>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {/* 中文翻译列 */}
+            <Card title="中文翻译" style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {shuffledTranslations.map((translation, index) => {
+                  const isUsed = Array.from(matchedPairs).some(pairId => {
+                    const word = memoryWords.find(w => w.id.toString() === pairId);
+                    return word?.translation === translation;
+                  });
+                  const isSelected = selectedTranslation === translation;
+                  
+                  return (
+                    <Button
+                      key={index}
+                      style={{
+                        padding: '15px',
+                        height: 'auto',
+                        minHeight: '50px',
+                        backgroundColor: isUsed ? '#f6ffed' : isSelected ? '#e6f7ff' : '#ffffff',
+                        borderColor: isUsed ? '#52c41a' : isSelected ? '#1890ff' : '#d9d9d9',
+                        color: isUsed ? '#52c41a' : '#000000',
+                        fontSize: '16px',
+                        fontWeight: 'bold'
+                      }}
+                      onClick={() => !isUsed && handleMemoryMatchSelect('translation', translation)}
+                      disabled={isUsed}
+                    >
+                      {translation}
+                      {isUsed && <CheckOutlined style={{ marginLeft: '8px', color: '#52c41a' }} />}
+                    </Button>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
+
+          {/* 底部控制 */}
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+            <Button onClick={() => navigate('/game')}>
+              <ArrowLeftOutlined /> 返回首页
+            </Button>
+          </div>
+
+          {/* 完成提示 */}
+          {isCompleted && (
+            <div style={{ 
+              position: 'fixed', 
+              top: '50%', 
+              left: '50%', 
+              transform: 'translate(-50%, -50%)',
+              zIndex: 1000
+            }}>
+              <Card style={{ textAlign: 'center', padding: '40px' }}>
+                <Title level={2} style={{ color: '#52c41a' }}>🎉 匹配完成！</Title>
+                <Text>所有单词都匹配正确！</Text>
+              </Card>
+            </div>
+          )}
+        </div>
       </div>
       </>
     );

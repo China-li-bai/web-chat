@@ -34,12 +34,54 @@ export const GameHomePage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [messageApi, contextHolder] = message.useMessage();
 
-  // 智能默认值 - 遵循"它就是那样"的哲学
-  const [gameConfig] = useState({
+  // 游戏配置状态 - 支持动态切换
+  const [gameConfig, setGameConfig] = useState({
     gameType: 'vocabulary-match' as GameType,
-    difficulty: 'medium' as GameDifficulty,
+    difficulty: 'easy' as GameDifficulty, // 默认改为easy，启用记忆匹配模式
     questionCount: 10
   });
+
+  // 难度配置映射 - 乔布斯式简约设计
+  const difficultyConfig = {
+    easy: { 
+      label: '简易', 
+      description: '记忆匹配模式，先记30秒再匹配', 
+      color: '#52c41a',
+      icon: '🧠',
+      gameMode: 'memory'
+    },
+    medium: { 
+      label: '中等', 
+      description: '选择题模式，快速反应', 
+      color: '#1890ff',
+      icon: '⚡',
+      gameMode: 'choice'
+    },
+    hard: { 
+      label: '困难', 
+      description: '限时选择题，挑战速度', 
+      color: '#fa8c16',
+      icon: '🔥',
+      gameMode: 'choice'
+    },
+    expert: { 
+      label: '专家', 
+      description: '超短时间，极限挑战', 
+      color: '#f5222d',
+      icon: '👑',
+      gameMode: 'choice'
+    }
+  };
+
+  // 获取难度标签
+  const getDifficultyLabel = (difficulty: GameDifficulty) => {
+    return difficultyConfig[difficulty]?.label || '中等';
+  };
+
+  // 获取游戏模式描述
+  const getGameModeDescription = (difficulty: GameDifficulty) => {
+    return difficultyConfig[difficulty]?.description || '';
+  };
 
   // 加载词书数据
   const loadWordbooks = async () => {
@@ -196,7 +238,7 @@ export const GameHomePage: React.FC = () => {
               单词游戏
             </Title>
             <Text type="secondary" style={{ fontSize: breakpoint === 'mobile' ? 14 : 16 }}>
-              10道题 · 中等难度 · 约5分钟
+              {gameConfig.questionCount}道题 · {getDifficultyLabel(gameConfig.difficulty)} · 约{Math.ceil(gameConfig.questionCount / 2)}分钟
             </Text>
           </div>
 
@@ -255,6 +297,220 @@ export const GameHomePage: React.FC = () => {
                 ))}
               </Select>
             )}
+          </div>
+
+          {/* 游戏配置选择 - 响应式配置界面 */}
+          <div style={{ 
+            marginBottom: breakpoint === 'mobile' ? 20 : 24,
+            padding: breakpoint === 'mobile' ? 16 : 20,
+            backgroundColor: '#f8f9fa',
+            borderRadius: breakpoint === 'mobile' ? 6 : 8,
+            border: '1px solid #e8e8e8',
+            // 移动端触摸优化
+            ...(breakpoint === 'mobile' && {
+              WebkitTapHighlightColor: 'transparent',
+              touchAction: 'manipulation'
+            })
+          }}>
+            <Text strong style={{ 
+              fontSize: breakpoint === 'mobile' ? 16 : 18,
+              display: 'block',
+              marginBottom: breakpoint === 'mobile' ? 12 : 16,
+              color: '#333'
+            }}>
+              🎮 游戏设置
+            </Text>
+
+            {/* 移动端垂直布局 */}
+            {breakpoint === 'mobile' ? (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                {/* 难度选择 - 移动端 */}
+                <div>
+                  <Text style={{ 
+                    fontSize: 14, 
+                    color: '#666',
+                    display: 'block',
+                    marginBottom: 8
+                  }}>
+                    难度级别
+                  </Text>
+                  <Select
+                    value={gameConfig.difficulty}
+                    onChange={(difficulty) => setGameConfig(prev => ({ ...prev, difficulty }))}
+                    style={{ width: '100%' }}
+                    size="large"
+                    {...(breakpoint === 'mobile' && {
+                      className: 'mobile-select',
+                      showSearch: false
+                    })}
+                  >
+                    {Object.entries(difficultyConfig).map(([key, config]) => (
+                      <Select.Option key={key} value={key}>
+                        <Space>
+                          <span>{config.icon}</span>
+                          <span style={{ color: config.color, fontWeight: 'bold' }}>
+                            {config.label}
+                          </span>
+                        </Space>
+                      </Select.Option>
+                    ))}
+                  </Select>
+                  <Text type="secondary" style={{ 
+                    fontSize: 12, 
+                    display: 'block',
+                    marginTop: 4,
+                    lineHeight: 1.4
+                  }}>
+                    {getGameModeDescription(gameConfig.difficulty)}
+                  </Text>
+                </div>
+
+                {/* 题目数量选择 - 移动端 */}
+                <div>
+                  <Text style={{ 
+                    fontSize: 14, 
+                    color: '#666',
+                    display: 'block',
+                    marginBottom: 8
+                  }}>
+                    题目数量
+                  </Text>
+                  <Select
+                    value={gameConfig.questionCount}
+                    onChange={(questionCount) => setGameConfig(prev => ({ ...prev, questionCount }))}
+                    style={{ width: '100%' }}
+                    size="large"
+                    {...(breakpoint === 'mobile' && {
+                      className: 'mobile-select'
+                    })}
+                  >
+                    <Select.Option value={5}>
+                      <Space>5题 <Text type="secondary">· 轻松</Text></Space>
+                    </Select.Option>
+                    <Select.Option value={10}>
+                      <Space>10题 <Text type="secondary">· 标准</Text></Space>
+                    </Select.Option>
+                    <Select.Option value={15}>
+                      <Space>15题 <Text type="secondary">· 挑战</Text></Space>
+                    </Select.Option>
+                    <Select.Option value={20}>
+                      <Space>20题 <Text type="secondary">· 持久</Text></Space>
+                    </Select.Option>
+                  </Select>
+                </div>
+              </Space>
+            ) : (
+              /* 桌面端水平布局 */
+              <Row gutter={[16, 16]}>
+                {/* 难度选择 - 桌面端 */}
+                <Col xs={24} sm={12}>
+                  <div style={{ marginBottom: 12 }}>
+                    <Text style={{ 
+                      fontSize: 14, 
+                      color: '#666',
+                      display: 'block',
+                      marginBottom: 8
+                    }}>
+                      难度级别
+                    </Text>
+                    <Select
+                      value={gameConfig.difficulty}
+                      onChange={(difficulty) => setGameConfig(prev => ({ ...prev, difficulty }))}
+                      style={{ width: '100%' }}
+                      size="middle"
+                    >
+                      {Object.entries(difficultyConfig).map(([key, config]) => (
+                        <Select.Option key={key} value={key}>
+                          <Space>
+                            <span>{config.icon}</span>
+                            <span style={{ color: config.color, fontWeight: 'bold' }}>
+                              {config.label}
+                            </span>
+                          </Space>
+                        </Select.Option>
+                      ))}
+                    </Select>
+                    <Text type="secondary" style={{ 
+                      fontSize: 12, 
+                      display: 'block',
+                      marginTop: 4
+                    }}>
+                      {getGameModeDescription(gameConfig.difficulty)}
+                    </Text>
+                  </div>
+                </Col>
+
+                {/* 题目数量选择 - 桌面端 */}
+                <Col xs={24} sm={12}>
+                  <div style={{ marginBottom: 12 }}>
+                    <Text style={{ 
+                      fontSize: 14, 
+                      color: '#666',
+                      display: 'block',
+                      marginBottom: 8
+                    }}>
+                      题目数量
+                    </Text>
+                    <Select
+                      value={gameConfig.questionCount}
+                      onChange={(questionCount) => setGameConfig(prev => ({ ...prev, questionCount }))}
+                      style={{ width: '100%' }}
+                      size="middle"
+                    >
+                      <Select.Option value={5}>
+                        <Space>5题 <Text type="secondary">· 轻松</Text></Space>
+                      </Select.Option>
+                      <Select.Option value={10}>
+                        <Space>10题 <Text type="secondary">· 标准</Text></Space>
+                      </Select.Option>
+                      <Select.Option value={15}>
+                        <Space>15题 <Text type="secondary">· 挑战</Text></Space>
+                      </Select.Option>
+                      <Select.Option value={20}>
+                        <Space>20题 <Text type="secondary">· 持久</Text></Space>
+                      </Select.Option>
+                    </Select>
+                  </div>
+                </Col>
+              </Row>
+            )}
+
+            {/* 当前配置预览 - 响应式设计 */}
+            <div style={{ 
+              marginTop: breakpoint === 'mobile' ? 12 : 16,
+              padding: breakpoint === 'mobile' ? '10px 12px' : '12px 16px',
+              backgroundColor: '#fff',
+              borderRadius: breakpoint === 'mobile' ? '4px' : '6px',
+              border: `1px solid ${difficultyConfig[gameConfig.difficulty].color}20`
+            }}>
+              <Space direction="vertical" size={breakpoint === 'mobile' ? 2 : 4} style={{ width: '100%' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '8px'
+                }}>
+                  <Text strong style={{ 
+                    color: difficultyConfig[gameConfig.difficulty].color,
+                    fontSize: breakpoint === 'mobile' ? 14 : 16
+                  }}>
+                    {difficultyConfig[gameConfig.difficulty].icon} {getDifficultyLabel(gameConfig.difficulty)}
+                  </Text>
+                  <Text type="secondary" style={{ 
+                    fontSize: breakpoint === 'mobile' ? 11 : 12
+                  }}>
+                    {gameConfig.questionCount} 题
+                  </Text>
+                </div>
+                <Text type="secondary" style={{ 
+                  fontSize: breakpoint === 'mobile' ? 11 : 12,
+                  lineHeight: 1.4
+                }}>
+                  {getGameModeDescription(gameConfig.difficulty)}
+                </Text>
+              </Space>
+            </div>
           </div>
 
           {/* 主要操作按钮 */}
