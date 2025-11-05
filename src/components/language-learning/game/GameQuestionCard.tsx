@@ -25,8 +25,28 @@ export const GameQuestionCard: React.FC<GameQuestionCardProps> = ({
   const [showResult, setShowResult] = useState(false);
   const [hasAnswered, setHasAnswered] = useState(false);
 
+  // 防御性编程：如果 question 为 undefined，显示加载状态
+  if (!question) {
+    return (
+      <Card 
+        style={{ 
+          maxWidth: '800px', 
+          margin: '0 auto',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          borderRadius: '12px'
+        }}
+        bodyStyle={{ padding: '24px' }}
+      >
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: '24px', marginBottom: '16px' }}>🎯</div>
+          <div>加载题目中...</div>
+        </div>
+      </Card>
+    );
+  }
+
   const handleAnswer = useCallback((answerIndex: number) => {
-    if (hasAnswered) return;
+    if (hasAnswered || !question) return;
     
     setSelectedAnswer(answerIndex);
     setHasAnswered(true);
@@ -39,15 +59,15 @@ export const GameQuestionCard: React.FC<GameQuestionCardProps> = ({
     if (navigator.vibrate) {
       navigator.vibrate(result.isCorrect ? [100] : [200, 100, 200]);
     }
-  }, [hasAnswered, onAnswer, question.timeLimit, timeRemaining]);
+  }, [hasAnswered, onAnswer, question?.timeLimit, timeRemaining, question]);
 
   const handleSkip = useCallback(() => {
-    if (hasAnswered) return;
+    if (hasAnswered || !question) return;
     
     setHasAnswered(true);
     setShowResult(true);
     onSkip?.();
-  }, [hasAnswered, onSkip]);
+  }, [hasAnswered, onSkip, question]);
 
   const handleHint = useCallback(() => {
     if (!canUseHint || hasAnswered) return;
@@ -124,12 +144,13 @@ export const GameQuestionCard: React.FC<GameQuestionCardProps> = ({
 
   // 计算时间奖励倍数
   const timeBonusMultiplier = useMemo(() => {
+    if (!question?.timeLimit || question.timeLimit <= 0) return 1;
     const timeRatio = timeRemaining / question.timeLimit;
     if (timeRatio > 0.8) return 2;
     if (timeRatio > 0.6) return 1.5;
     if (timeRatio > 0.4) return 1.2;
     return 1;
-  }, [timeRemaining, question.timeLimit]);
+  }, [timeRemaining, question?.timeLimit]);
 
   return (
     <Card 

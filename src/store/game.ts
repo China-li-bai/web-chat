@@ -91,19 +91,29 @@ export const useGameStore = create<GameStoreFull>()(
 
       // 游戏会话管理
       startGame: async (params: StartGameParams) => {
+        console.log('=== GameStore: startGame 调用 ===');
+        console.log('接收到的参数:', params);
+        
         const { settings } = get();
         const customSettings = params.customSettings ? 
           { ...settings, ...params.customSettings } : settings;
 
+        console.log('自定义设置:', customSettings);
+
         set({ isLoading: true, error: null });
 
         try {
+          console.log('开始调用 gameService.createGameSession');
           const session = await gameService.createGameSession({
             ...params,
             settings: customSettings
           });
+          console.log('=== GameStore: 游戏会话创建成功 ===');
+          console.log('创建的会话:', session);
           set({ currentSession: session, isLoading: false });
         } catch (error) {
+          console.error('=== GameStore: 游戏会话创建失败 ===');
+          console.error('错误详情:', error);
           set({ 
             error: error instanceof Error ? error.message : '创建游戏失败',
             isLoading: false 
