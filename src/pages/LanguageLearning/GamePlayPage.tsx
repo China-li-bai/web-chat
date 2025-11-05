@@ -6,6 +6,9 @@ import type { GameDifficulty } from '@/types/game';
 import { useAppStore } from '@/store/useAppStore';
 import { createLearningSessionForWordbook, processStudyResponse } from '@/services/learningService';
 import { initializeDatabase, isDatabaseInitialized } from '@/services/dataInitService';
+import ImmediateFeedback, {
+  useImmediateFeedback,
+} from '@/components/language-learning/ImmediateFeedback';
 
 const { Title, Text } = Typography;
 
@@ -59,6 +62,10 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   const [isCorrect, setIsCorrect] = useState(false);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
   const [answerStartTime, setAnswerStartTime] = useState<number | null>(null); // 记录答题开始时间
+
+  // 沉浸式体验hooks
+  const { feedbackTrigger, triggerFeedback, clearFeedback } =
+    useImmediateFeedback();
 
   // 获取难度配置
   const getDifficultyConfig = (difficulty: GameDifficulty) => {
@@ -281,8 +288,26 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
       setScore(prev => prev + getDifficultyConfig(gameParams.difficulty).points);
       setCorrectAnswers(prev => prev + 1);
       message.success('正确！+ ' + getDifficultyConfig(gameParams.difficulty).points + ' 分');
+      
+      // 触发成功反馈
+      triggerFeedback({
+        type: 'success',
+        duration: 1500,
+        intensity: 'medium',
+        haptic: true,
+        sound: true,
+      });
     } else {
       message.error(`错误！正确答案是：${currentWord.translation}`);
+      
+      // 触发重试反馈
+      triggerFeedback({
+        type: 'retry',
+        duration: 1500,
+        intensity: 'light',
+        haptic: true,
+        sound: false,
+      });
     }
 
     // 2秒后进入下一题或结束游戏
@@ -317,67 +342,79 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   // 如果没有参数，返回首页
   if (!gameParams) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        flexDirection: 'column'
-      }}>
-        <Title level={3}>缺少游戏参数</Title>
-        <Button type="primary" onClick={() => navigate('/game')}>
-          返回游戏首页
-        </Button>
-      </div>
+      <>
+        {/* 即时反馈层 */}
+        <ImmediateFeedback trigger={feedbackTrigger} onComplete={clearFeedback} />
+        <div style={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          flexDirection: 'column'
+        }}>
+          <Title level={3}>缺少游戏参数</Title>
+          <Button type="primary" onClick={() => navigate('/game')}>
+            返回游戏首页
+          </Button>
+        </div>
+      </>
     );
   }
 
   // 加载中
   if (loading) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        flexDirection: 'column'
-      }}>
-        <Title level={3}>加载中...</Title>
-        <Text type="secondary">正在准备游戏题目</Text>
-      </div>
+      <>
+        {/* 即时反馈层 */}
+        <ImmediateFeedback trigger={feedbackTrigger} onComplete={clearFeedback} />
+        <div style={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          flexDirection: 'column'
+        }}>
+          <Title level={3}>加载中...</Title>
+          <Text type="secondary">正在准备游戏题目</Text>
+        </div>
+      </>
     );
   }
 
   // 错误处理
   if (error) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        flexDirection: 'column',
-        padding: '20px'
-      }}>
-        <Card style={{ maxWidth: '500px', textAlign: 'center' }}>
-          <Title level={3} style={{ color: '#ff4d4f' }}>⚠️ 加载失败</Title>
-          <Text type="secondary" style={{ display: 'block', marginBottom: '20px' }}>
-            {error}
-          </Text>
-          <Space>
-            <Button onClick={() => navigate('/game')}>
-              返回游戏首页
-            </Button>
-            <Button type="primary" onClick={() => {
-              setError(null);
-              setLoading(true);
-              window.location.reload();
-            }}>
-              重试
-            </Button>
-          </Space>
-        </Card>
-      </div>
+      <>
+        {/* 即时反馈层 */}
+        <ImmediateFeedback trigger={feedbackTrigger} onComplete={clearFeedback} />
+        <div style={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          flexDirection: 'column',
+          padding: '20px'
+        }}>
+          <Card style={{ maxWidth: '500px', textAlign: 'center' }}>
+            <Title level={3} style={{ color: '#ff4d4f' }}>⚠️ 加载失败</Title>
+            <Text type="secondary" style={{ display: 'block', marginBottom: '20px' }}>
+              {error}
+            </Text>
+            <Space>
+              <Button onClick={() => navigate('/game')}>
+                返回游戏首页
+              </Button>
+              <Button type="primary" onClick={() => {
+                setError(null);
+                setLoading(true);
+                window.location.reload();
+              }}>
+                重试
+              </Button>
+            </Space>
+          </Card>
+        </div>
+      </>
     );
   }
 
@@ -385,7 +422,10 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   if (gameEnded) {
     const stats = getGameStats();
     return (
-      <div style={{ 
+      <>
+        {/* 即时反馈层 */}
+        <ImmediateFeedback trigger={feedbackTrigger} onComplete={clearFeedback} />
+        <div style={{ 
         minHeight: '100vh', 
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         display: 'flex', 
@@ -436,13 +476,17 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
           </Space>
         </Card>
       </div>
+      </>
     );
   }
 
   // 游戏开始前
   if (!gameStarted) {
     return (
-      <div style={{ 
+      <>
+        {/* 即时反馈层 */}
+        <ImmediateFeedback trigger={feedbackTrigger} onComplete={clearFeedback} />
+        <div style={{ 
         minHeight: '100vh', 
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         display: 'flex', 
@@ -489,6 +533,7 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
           </Space>
         </Card>
       </div>
+      </>
     );
   }
 
@@ -498,12 +543,16 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
   const progress = ((currentQuestionIndex + 1) / words.length) * 100;
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px'
-    }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <>
+      {/* 即时反馈层 */}
+      <ImmediateFeedback trigger={feedbackTrigger} onComplete={clearFeedback} />
+
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '20px'
+      }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         
         {/* 顶部状态栏 */}
         <Card style={{ marginBottom: '20px' }}>
@@ -663,6 +712,7 @@ export const GamePlayPage: React.FC<GamePlayPageProps> = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
