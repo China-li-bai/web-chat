@@ -9,7 +9,6 @@ interface SessionHeaderProps {
 }
 
 export const SessionHeader: React.FC<SessionHeaderProps> = ({
-  wordbookId,
   onBack,
   currentItemIndex,
   segmentQueueLength
@@ -29,7 +28,6 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
       justifyContent: 'space-between',
       padding: '0 20px',
       position: 'relative',
-      zIndex: 9999
     }}>
       {/* 主要操作：返回 */}
       <button 

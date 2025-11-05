@@ -204,7 +204,6 @@
   align-items: center;
   justify-content: flex-start;
   width: 100%;
-  min-height: 100vh; /* 使用min-height而不是height */
   box-sizing: border-box;
 }
 
