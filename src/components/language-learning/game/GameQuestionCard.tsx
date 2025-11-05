@@ -3,7 +3,7 @@ import { Button, Card, Typography, Space, Row, Col, Tag, Tooltip } from 'antd';
 import { 
   CheckCircleOutlined, 
   CloseCircleOutlined, 
-  SkipOutlined, 
+  ForwardOutlined, 
   BulbOutlined,
   TrophyOutlined 
 } from '@ant-design/icons';
@@ -216,7 +216,7 @@ export const GameQuestionCard: React.FC<GameQuestionCardProps> = ({
           <Space size="middle">
             <Tooltip title="跳过本题（不扣分）">
               <Button 
-                icon={<SkipOutlined />} 
+                icon={<ForwardOutlined />} 
                 onClick={handleSkip}
                 disabled={hasAnswered}
               >

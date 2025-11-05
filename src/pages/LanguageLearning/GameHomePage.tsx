@@ -27,7 +27,7 @@ import {
 import { useGameStore } from '@/store/game';
 import { useAppStore } from '@/store/useAppStore';
 import { GameLayout, GameButton, GameStatCard, GameGrid } from '@/components/language-learning/game/GameLayout';
-import { useGameResponsive } from '@/hooks/useGameResponsive';
+import { useResponsive, useResponsiveProps } from '@/hooks/useGameResponsive';
 import type { GameType, GameDifficulty } from '@/types/game';
 
 const { Title, Text, Paragraph } = Typography;
@@ -42,7 +42,7 @@ export const GameHomePage: React.FC = () => {
     isLoading, 
     loadStatistics 
   } = useGameStore();
-  const { isMobile, isTablet } = useGameResponsive();
+  const { isMobile, isTablet } = useResponsive();
   
   const [selectedWordbook, setSelectedWordbook] = useState<number>(1);
   const [selectedGameType, setSelectedGameType] = useState<GameType>('vocabulary-match');
@@ -190,7 +190,7 @@ export const GameHomePage: React.FC = () => {
                       title={<span style={{ color: 'rgba(255,255,255,0.8)' }}>经验</span>} 
                       value={userLevel.experience} 
                       valueStyle={{ color: 'white' }}
-                      suffix="/ " + milestone.nextLevelExp
+                      suffix={`/ ${milestone.nextLevelExp}`}
                     />
                   </Col>
                   <Col xs={12} sm={6}>

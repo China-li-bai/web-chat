@@ -6,7 +6,7 @@ import {
   DesktopOutlined,
   HeartOutlined
 } from '@ant-design/icons';
-import { useGameResponsive } from '@/hooks/useGameResponsive';
+import { useResponsive, useResponsiveProps } from '@/hooks/useGameResponsive';
 
 const { Text, Title } = Typography;
 
@@ -21,8 +21,8 @@ export const GameLayout: React.FC<GameLayoutProps> = ({
   showDeviceInfo = false,
   className = ''
 }) => {
-  const { isMobile, isTablet, isDesktop, getCardPadding } = useGameResponsive();
-  const padding = getCardPadding();
+  const { isMobile, isTablet, isDesktop } = useResponsive();
+  const responsiveProps = useResponsiveProps();
 
   const getLayoutStyle = () => {
     if (isMobile) {
@@ -176,7 +176,7 @@ export const GameButton: React.FC<{
   style,
   className = ''
 }) => {
-  const { isMobile, isSmallMobile } = useGameResponsive();
+  const { isMobile, isSmallMobile } = useResponsive();
   const finalSize = size || (isSmallMobile ? 'small' : isMobile ? 'middle' : 'large');
   const finalBlock = block || isMobile;
   
@@ -228,7 +228,7 @@ export const GameStatCard: React.FC<{
   loading = false,
   onClick
 }) => {
-  const { isMobile, isSmallMobile } = useGameResponsive();
+  const { isMobile, isSmallMobile } = useResponsive();
   
   const getCardStyle = (): React.CSSProperties => ({
     backgroundColor: isMobile ? 'rgba(255,255,255,0.9)' : '#fff',
@@ -300,7 +300,7 @@ export const GameGrid: React.FC<{
   gutter?: [number, number] | number;
   className?: string;
 }> = ({ children, gutter = 16, className = '' }) => {
-  const { isMobile, isSmallMobile } = useGameResponsive();
+  const { isMobile, isSmallMobile } = useResponsive();
   
   const getGutter = () => {
     if (isSmallMobile) return [8, 8];

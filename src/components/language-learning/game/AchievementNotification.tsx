@@ -5,8 +5,7 @@ import {
   StarOutlined, 
   FireOutlined, 
   ThunderboltOutlined,
-  CrownOutlined,
-  MedalOutlined
+  CrownOutlined
 } from '@ant-design/icons';
 import type { AchievementNotificationProps, Achievement } from '@/types/game';
 
@@ -42,7 +41,7 @@ export const AchievementNotification: React.FC<AchievementNotificationProps> = (
         color: '#52c41a',
         borderColor: '#b7eb8f',
         bgColor: '#f6ffed',
-        icon: <MedalOutlined />,
+        icon: <StarOutlined />,
         textColor: '#389e0d'
       },
       rare: {

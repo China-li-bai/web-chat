@@ -303,8 +303,6 @@ export const useLearningSessionStore = create<LearningSessionStore>((set, get) =
     }));
   },
   
-  setSummaryStats: (stats) => set({ summaryStats: stats }),
-  
   addResponseTime: (time) => {
     set((state) => {
       const newTimes = [...state.responseTimesRef, time];

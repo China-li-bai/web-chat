@@ -6,7 +6,7 @@ import {
   FireOutlined, 
   ThunderboltOutlined,
   CrownOutlined,
-  MedalOutlined,
+  MailOutlined,
   PlayCircleOutlined,
   BarChartOutlined,
   ShareAltOutlined
@@ -26,19 +26,19 @@ export const GameResultModal: React.FC<GameResultModalProps> = ({
   const getGrade = (accuracy: number) => {
     if (accuracy >= 95) return { text: '完美', color: '#52c41a', icon: <CrownOutlined /> };
     if (accuracy >= 85) return { text: '优秀', color: '#1890ff', icon: <TrophyOutlined /> };
-    if (accuracy >= 70) return { text: '良好', color: '#faad14', icon: <MedalOutlined /> };
+    if (accuracy >= 70) return { text: '良好', color: '#faad14', icon: <MailOutlined /> };
     if (accuracy >= 60) return { text: '及格', color: '#fa8c16', icon: <StarOutlined /> };
     return { text: '需要努力', color: '#f5222d', icon: <FireOutlined /> };
   };
 
   const getRarityIcon = (rarity: string) => {
     const icons = {
-      common: <MedalOutlined />,
+      common: <MailOutlined />,
       rare: <StarOutlined />,
       epic: <FireOutlined />,
       legendary: <CrownOutlined />
     };
-    return icons[rarity as keyof typeof icons] || <MedalOutlined />;
+    return icons[rarity as keyof typeof icons] || <MailOutlined />;
   };
 
   const getRarityColor = (rarity: string) => {
