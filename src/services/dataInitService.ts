@@ -1,10 +1,10 @@
-import { getDB } from './database';
+import { databaseService } from './database';
 import sampleData from '../data/sample-learning-data.json';
 /**
  * Initializes the database with sample data if it's empty.
  */
 export async function initializeDatabase(userId: string): Promise<void> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   
   try {
     // Check if we need to seed data
@@ -147,7 +147,7 @@ async function insertSampleData(db: any, userId: string): Promise<void> {
  */
 export async function isDatabaseInitialized(): Promise<boolean> {
   try {
-    const db = await getDB();
+    const db = await databaseService.getConnection();
     const result = await db.exec({
       sql: 'SELECT COUNT(*) as count FROM wordbooks'
     });

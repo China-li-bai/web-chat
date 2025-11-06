@@ -1,4 +1,4 @@
-import { getDB } from './database';
+import { databaseService } from './database';
 
 type GeneratedPractice = {
   referenceText: string;
@@ -27,7 +27,7 @@ type GeneratedPractice = {
  * - Store tips and vocabulary as system messages with meta.type
  */
 export async function saveGeneratedPractice(payload: GeneratedPractice, userId: string): Promise<{ sessionId: number, turnId: number }> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
 
   // Create session
   const topic = payload?.meta?.goal || 'practice';

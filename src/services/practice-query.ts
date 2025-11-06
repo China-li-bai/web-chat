@@ -1,4 +1,4 @@
-import { getDB } from './database';
+import { databaseService } from './database';
 
 export type DialogueItem = {
   role: 'user' | 'assistant';
@@ -32,7 +32,7 @@ export type PracticePromptOutput = {
  * Build practice session JSON matching practice-goal-driven.md Output Format (JSON only)
  */
 export async function getPracticeSessionJSON(sessionId: number): Promise<PracticePromptOutput> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
 
   // session meta
   const sessionRow = await db.exec({
@@ -174,7 +174,7 @@ export async function getRecentPracticeSessions(userId: string, limit = 20, offs
   createdAt: string;
   lastUpdated: string | null;
 }>> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const rows = await db.exec({
     sql: `
       SELECT "id","topic","difficulty","createdAt","lastUpdated"
@@ -203,7 +203,7 @@ export async function getPracticeTurns(sessionId: number): Promise<Array<{
   createdAt: string;
   transcription: string | null;
 }>> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const rows = await db.exec({
     sql: `
       SELECT "id","referenceText","createdAt","transcription"
@@ -225,7 +225,7 @@ export async function getPracticeTurns(sessionId: number): Promise<Array<{
  * Frontend-friendly lightweight accessors to match existing imports in Practice.jsx
  */
 export async function getDialogue(sessionId: number): Promise<DialogueItem[]> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const rows = await db.exec({
     sql: `
       SELECT "role","content","contentZh","lang","meta","createdAt"
@@ -250,7 +250,7 @@ export async function getDialogue(sessionId: number): Promise<DialogueItem[]> {
 }
 
 export async function getTips(sessionId: number): Promise<string[]> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const row = await db.exec({
     sql: `
       SELECT "content","meta"
@@ -269,7 +269,7 @@ export async function getTips(sessionId: number): Promise<string[]> {
 }
 
 export async function getVocabulary(sessionId: number): Promise<VocabularyItem[]> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const row = await db.exec({
     sql: `
       SELECT "content","meta"
@@ -288,7 +288,7 @@ export async function getVocabulary(sessionId: number): Promise<VocabularyItem[]
 }
 
 export async function getReferenceText(sessionId: number): Promise<string> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const row = await db.exec({
     sql: `
       SELECT "referenceText"

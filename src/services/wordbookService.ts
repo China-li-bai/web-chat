@@ -1,4 +1,4 @@
-import { getDB } from './database';
+import { databaseService } from './database';
 import cet4Data from '@/data/cet4-core.json';
 import gmatData from '@/data/gmat-core.json';
 import satData from '@/data/sat-advanced.json';
@@ -61,7 +61,7 @@ async function seedFromFile(db: any, fileData: ImportFile, userId: string) {
 
 // Function to seed initial data
 export async function seedInitialData(userId: string) {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   
   console.log('Seeding initial data if necessary...');
   
@@ -73,7 +73,7 @@ export async function seedInitialData(userId: string) {
 }
 
 export async function getAllWordbooksWithStats(userId: string): Promise<WordbookWithStats[]> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const books = (await db.exec({
     sql: 'SELECT * FROM "wordbooks" ORDER BY "createdAt" DESC',
   })) as any[];
@@ -137,7 +137,7 @@ export async function getAllWordbooksWithStats(userId: string): Promise<Wordbook
 }
 
 export async function checkWordbookExists(name: string): Promise<boolean> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const existing = await db.exec({
     sql: 'SELECT "id" FROM "wordbooks" WHERE "name" = ?',
     args: [name],
@@ -147,7 +147,7 @@ export async function checkWordbookExists(name: string): Promise<boolean> {
 
 
 export async function importWordbook(jsonContent: string, userId: string): Promise<{ status: 'created' | 'updated', wordbookId: number }> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const parsed = JSON.parse(jsonContent);
   const data: ImportFile = ensureImportFileSchema(parsed);
 

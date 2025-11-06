@@ -1,5 +1,5 @@
 // keep: Imports aligned with existing db.ts usage
-import { getDB } from '@/services/database';
+import { databaseService } from '@/services/database';
 
 export interface CreateSessionInput {
   userId: string;
@@ -35,7 +35,7 @@ export interface AppendMessageInput {
 // Linus-style minimal, explicit SQL-based DAO for wa-sqlite
 
 export async function createSession(input: CreateSessionInput): Promise<number> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   await db.exec({
     sql: `
       INSERT INTO "practice_sessions" ("userId","topic","difficulty","lastUpdated")
@@ -56,7 +56,7 @@ export async function createSession(input: CreateSessionInput): Promise<number> 
 }
 
 export async function startTurn(input: StartTurnInput): Promise<number> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   await db.exec({
     sql: `
       INSERT INTO "practice_turns" ("sessionId","referenceText")
@@ -76,7 +76,7 @@ export async function startTurn(input: StartTurnInput): Promise<number> {
 }
 
 export async function completeTurn(input: CompleteTurnInput): Promise<void> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   await db.exec({
     sql: `
       UPDATE "practice_turns"
@@ -104,7 +104,7 @@ export async function completeTurn(input: CompleteTurnInput): Promise<void> {
 }
 
 export async function appendMessage(input: AppendMessageInput): Promise<number> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const metaStr = input.meta ? JSON.stringify(input.meta) : null;
   await db.exec({
     sql: `
@@ -125,7 +125,7 @@ export async function appendMessage(input: AppendMessageInput): Promise<number> 
 }
 
 export async function getLatestTurn(sessionId: number): Promise<any | null> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const rows = await db.exec({
     sql: `
       SELECT * FROM "practice_turns"
@@ -138,7 +138,7 @@ export async function getLatestTurn(sessionId: number): Promise<any | null> {
 }
 
 export async function listMessages(sessionId: number): Promise<Array<any>> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const rows = await db.exec({
     sql: `
       SELECT * FROM "practice_messages"
@@ -170,7 +170,7 @@ export async function beginPracticeSession(
 
 /** 获取某用户最新的练习会话 */
 export async function getLatestSession(userId: string): Promise<any | null> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const rows = await db.exec({
     sql: `
       SELECT * FROM "practice_sessions"

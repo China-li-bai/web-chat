@@ -17,7 +17,7 @@ import {
 } from '@ant-design/icons';
 import { useGameStore } from '@/store/game';
 import { useAppStore } from '@/store/useAppStore';
-import { getDB } from '@/services/database';
+import { databaseService } from '@/services/database';
 import type { GameType, GameDifficulty } from '@/types/game';
 import type { WordbookWithStats } from '@/types/wordbook';
 
@@ -89,7 +89,7 @@ export const GameHomePage: React.FC = () => {
     
     try {
       setLoading(true);
-      const db = await getDB();
+      const db = await databaseService.getConnection();
       
       // 直接查询词书列表和统计信息
       const books = await db.exec({
