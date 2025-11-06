@@ -1,4 +1,4 @@
-import { getDB } from './db';
+import { getDB } from './database';
 import cet4Data from '@/data/cet4-core.json';
 import gmatData from '@/data/gmat-core.json';
 import satData from '@/data/sat-advanced.json';

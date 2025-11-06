@@ -1,4 +1,4 @@
-import { getDB } from '@/services/db';
+import { databaseService } from '@/services/database';
 import type { 
   GameSession, 
   GameQuestion, 
@@ -12,7 +12,6 @@ import type {
 
 class GameService {
   private static instance: GameService;
-  private db: any = null;
 
   static getInstance(): GameService {
     if (!GameService.instance) {
@@ -21,16 +20,9 @@ class GameService {
     return GameService.instance;
   }
 
-  async initDB() {
-    if (!this.db) {
-      this.db = await getDB();
-    }
-    return this.db;
-  }
-
   // 创建游戏会话
   async createGameSession(params: StartGameParams): Promise<GameSession> {
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     const sessionId = this.generateId();
     const now = new Date().toISOString();
     
@@ -123,7 +115,7 @@ class GameService {
 
   // 生成游戏问题
   async generateGameQuestions(params: GenerateGameQuestionsParams): Promise<GameQuestion[]> {
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     
     try {
       console.log('=== GameService: 开始生成游戏问题 ===');
@@ -311,7 +303,7 @@ class GameService {
 
   // 生成干扰选项
   private async generateOptions(correctDefinition: string, difficulty: string): Promise<string[]> {
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     const options: string[] = [correctDefinition];
     
     // 从其他单词的翻译中随机选择作为干扰项
@@ -358,7 +350,7 @@ class GameService {
       pointsEarned: number;
     }
   ): Promise<void> {
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     
     await db.exec({
       sql: `INSERT INTO game_answers (
@@ -375,7 +367,7 @@ class GameService {
 
   // 保存跳过记录
   async saveSkip(sessionId: string, questionId: string): Promise<void> {
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     
     await db.exec({
       sql: `INSERT INTO game_answers (
@@ -391,7 +383,7 @@ class GameService {
   // 保存提示使用
   async saveHintUse(sessionId: string, questionId: string): Promise<void> {
     // 提示功能可以记录到专门的表中或追加到game_answers的feedback字段
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     
     await db.exec({
       sql: `UPDATE game_answers SET feedback = ? 
@@ -402,7 +394,7 @@ class GameService {
 
   // 结束游戏会话
   async finishGameSession(sessionId: string): Promise<{ result: GameResult; updatedStatistics: GameStatistics }> {
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     
     // 获取会话信息
     const sessionResult = await db.exec({
@@ -490,7 +482,7 @@ class GameService {
 
   // 更新用户统计
   private async updateUserStatistics(userId: string, wordbookId: number, result: GameResult): Promise<GameStatistics> {
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     
     // 获取现有统计
     const existingStats = await db.exec({
@@ -595,7 +587,7 @@ class GameService {
 
   // 获取用户统计
   async getUserStatistics(userId: string, wordbookId: number): Promise<GameStatistics> {
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     
     const result = await db.exec({
       sql: 'SELECT * FROM game_statistics WHERE userId = ? AND wordbookId = ?',
@@ -634,7 +626,7 @@ class GameService {
 
   // 获取排行榜
   async getLeaderboard(period: string, gameType?: string, difficulty?: string): Promise<Leaderboard> {
-    const db = await this.initDB();
+    const db = await databaseService.getConnection();
     const now = new Date();
     let startDate: Date;
 

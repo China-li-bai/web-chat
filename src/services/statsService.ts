@@ -1,4 +1,4 @@
-import { getDB } from './db';
+import { databaseService } from './database';
 
 export interface OverallStats {
   totalWords: number;
@@ -40,7 +40,7 @@ export interface WordTypeStatistics {
 }
 
 export async function getOverallStats(userId: string): Promise<OverallStats> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
 
   // 获取用户相关的单词总数
   const totalWordsResult = await db.exec({
@@ -91,7 +91,7 @@ export async function getOverallStats(userId: string): Promise<OverallStats> {
 }
 
 export async function getHeatmapData(userId: string): Promise<HeatmapData[]> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const rows = await db.exec({
     sql: `
       SELECT
@@ -113,7 +113,7 @@ export async function getHeatmapData(userId: string): Promise<HeatmapData[]> {
 }
 
 export async function getProficiencyStats(userId: string): Promise<ProficiencyData[]> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const rows = await db.exec({
     sql: `
       SELECT
@@ -140,7 +140,7 @@ export async function getProficiencyStats(userId: string): Promise<ProficiencyDa
  * @returns 长期学习统计数据
  */
 export async function getLearningStatistics(userId: string, days: number = 30): Promise<LearningStatistics[]> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   
   // 获取最近N天的学习统计数据
   const result = await db.exec({
@@ -178,7 +178,7 @@ export async function getLearningStatistics(userId: string, days: number = 30): 
  * @returns 单词类型统计数据
  */
 export async function getWordTypeStatistics(userId: string, days: number = 30): Promise<WordTypeStatistics[]> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   
   // 获取最近N天的单词类型统计数据
   const result = await db.exec({
@@ -212,7 +212,7 @@ export async function getWordTypeStatistics(userId: string, days: number = 30): 
  * - 不改变 words/learning_progress 的结构，不触碰 wordCount
  */
 export async function finalizeSessionStatistics(userId: string, date?: string): Promise<{ ok: boolean; updatedDates: string[] }> {
-  const db = await getDB();
+  const db = await databaseService.getConnection();
   const nowIso = new Date().toISOString();
   const day = (date || nowIso.split('T')[0]);
 

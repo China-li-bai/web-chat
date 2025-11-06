@@ -1,4 +1,4 @@
-import { getDB } from './db';
+import { getDB } from './database';
 
 type GeneratedPractice = {
   referenceText: string;

@@ -1,4 +1,4 @@
-import { getDB } from './db';
+import { getDB } from './database';
 import sampleData from '../data/sample-learning-data.json';
 /**
  * Initializes the database with sample data if it's empty.

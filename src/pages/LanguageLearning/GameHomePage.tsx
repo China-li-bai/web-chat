@@ -17,7 +17,7 @@ import {
 } from '@ant-design/icons';
 import { useGameStore } from '@/store/game';
 import { useAppStore } from '@/store/useAppStore';
-import { getDB } from '@/services/db';
+import { getDB } from '@/services/database';
 import type { GameType, GameDifficulty } from '@/types/game';
 import type { WordbookWithStats } from '@/types/wordbook';
 

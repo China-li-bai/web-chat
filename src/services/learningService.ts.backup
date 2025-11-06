@@ -1,4 +1,4 @@
-import { databaseService } from './database';
+import { getDB } from './db';
 import { MemoryLearningManager } from '@/lib/memo/MemoryLearningManager';
 import type { LearningItem, LearningItemType, StudyRecord } from '@/lib/memo/types';
 import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
@@ -20,8 +20,21 @@ interface WordWithProgress {
 }
 
 export async function createLearningSessionForWordbook(wordbookId: number, userId: string) {
+  const db = await getDB();
+
   // 1. Fetch all words and their progress for the given wordbook that are due
-  const wordsAndProgress = await databaseService.getWordsForReview(wordbookId, userId, 200);
+  const now = new Date().toISOString();
+  const wordsAndProgress = (await db.exec({
+    sql: `
+      SELECT
+        w.id, w.word, w.type, w.phonetic, w.definition, w.translation, w.example, w.createdAt,
+        lp.stability, lp.retrievability, lp.difficulty, lp.nextReview, lp.lastReview, lp.state
+      FROM words w
+      JOIN learning_progress lp ON w.id = lp.wordId
+      WHERE w.wordbookId = ? AND lp.nextReview <= ? AND w.userId = ?
+    `,
+    args: [wordbookId, now, userId],
+  })) as any[];
 
   // 2. Map to the format expected by the MemoryLearningManager
   const learningItems: LearningItem[] = wordsAndProgress.map((row: any) => ({
@@ -47,7 +60,7 @@ export async function createLearningSessionForWordbook(wordbookId: number, userI
   let studyRecords: StudyRecord[] = [];
   if (wordIds.length > 0) {
     const placeholders = wordIds.map(() => '?').join(',');
-    const logs = await databaseService.exec({
+    const logs = await db.exec({
       sql: `SELECT * FROM study_logs WHERE itemId IN (${placeholders}) ORDER BY timestamp DESC LIMIT 100`,
       args: wordIds,
     });
@@ -105,13 +118,14 @@ export async function startSessionFromTodayPlan(params: {
   targetDurationSeconds?: number; // 可选，会话目标时长
 }): Promise<LearningSession> {
   const { userId, plan } = params;
+  const db = await getDB();
 
   // 获取详细字段（type/phonetic/definition/example 及 progress）
   const ids = (plan.items || []).map(i => i.wordId).filter(n => Number.isFinite(n));
   let rows: any[] = [];
   if (ids.length > 0) {
     const placeholders = ids.map(() => '?').join(',');
-    rows = await databaseService.exec({
+    rows = await db.exec({
       sql: `
         SELECT
           w.id, w.word, w.type, w.phonetic, w.definition, w.translation, w.example, w.createdAt,
@@ -279,8 +293,9 @@ export async function getTodayPlan(params: {
 
   // 基于昨日统计的轻量配额微调：按词书昨日 again/hard 占比，上调今日 quota，封顶 20%
   try {
+    const db = await getDB();
     const yesterday = new Date(Date.now() - 24 * 3600 * 1000).toISOString().split('T')[0];
-    const rows = await databaseService.exec({
+    const rows = await db.exec({
       sql: `
         SELECT 
           w.wordbookId AS wordbookId,
@@ -401,7 +416,7 @@ export async function aggregateDailyStudyAndUpdateProgress(params: {
   userId: string;
   date?: string; // YYYY-MM-DD（可选，默认当天）
 }): Promise<{ updatedWordbooks: Array<{ wordbookId: number; masteredCount: number; progress: number }> }> {
-  const db = await databaseService.getConnection();
+  const db = await getDB();
   const { userId } = params;
   const nowIso = new Date().toISOString();
   const todayStr = (params.date || nowIso.split('T')[0]);
@@ -519,7 +534,7 @@ export async function processStudyResponse(
   const confidence = confidenceMap[response];
 
   const wordId = Number(itemId);
-  const db = await databaseService.getConnection();
+  const db = await getDB();
 
   // 获取当前进度（仅用于日志记录）
   const currentProgress = await db.exec({
@@ -602,7 +617,7 @@ export async function updateLearningStatistics(
   stability: number,
   retrievability: number
 ) {
-  const db = await databaseService.getConnection();
+  const db = await getDB();
   const now = new Date().toISOString();
   const today = now.split('T')[0];
 
@@ -669,7 +684,7 @@ export async function updateWordTypeStatistics(
   stability: number,
   retrievability: number
 ) {
-  const db = await databaseService.getConnection();
+  const db = await getDB();
   const now = new Date().toISOString();
   const today = now.split('T')[0];
 
@@ -734,7 +749,7 @@ export async function schedulePlannedReviews(params: {
   wordbookId: number;
   planned: Array<{ itemId: string; category: 'mastered' | 'shaky' | 'forgotten'; nextReview: Date }>;
 }): Promise<{ updated: number }> {
-  const db = await databaseService.getConnection();
+  const db = await getDB();
   const { userId, planned } = params;
   let updated = 0;
 
@@ -768,7 +783,7 @@ export async function getReviewQueueGroupedByWordbook(params: {
   page?: number;
   pageSize?: number;
 }) {
-  const db = await databaseService.getConnection();
+  const db = await getDB();
   const userId = params.userId;
   const page = Math.max(1, params.page || 1);
   const pageSize = Math.max(1, Math.min(100, params.pageSize || 10));
@@ -863,7 +878,7 @@ export async function getDueItems(params: {
   page?: number;
   pageSize?: number;
 }) {
-  const db = await databaseService.getConnection();
+  const db = await getDB();
   const userId = params.userId;
   const wordbookId = params.wordbookId;
   const includeUpcoming = !!params.includeUpcoming;
@@ -942,7 +957,7 @@ export async function createLearningSessionForWordbookExtended(params: {
   includeUpcoming?: boolean; // false=仅到期；true=含24h内
   startsWith?: string; // 'A'-'Z' 或 '#'
 }) {
-  const db = await databaseService.getConnection();
+  const db = await getDB();
   const { userId, wordbookId } = params;
   const includeUpcoming = !!params.includeUpcoming;
   const letter = (params.startsWith || '').trim().toLowerCase();

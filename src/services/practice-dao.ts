@@ -1,5 +1,5 @@
 // keep: Imports aligned with existing db.ts usage
-import { getDB } from '@/services/db';
+import { getDB } from '@/services/database';
 
 export interface CreateSessionInput {
   userId: string;
