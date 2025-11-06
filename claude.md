@@ -104,16 +104,18 @@ chmod +x scripts/dev.sh    # Make script executable (first time only)
 4. Test on multiple difficulty levels
 
 ### Database Schema Changes
-1. Update schema in `db.ts` with migration logic
-2. Generate TypeScript types from schema
-3. Update all related service layer functions
+1. Update schema in `src/services/database/schemas/` with proper TypeScript types
+2. Add migration in `src/services/database/migrations/`
+3. Update service layer functions in `learningService.ts`
 4. Test with both new and existing data
 
 ## Core Architecture
 
-### Database Layer (`src/services/db.ts`)
+### Database Layer (`src/services/database/`)
 - Uses wa-sqlite with IndexedDB VFS for persistence
-- Auto-migration system for schema updates
+- Unified `databaseService` interface with type-safe query methods
+- Auto-migration system for schema updates with `MigrationManager`
+- Domain-specific schemas: learning, practice, game, user
 - Tables: wordbooks, words, learning_progress, study_logs, learning_statistics
 - Self-healing database corruption recovery
 
@@ -268,7 +270,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
 ## Important File Locations
 
-- Database service: `src/services/db.ts`
+- Database service: `src/services/database/index.ts` - 统一数据库服务层
 - Learning algorithm: `src/lib/memo/MemoryLearningManager.ts`
 - **🎮 Game Learning**: `src/pages/LanguageLearning/GamePlayPage.tsx`
 - **✨ Canvas Feedback**: `src/components/language-learning/ImmediateFeedback.tsx`
@@ -412,7 +414,7 @@ DEV Community
 ## 开发时前端項目的一些注意事项
 - 项目采用 npm 作为包管理工具
 - 项目采用 TypeScript 作为开发语言
-- 项目采用 React 18 作为前端框架
+- 项目采用 React  作为前端框架
 - 项目采用 Vite 作为构建工具
 - 项目采用 Tauri 作为跨平台打包工具
 - 严格控制版本依赖，避免版本冲突
@@ -462,9 +464,44 @@ DEV Community
 - `GamePlayPage.tsx` - 遊戲化學習主頁面 + Canvas反饋系統
 - `ImmediateFeedback.tsx` - 增強型粒子動效引擎
 - `ImmediateFeedback.css` - Z-index衝突修復
-- ~~`wordbookService.ts`~~ - 已移除，合併至 learningService.ts
+
 
 **Next Steps**:
 - 🎯 測試不同設備上的Canvas粒子性能
 - 🎯 優化低端設備的粒子數量
 - 🎯 添加更多反饋類型的視覺效果
+
+### 🎯 Phase 2: 核心服务迁移完成
+
+**Date**: 2025-11-06  
+**Status**: ✅ COMPLETED
+
+**Key Achievements**:
+1. **Database Service Unification**:
+   - ✅ 重构数据库服务层到 `src/services/database/`
+   - ✅ 统一 `databaseService` 接口替代旧的 `db.ts`
+   - ✅ 类型安全的查询方法和域特定模式
+   - ✅ 修复所有导入路径和 `db.exec` 错误
+
+2. **Service Layer Consolidation**:
+   - ✅ 合并 `wordbookService.ts` 功能到 `learningService.ts`
+   - ✅ 移除重复的服务文件，避免功能重复
+   - ✅ 更新所有组件导入路径
+   - ✅ 保持功能完整性和向后兼容
+
+3. **Unified Learning Architecture**:
+   - ✅ `learningService.ts` 现包含词书管理、学习会话、FSRS算法
+   - ✅ 统一数据库访问模式
+   - ✅ 简化服务层依赖关系
+
+**Technical Verification**:
+- ✅ TypeScript编译无错误
+- ✅ 开发服务器启动成功  
+- ✅ 所有服务功能正常运行
+- ✅ 数据库迁移和类型安全验证通过
+
+**File Structure Updates**:
+- `src/services/database/` - 新的统一数据库服务层
+- `src/services/learningService.ts` - 合并后的学习服务 (含词书管理)
+- ~~`src/services/wordbookService.ts`~~ - 已移除，功能合并至 learningService.ts
+- ~~`src/services/db.ts`~~ - 已替换为新的database服务架构
