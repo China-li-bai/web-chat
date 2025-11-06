@@ -69,15 +69,9 @@ const LearningSessionPage: React.FC = () => {
   // 问题类型逻辑
   const questionType = useMemo(() => {
     if (questionMode === "flashcard-only") return "flashcard";
-
-    const baseCycle: string[] = [
-      "flashcard",
-      "choice",
-      "spelling",
-      "listening",
-    ];
+    
     if (questionMode === "mixed") {
-      return baseCycle[currentItemIndex % baseCycle.length] as any;
+      return ["flashcard", "choice", "spelling", "listening"][currentItemIndex % 4] as any;
     }
 
     return "flashcard"; // 简化自适应逻辑
@@ -120,9 +114,10 @@ const LearningSessionPage: React.FC = () => {
       // 添加响应时间
       addResponseTime(responseTime);
 
-      // 验证响应时间
+      // 可疑响应时间检查
       if (responseTime < 100) {
-        console.warn("Unusually fast response time detected:", responseTime);
+        console.warn("可疑的快速响应时间:", responseTime);
+        // 可以考虑标记为可疑数据或直接忽略
       }
 
       try {
