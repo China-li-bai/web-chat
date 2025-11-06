@@ -45,19 +45,26 @@ npm test -- --run --reporter=verbose  # Run tests with detailed output
 
 # Backend
 npm run server             # Start backend server
+
+# Using Development Scripts (Recommended)
+chmod +x scripts/dev.sh    # Make script executable (first time only)
+./scripts/dev.sh           # Start full development environment (frontend + backend)
 ```
 
 ## Technology Stack
 
 - **Frontend**: React 18 + Vite + Tauri
-- **UI Library**: Ant Design 5
+- **UI Library**: Ant Design 5 + Radix UI components
 - **State Management**: Zustand with immer middleware
 - **Database**: wa-sqlite (WebAssembly SQLite) for local-first approach
 - **Routing**: React Router DOM 6
 - **🎮 Game System**: Canvas Particle Effects + Game Mechanics
 - **✨ Visual Feedback**: Canvas 2D API + Web Audio API + Device Vibration API
-- **AI Services**: Multiple providers (Gemini, Baidu, iFlytek, Tencent)
-- **Learning Algorithm**: FSRS (Free Spaced Repetition Scheduler) + SuperMemo
+- **AI Services**: Multiple providers (Gemini, OpenAI, iFlytek, Tencent)
+- **Learning Algorithm**: FSRS (Free Spaced Repetition Scheduler) + SuperMemo + fsrs-browser
+- **Audio Processing**: Web Audio API + MediaRecorder + WaveSurfer.js
+- **Build Tools**: Vite + Vitest + PostCSS + TailwindCSS
+- **Development**: TypeScript strict mode + ESLint + Prettier
 
 ## Entry Points & Key Files
 
@@ -66,6 +73,20 @@ npm run server             # Start backend server
 - **Canvas Feedback**: `src/components/language-learning/ImmediateFeedback.tsx` - 粒子反饋系統
 - **Learning Service**: `src/services/learningService.ts` - 統一學習邏輯服務層
 - **Database Service**: `src/services/db.ts` - wa-sqlite數據庫操作
+
+### Application Routes
+- `/` - Home page
+- `/practice` - General practice page
+- `/today-plan` - Daily learning plan
+- `/language-learning` - Main language learning hub
+- `/learning-session/:wordbookId` - Traditional learning session
+- `/statistics` - Learning statistics dashboard
+- `/review-planner` - FSRS-based review planning
+- `/progress` - Learning progress tracking
+- `/settings` - Application settings
+- `/particle-test` - Visual effects testing page
+- `/game` - Game hub (`GameHomePage`)
+- `/game/play` - Active game session (`GamePlayPage`)
 
 ## Common Development Workflows
 
@@ -109,8 +130,19 @@ npm run server             # Start backend server
 
 ### wa-sqlite Integration (`src/packages/wa-sqlite-adapter/`)
 - Custom adapter for wa-sqlite database operations
-- `BasicDatabase` class for connection management
+- `BasicDatabase` class for connection management  
 - Type-safe query execution with error handling
+- IndexedDB VFS for persistent local storage
+- Auto-migration system for schema updates
+
+### Game Architecture (`src/pages/LanguageLearning/GamePlayPage.tsx`)
+- **Game State Management**: Integrated with Zustand stores (`useAppStore`, game-specific stores)
+- **Question Flow**: Vocabulary matching with multiple choice options
+- **Difficulty Levels**: easy/medium/hard/expert with dynamic question generation
+- **Real-time Feedback**: Canvas particle effects + haptic + audio feedback
+- **FSRS Integration**: Immediate learning progress updates via `learningService.ts`
+- **Timer System**: Countdown challenges with score tracking
+- **Session Management**: Complete game lifecycle from start to finish
 
 ### AI Services (`src/modules/ai/`)
 - Multiple LLM providers (OpenAI, Gemini, etc.)
@@ -340,33 +372,40 @@ DEV Community
 - **⚠️ REQUIRED**: Fix any script failures immediately, then continue using .sh scripts
 - **⚠️ REQUIRED**: Configure Logger with File Output to `logs/` directory before debugging
 
-### Development Scripts Setup
+### Available Development Scripts
 ```bash
-# Ensure scripts directory exists with necessary .sh files
-mkdir -p scripts
-# Development server startup
-scripts/dev-start.sh
-# Production build
-scripts/build.sh  
-# Testing execution
-scripts/test.sh
+# Full development environment (frontend + backend)
+./scripts/dev.sh
+
+# HTTP setup and validation
+./scripts/setup-app-http.sh
+./scripts/simple-validate.cjs
+./scripts/validate-refactor.cjs
+
+# HTTPS/Cloudflare setup
+./scripts/switch-to-https-cf.sh
 ```
 
 ## Quick Reference
 
 ### Common Tasks
-- **Start development**: `npm run dev` + `npm run tauri:dev`
+- **Start development**: `./scripts/dev.sh` (recommended) or `npm run dev` + `npm run tauri:dev`
 - **Run single test**: `npm test -- --run src/file.test.tsx`
 - **Check TypeScript**: `npm run build` (includes type checking)
 - **View learning data**: Access wa-sqlite database via browser dev tools
 - **Debug Canvas effects**: Check browser console for particle system logs
+- **Game testing**: Navigate to `/game/play` route for game mechanics
+- **Particle testing**: Navigate to `/particle-test` route for visual effects testing
 
 ### Key Dependencies
-- **Tauri**: Cross-platform desktop app framework
-- **wa-sqlite**: WebAssembly SQLite for local-first storage
-- **FSRS**: Free Spaced Repetition Scheduler algorithm
-- **Zustand**: Lightweight state management
-- **Ant Design**: UI component library
+- **Tauri**: Cross-platform desktop app framework (^2.7.0)
+- **wa-sqlite**: WebAssembly SQLite for local-first storage (^1.0.0)
+- **FSRS**: Multiple FSRS implementations - fsrs-browser (^4.1.1), ts-fsrs (^5.2.3), @open-spaced-repetition/sm-2 (^0.2.1)
+- **Zustand**: Lightweight state management (^4.4.0)
+- **Ant Design**: UI component library (^5.12.0)
+- **AI SDK**: Multiple AI providers - @ai-sdk/openai (^2.0.52), @google/genai (^1.0.0), @google/generative-ai (^0.24.1)
+- **Audio**: WaveSurfer.js (^7.0.0), RecordRTC (^5.6.0)
+- **Testing**: Vitest (^0.34.6) with UI support
 
 
 
