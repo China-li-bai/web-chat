@@ -16,7 +16,7 @@ import { ArrowLeftOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { createLearningSessionForWordbook, processStudyResponse, schedulePlannedReviews, startSessionFromTodayPlan, aggregateDailyStudyAndUpdateProgress } from '@/services/learningService';
 import { evaluateRewardsOnEvent, addDailyFocusProgress } from '@/services/rewardService';
 import { finalizeSessionStatistics } from '@/services/statsService';
-import { importWordbook } from '@/services/wordbookService';
+import { importWordbook } from '@/services/learningService';
 import { useAppStore } from '@/store/useAppStore';
 import './LearningSessionPage.css';
 import { selectNextQuestionType, type QuestionType } from '@/modules/qts';

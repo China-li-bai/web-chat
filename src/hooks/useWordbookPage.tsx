@@ -6,7 +6,7 @@ import {
   getAllWordbooksWithStats, 
   importWordbook, 
   checkWordbookExists 
-} from '@/services/wordbookService';
+} from '@/services/learningService';
 import { type WordbookWithStats, type ImportFile } from '@/types/wordbook';
 import { useAppStore } from '@/store/useAppStore';
 import { useFileImport } from '@/hooks/useFileImport';

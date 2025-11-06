@@ -1,4 +1,4 @@
-import { databaseService } from '@/services/database';
+import { databaseService } from '@/services/database/index';
 import type { 
   GameSession, 
   GameQuestion, 

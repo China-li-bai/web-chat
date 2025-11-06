@@ -1,4 +1,4 @@
-import { checkWordbookExists, importWordbook } from '@/services/wordbookService';
+import { checkWordbookExists, importWordbook } from '@/services/learningService';
 import { defaultBaseByProvider, resolveBaseUrl } from './provider';
 import type { WordbookGenerateBaseOptions, ExplicitProviderOptions, ProviderKey, ConfirmOverwrite } from './types';
 import { ensureImportFileSchema, type GenerateOptions, type ImportFile } from '@/types/wordbook';

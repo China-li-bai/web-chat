@@ -67,8 +67,8 @@ export const DatabaseFixTestPage: React.FC = () => {
       // 测试4: 获取词书列表
       addTestResult('4. 获取词书列表', 'info');
       try {
-        const { getDB } = await import('@/services/db');
-        const db = await getDB();
+        const { databaseService } = await import('@/services/database/index');
+        const db = await databaseService.getConnection();
         const wordbooks = await db.exec({
           sql: 'SELECT id, name FROM wordbooks LIMIT 5'
         });

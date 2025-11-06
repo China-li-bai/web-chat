@@ -1,7 +1,12 @@
-import { databaseService } from './database';
+import { databaseService } from './database/index';
 import { MemoryLearningManager } from '@/lib/memo/MemoryLearningManager';
 import type { LearningItem, LearningItemType, StudyRecord } from '@/lib/memo/types';
 import type { LearningSession } from '@/lib/memo/MemoryLearningManager';
+import cet4Data from '@/data/cet4-core.json';
+import gmatData from '@/data/gmat-core.json';
+import satData from '@/data/sat-advanced.json';
+import { ImportFile, Wordbook, WordbookWithStats } from '@/types/wordbook';
+import { ensureImportFileSchema } from '@/types/wordbook';
 
 interface WordWithProgress {
   id: number;
@@ -147,7 +152,7 @@ export async function startSessionFromTodayPlan(params: {
   let studyRecords: StudyRecord[] = [];
   if (wordIds.length > 0) {
     const placeholders = wordIds.map(() => '?').join(',');
-    const logs = await db.exec({
+    const logs = await databaseService.exec({
       sql: `SELECT * FROM study_logs WHERE itemId IN (${placeholders}) ORDER BY timestamp DESC LIMIT 200`,
       args: wordIds,
     });
@@ -407,7 +412,7 @@ export async function aggregateDailyStudyAndUpdateProgress(params: {
   const todayStr = (params.date || nowIso.split('T')[0]);
 
   // 收集当天学习的唯一词ID
-  const logs = await db.exec({
+  const logs = await databaseService.exec({
     sql: `
       SELECT DISTINCT itemId 
       FROM study_logs 
@@ -418,7 +423,7 @@ export async function aggregateDailyStudyAndUpdateProgress(params: {
   const studiedWordIds: number[] = (logs || []).map((r: any) => Number(r.itemId)).filter(n => Number.isFinite(n));
   if (studiedWordIds.length === 0) {
     // 无当日学习，返回当前进度快照
-    const wbRows = await db.exec({
+    const wbRows = await databaseService.exec({
       sql: `
         SELECT w.wordbookId AS wordbookId
         FROM words w
@@ -430,7 +435,7 @@ export async function aggregateDailyStudyAndUpdateProgress(params: {
     const updatedWordbooks: Array<{ wordbookId: number; masteredCount: number; progress: number }> = [];
     for (const r of wbRows) {
       const wid = Number(r.wordbookId);
-      const wcRows = await db.exec({
+      const wcRows = await databaseService.exec({
         sql: `
           SELECT COUNT(*) AS cnt
           FROM learning_progress lp
@@ -439,7 +444,7 @@ export async function aggregateDailyStudyAndUpdateProgress(params: {
         `,
         args: [userId, wid],
       });
-      const mcRows = await db.exec({
+      const mcRows = await databaseService.exec({
         sql: `
           SELECT COUNT(*) AS cnt
           FROM learning_progress lp
@@ -458,7 +463,7 @@ export async function aggregateDailyStudyAndUpdateProgress(params: {
 
   // 映射：词ID -> 词书ID
   const placeholders = studiedWordIds.map(() => '?').join(',');
-  const wbMapRows = await db.exec({
+  const wbMapRows = await databaseService.exec({
     sql: `
       SELECT id, wordbookId
       FROM words
@@ -475,7 +480,7 @@ export async function aggregateDailyStudyAndUpdateProgress(params: {
   const updatedWordbooks: Array<{ wordbookId: number; masteredCount: number; progress: number }> = [];
   const uniqueBooks = new Set<number>(Array.from(wordToBook.values()));
   for (const wid of uniqueBooks) {
-    const wcRows = await db.exec({
+    const wcRows = await databaseService.exec({
       sql: `
         SELECT COUNT(*) AS cnt
         FROM learning_progress lp
@@ -484,7 +489,7 @@ export async function aggregateDailyStudyAndUpdateProgress(params: {
       `,
       args: [userId, wid],
     });
-    const mcRows = await db.exec({
+    const mcRows = await databaseService.exec({
       sql: `
         SELECT COUNT(*) AS cnt
         FROM learning_progress lp
@@ -522,7 +527,7 @@ export async function processStudyResponse(
   const db = await databaseService.getConnection();
 
   // 获取当前进度（仅用于日志记录）
-  const currentProgress = await db.exec({
+  const currentProgress = await databaseService.exec({
     sql: 'SELECT stability, retrievability FROM learning_progress WHERE wordId = ? AND userId = ?',
     args: [wordId, userId],
   });
@@ -541,14 +546,14 @@ export async function processStudyResponse(
   const state = ms?.state ?? 'new';
 
   // 批量数据库更新（原子操作）
-  await db.exec({
+  await databaseService.exec({
     sql: 'BEGIN TRANSACTION',
     args: []
   });
 
   try {
     // 1. 更新学习进度
-    await db.exec({
+    await databaseService.exec({
       sql: `
         UPDATE learning_progress
         SET stability = ?, retrievability = ?, difficulty = ?, nextReview = ?, 
@@ -561,7 +566,7 @@ export async function processStudyResponse(
     });
 
     // 2. 插入学习日志
-    await db.exec({
+    await databaseService.exec({
       sql: `
         INSERT INTO study_logs
         (itemId, userId, timestamp, response, responseTime, confidence, 
@@ -575,12 +580,12 @@ export async function processStudyResponse(
     // 3. 更新统计数据
     await updateLearningStatistics(userId, wordId, response, responseTime, stability, retrievability);
 
-    await db.exec({
+    await databaseService.exec({
       sql: 'COMMIT',
       args: []
     });
   } catch (error) {
-    await db.exec({
+    await databaseService.exec({
       sql: 'ROLLBACK',
       args: []
     });
@@ -610,7 +615,7 @@ export async function updateLearningStatistics(
     const isCorrect = response === 'good' || response === 'easy';
     const correctReviewsInc = isCorrect ? 1 : 0;
 
-    const existingStats = await db.exec({
+    const existingStats = await databaseService.exec({
       sql: 'SELECT * FROM learning_statistics WHERE userId = ? AND date = ?',
       args: [userId, today],
     });
@@ -624,7 +629,7 @@ export async function updateLearningStatistics(
       const newAvgStability = ((currentStats.avgStability * currentStats.totalReviews) + stability) / newTotalReviews;
       const newAvgRetrievability = ((currentStats.avgRetrievability * currentStats.totalReviews) + retrievability) / newTotalReviews;
 
-      await db.exec({
+      await databaseService.exec({
         sql: `
           UPDATE learning_statistics
           SET 
@@ -640,7 +645,7 @@ export async function updateLearningStatistics(
       });
     } else {
       // TODO: Streak calculation needs to check yesterday's record
-      await db.exec({
+      await databaseService.exec({
         sql: `
           INSERT INTO learning_statistics
           (userId, date, totalReviews, correctReviews, avgResponseTime, avgStability, avgRetrievability, streakDays, lastUpdated)
@@ -674,7 +679,7 @@ export async function updateWordTypeStatistics(
   const today = now.split('T')[0];
 
   try {
-    const wordInfo = await db.exec({
+    const wordInfo = await databaseService.exec({
       sql: 'SELECT type FROM words WHERE id = ?',
       args: [wordId],
     });
@@ -682,7 +687,7 @@ export async function updateWordTypeStatistics(
     if (wordInfo.length === 0) return;
     const wordType = wordInfo[0].type as string;
 
-    const existingStats = await db.exec({
+    const existingStats = await databaseService.exec({
       sql: 'SELECT * FROM word_type_statistics WHERE userId = ? AND date = ? AND wordType = ?',
       args: [userId, today, wordType],
     });
@@ -697,7 +702,7 @@ export async function updateWordTypeStatistics(
       const newAvgStability = ((currentStats.avgStability * currentStats.totalReviews) + stability) / newTotalReviews;
       const newAvgRetrievability = ((currentStats.avgRetrievability * currentStats.totalReviews) + retrievability) / newTotalReviews;
 
-      await db.exec({
+      await databaseService.exec({
         sql: `
           UPDATE word_type_statistics
           SET 
@@ -711,7 +716,7 @@ export async function updateWordTypeStatistics(
         args: [correctReviewsInc, newAvgStability, newAvgRetrievability, now, userId, today, wordType],
       });
     } else {
-      await db.exec({
+      await databaseService.exec({
         sql: `
           INSERT INTO word_type_statistics
           (userId, date, wordType, totalReviews, correctReviews, avgStability, avgRetrievability, lastUpdated)
@@ -744,7 +749,7 @@ export async function schedulePlannedReviews(params: {
       continue;
     }
     try {
-      await db.exec({
+      await databaseService.exec({
         sql: `
           UPDATE learning_progress
           SET nextReview = ?
@@ -779,7 +784,7 @@ export async function getReviewQueueGroupedByWordbook(params: {
   const upper = new Date(now.getTime() + timeWindowHours * 3600 * 1000);
 
   // 1) 基础分组统计（严格按 nextReview 窗口）
-  const rows = await db.exec({
+  const rows = await databaseService.exec({
     sql: `
       SELECT 
         w.wordbookId AS wordbookId,
@@ -797,7 +802,7 @@ export async function getReviewQueueGroupedByWordbook(params: {
   });
 
   // 2) 统计总组数（用于分页）
-  const totalGroupsRows = await db.exec({
+  const totalGroupsRows = await databaseService.exec({
     sql: `
       SELECT COUNT(*) AS cnt
       FROM (
@@ -818,7 +823,7 @@ export async function getReviewQueueGroupedByWordbook(params: {
   if (idList.length > 0) {
     try {
       const placeholders = idList.map(() => '?').join(',');
-      const nameRows = await db.exec({
+      const nameRows = await databaseService.exec({
         sql: `
           SELECT id, name 
           FROM wordbooks 
@@ -896,7 +901,7 @@ export async function getDueItems(params: {
     ${letterPredicate}
   `;
 
-  const listRows = await db.exec({
+  const listRows = await databaseService.exec({
     sql: `
       SELECT 
         w.id, w.word, lp.nextReview, lp.retrievability
@@ -908,7 +913,7 @@ export async function getDueItems(params: {
   });
 
   // 统计总数
-  const countRows = await db.exec({
+  const countRows = await databaseService.exec({
     sql: `
       SELECT COUNT(*) AS cnt
       ${baseSql}
@@ -959,7 +964,7 @@ export async function createLearningSessionForWordbookExtended(params: {
   const letterPredicate = isAZ ? 'AND (w.word LIKE ? OR w.word LIKE ?)' : '';
   const letterArgs = isAZ ? [`${letter}%`, `${letter.toUpperCase()}%`] : [];
 
-  const rows = await db.exec({
+  const rows = await databaseService.exec({
     sql: `
       SELECT
         w.id, w.word, w.type, w.phonetic, w.definition, w.translation, w.example, w.createdAt,
@@ -1001,7 +1006,7 @@ export async function createLearningSessionForWordbookExtended(params: {
   let studyRecords: StudyRecord[] = [];
   if (wordIds.length > 0) {
     const placeholders = wordIds.map(() => '?').join(',');
-    const logs = await db.exec({
+    const logs = await databaseService.exec({
       sql: `SELECT * FROM study_logs WHERE itemId IN (${placeholders}) ORDER BY timestamp DESC LIMIT 100`,
       args: wordIds,
     });
@@ -1042,4 +1047,206 @@ export async function createLearningSessionForWordbookExtended(params: {
   (learningSession as any).manager = manager;
 
   return learningSession;
+}
+
+// ===== Wordbook Management Functions (merged from wordbookService.ts) =====
+
+async function seedFromFile(db: any, fileData: ImportFile, userId: string) {
+  const { name, description, words } = fileData;
+
+  // Use INSERT OR IGNORE for idempotency, then fetch the ID.
+  await db.exec({
+    sql: 'INSERT OR IGNORE INTO "wordbooks" ("name", "description") VALUES (?, ?)',
+    args: [name, description || ''],
+  });
+  
+  const wordbookIdResult = await db.exec({
+    sql: 'SELECT "id" FROM "wordbooks" WHERE "name" = ?',
+    args: [name],
+  });
+
+  if (wordbookIdResult.length === 0) {
+    console.error(`Failed to insert or find wordbook: ${name}`);
+    return;
+  }
+  const wordbookId = wordbookIdResult[0].id as number;
+
+  // Check if words for this user and wordbook already exist to prevent re-seeding
+  const wordCountResult = await db.exec({
+    sql: 'SELECT COUNT(*) as count FROM "words" WHERE "wordbookId" = ? AND "userId" = ?',
+    args: [wordbookId, userId],
+  });
+
+  if ((wordCountResult[0]?.count as number) > 0) {
+    console.log(`Words for "${name}" and user "${userId}" already exist, skipping word seed.`);
+    return;
+  }
+
+  // Batch insert words and their learning progress
+  for (const word of words) {
+    // 幂等插入 words
+    await db.exec({
+      sql: 'INSERT OR IGNORE INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "translation", "example") VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.translation || null, word.example || null],
+    });
+    // 获取已存在或新插入的 wordId
+    const gotWordId = await db.exec({
+      sql: 'SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "word" = ?',
+      args: [wordbookId, word.word],
+    });
+    const wordId = gotWordId?.[0]?.id as number;
+
+    // 幂等插入 learning_progress（wordId 唯一）
+    await db.exec({
+      sql: 'INSERT OR IGNORE INTO "learning_progress" ("wordId", "userId", "nextReview") VALUES (?, ?, ?)',
+      args: [wordId, userId, new Date().toISOString()],
+    });
+  }
+}
+
+// Function to seed initial data
+export async function seedInitialData(userId: string) {
+  const db = await databaseService.getConnection();
+  
+  console.log('Seeding initial data if necessary...');
+  
+  await seedFromFile(db, cet4Data as ImportFile, userId);
+  await seedFromFile(db, gmatData as ImportFile, userId);
+  await seedFromFile(db, satData as ImportFile, userId);
+  
+  console.log('Seeding complete.');
+}
+
+export async function getAllWordbooksWithStats(userId: string): Promise<WordbookWithStats[]> {
+  const db = await databaseService.getConnection();
+  const books = (await db.exec({
+    sql: 'SELECT * FROM "wordbooks" ORDER BY "createdAt" DESC',
+  })) as any[];
+
+  const statsPromises = (books as Wordbook[]).map(async (book) => {
+    const wordCountResult = await db.exec({
+      sql: 'SELECT COUNT(*) as count FROM "words" WHERE "wordbookId" = ? AND "userId" = ?',
+      args: [book.id, userId],
+    });
+    const wordCount = (wordCountResult[0]?.count as number) || 0;
+
+    // Get mastered count
+    const masteredCountResult = await db.exec({
+      sql: `
+        SELECT COUNT(*) as count
+        FROM "learning_progress"
+        WHERE "userId" = ? AND "wordId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "userId" = ?)
+        AND "state" = 'review'
+      `,
+      args: [userId, book.id, userId],
+    });
+    const masteredCount = (masteredCountResult[0]?.count as number) || 0;
+
+    // Get due count (words that need to be studied now)
+    const now = new Date().toISOString();
+    const dueCountResult = await db.exec({
+      sql: `
+        SELECT COUNT(*) as count
+        FROM "learning_progress"
+        WHERE "userId" = ? AND "wordId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "userId" = ?)
+        AND "nextReview" <= ?
+      `,
+      args: [userId, book.id, userId, now],
+    });
+    const dueCount = (dueCountResult[0]?.count as number) || 0;
+
+    // Get last studied date
+    const lastStudiedResult = await db.exec({
+      sql: `
+        SELECT MAX("timestamp") as lastStudied
+        FROM "study_logs"
+        WHERE "userId" = ? AND "itemId" IN (SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "userId" = ?)
+      `,
+      args: [userId, book.id, userId],
+    });
+    const lastStudied = lastStudiedResult[0]?.lastStudied as string | null;
+
+    const progress = wordCount > 0 ? (masteredCount / wordCount) * 100 : 0;
+
+    return {
+      ...book,
+      wordCount,
+      progress,
+      masteredCount,
+      dueCount,
+      lastStudied: lastStudied || undefined,
+    } as WordbookWithStats;
+  });
+
+  return Promise.all(statsPromises);
+}
+
+export async function checkWordbookExists(name: string): Promise<boolean> {
+  const db = await databaseService.getConnection();
+  const existing = await db.exec({
+    sql: 'SELECT "id" FROM "wordbooks" WHERE "name" = ?',
+    args: [name],
+  });
+  return existing.length > 0;
+}
+
+export async function importWordbook(jsonContent: string, userId: string): Promise<{ status: 'created' | 'updated', wordbookId: number }> {
+  const db = await databaseService.getConnection();
+  const parsed = JSON.parse(jsonContent);
+  const data: ImportFile = ensureImportFileSchema(parsed);
+
+  // 1. Check if wordbook with the same name already exists
+  const existingResult = await db.exec({
+    sql: 'SELECT "id" FROM "wordbooks" WHERE "name" = ?',
+    args: [data.name],
+  });
+
+  let wordbookId: number;
+  let status: 'created' | 'updated';
+
+  if (existingResult.length > 0) {
+    // Wordbook exists, get its ID and prepare for update
+    status = 'updated';
+    wordbookId = existingResult[0].id as number;
+    console.log(`Updating existing wordbook for user ${userId}: ${data.name} (ID: ${wordbookId})`);
+    
+    // Delete old words for this user in this wordbook.
+    await db.exec({
+      sql: 'DELETE FROM "words" WHERE "wordbookId" = ? AND "userId" = ?',
+      args: [wordbookId, userId],
+    });
+  } else {
+    // Wordbook does not exist, insert it
+    status = 'created';
+    console.log(`Importing new wordbook: ${data.name}`);
+    await db.exec({
+      sql: 'INSERT INTO "wordbooks" ("name", "description") VALUES (?, ?)',
+      args: [data.name, data.description || ''],
+    });
+    const wordbookIdResult = await db.exec({ sql: 'SELECT last_insert_rowid() as id' });
+    wordbookId = wordbookIdResult[0].id as number;
+  }
+
+  // 3. Batch insert new words and their learning progress for the given user
+  for (const word of data.words) {
+    // 幂等插入 words
+    await db.exec({
+      sql: 'INSERT OR IGNORE INTO "words" ("wordbookId", "userId", "word", "phonetic", "definition", "translation", "example") VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [wordbookId, userId, word.word, word.phonetic || null, word.definition, word.translation || null, word.example || null],
+    });
+    // 获取已存在或新插入的 wordId
+    const gotWordId = await db.exec({
+      sql: 'SELECT "id" FROM "words" WHERE "wordbookId" = ? AND "word" = ?',
+      args: [wordbookId, word.word],
+    });
+    const wordId = gotWordId?.[0]?.id as number;
+
+    // 幂等插入 learning_progress
+    await db.exec({
+      sql: 'INSERT OR IGNORE INTO "learning_progress" ("wordId", "userId", "nextReview") VALUES (?, ?, ?)',
+      args: [wordId, userId, new Date().toISOString()],
+    });
+  }
+  
+  return { status, wordbookId };
 }

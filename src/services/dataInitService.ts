@@ -1,4 +1,4 @@
-import { databaseService } from './database';
+import { databaseService } from './database/index';
 import sampleData from '../data/sample-learning-data.json';
 /**
  * Initializes the database with sample data if it's empty.

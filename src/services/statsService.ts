@@ -1,4 +1,4 @@
-import { databaseService } from './database';
+import { databaseService } from './database/index';
 
 export interface OverallStats {
   totalWords: number;
